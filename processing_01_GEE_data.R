@@ -111,11 +111,14 @@ figure1_1$updatedHansen = canopy_cover$select(0)$unmask()$mask(onlyNonDisturbedP
 # in loss pixel, then we bring back hansen's tree cover
 forestPercCover = esaWorldCover10m$eq(10)$multiply(100)
 
-#Urban or suburban development; insufficient wildland fuel t
+# 91 Urban or suburban development; insufficient wildland fuel -- --
 figure1_1_scottBurgan$a91 = clcplus$eq(1)$Or(proba$select('discrete_classification')$eq(50))$multiply(100)$reduceResolution(reducer = ee$Reducer$mean())$reproject(proj)$rename("prob")$addBands(ee$Image(91));
 
-# water and barren are all in the same class
-figure1_1_scottBurgan$a98 = clcplus$gt(253)$Or(clcplus$gt(7)$And(clcplus$lt(11) ))$multiply(100)$reduceResolution(reducer = ee$Reducer$mean())$reproject(proj)$rename("prob")$addBands(ee$Image(98));
+# 98 water ----
+figure1_1_scottBurgan$a98 = clcplus$gt(253)$Or(clcplus$eq(10))$multiply(100)$reduceResolution(reducer = ee$Reducer$mean())$reproject(proj)$rename("prob")$addBands(ee$Image(98));
+
+# 99 barren ---
+figure1_1_scottBurgan$a99 = clcplus$gt(253)$Or(clcplus$gt(7)$And(clcplus$lt(10) ))$multiply(100)$reduceResolution(reducer = ee$Reducer$mean())$reproject(proj)$rename("prob")$addBands(ee$Image(99));
 
 # snow ice
 figure1_1_scottBurgan$a92 = clcplus$eq(11)$multiply(100)$reduceResolution(reducer = ee$Reducer$mean())$reproject(proj)$rename("prob")$addBands(ee$Image(92));
@@ -124,116 +127,115 @@ figure1_1_scottBurgan$a92 = clcplus$eq(11)$multiply(100)$reduceResolution(reduce
 # conservative approach as if permanent herbaceaus it is better it goes in GR code of
 # scott and burgan
 
-figure1_1_scottBurgan$a93=clcplus$eq(5)$Or(clcplus$  eq(6))$Or(clcplus$  eq(7))$
+figure1_1_scottBurgan$a93=clcplus$eq(5)$Or(clcplus$ eq(6))$Or(clcplus$ eq(7))$
   And(proba$select('discrete_classification')$eq(40))$
-  multiply(100)$reduceResolution(reducer=ee$ Reducer$ mean())$reproject(proj)$rename("prob")$addBands(ee$Image(93))
+  multiply(100)$reduceResolution(reducer=ee$Reducer$mean())$reproject(proj)$rename("prob")$addBands(ee$Image(93))
 
-#grasssparse
-grassSparse=proba$select('discrete_classification')$eq(60)$And(clcplus$eq(6))$multiply(99)$reduceResolution(reducer=ee$ Reducer$ mean())$reproject(proj)$rename("prob")$addBands(ee$Image(101))
+#grasssparse 101 ----
+grassSparse=proba$select('discrete_classification')$eq(60)$And(clcplus$eq(6))$multiply(99)$reduceResolution(reducer=ee$Reducer$mean())$reproject(proj)$rename("prob")$addBands(ee$Image(101))
 
 figure1_1_scottBurgan$a101=grassSparse
-  ##########/
-  #GRASSlowload
+
+  #GRASSlowload ----
 grass=proba$select('discrete_classification')$eq(30)
-grassLowLoad=clcplus$eq(6)$And(grass)$And(ndviMax$lt(0.2))$multiply(99)$reduceResolution(reducer=ee$ Reducer$ mean())$reproject(proj)
-##dry
-figure1_1_scottBurgan$a102=grassLowLoad$mask(aridityIndex$ lte(aridityThreshold))$rename("prob")$addBands(ee$Image(102));
-##wet
-figure1_1_scottBurgan$a105=grassLowLoad$mask(aridityIndex$ gt(aridityThreshold))$rename("prob")$addBands(ee$Image(105))
+grassLowLoad=clcplus$eq(6)$And(grass)$And(ndviMax$lt(0.2))$multiply(99)$reduceResolution(reducer=ee$Reducer$mean())$reproject(proj)
+## 102 dry ----
+figure1_1_scottBurgan$a102=grassLowLoad$mask(aridityIndex$lte(aridityThreshold))$rename("prob")$addBands(ee$Image(102));
+## 105 wet ----
+figure1_1_scottBurgan$a105=grassLowLoad$mask(aridityIndex$gt(aridityThreshold))$rename("prob")$addBands(ee$Image(105))
 
 #############
-#grassmoderateload
-grassModerateLoad=clcplus$eq(6)$And(grass)$And(ndviMax$gte(0.2)$Or(ndviMax$lt(0.4)))$multiply(99)$reduceResolution(reducer=ee$ Reducer$ mean())$reproject(proj)
-##dry
-figure1_1_scottBurgan$a104=grassModerateLoad$mask(aridityIndex$ lte(aridityThreshold))$rename("prob")$addBands(ee$Image(104));
-##wet
-figure1_1_scottBurgan$a106=grassModerateLoad$mask(aridityIndex$ gt(aridityThreshold))$rename("prob")$addBands(ee$Image(106))
+#grassmoderateload ----
+grassModerateLoad=clcplus$eq(6)$And(grass)$And(ndviMax$gte(0.2)$Or(ndviMax$lt(0.4)))$multiply(99)$reduceResolution(reducer=ee$Reducer$mean())$reproject(proj)
+## 104 dry ----
+figure1_1_scottBurgan$a104=grassModerateLoad$mask(aridityIndex$lte(aridityThreshold))$rename("prob")$addBands(ee$Image(104));
+## 106 wet ----
+figure1_1_scottBurgan$a106=grassModerateLoad$mask(aridityIndex$gt(aridityThreshold))$rename("prob")$addBands(ee$Image(106))
 
-#############
-#grasshighload
-grassHighLoad=clcplus$eq(6)$And(grass)$And(ndviMax$gte(0.4))$multiply(99)$reduceResolution(reducer=ee$ Reducer$ mean())$reproject(proj)
-##dry
-figure1_1_scottBurgan$a107=grassHighLoad$mask(aridityIndex$ lte(aridityThreshold))$rename("prob")$addBands(ee$Image(107));
-##wet
-figure1_1_scottBurgan$a108=grassHighLoad$mask(aridityIndex$ gt(aridityThreshold))$rename("prob")$addBands(ee$Image(108))
+#grasshighload ----
+grassHighLoad=clcplus$eq(6)$And(grass)$And(ndviMax$gte(0.4))$multiply(99)$reduceResolution(reducer=ee$Reducer$mean())$reproject(proj)
+## 107 dry ----
+figure1_1_scottBurgan$a107=grassHighLoad$mask(aridityIndex$lte(aridityThreshold))$rename("prob")$addBands(ee$Image(107));
+## 108 wet ----
+figure1_1_scottBurgan$a108=grassHighLoad$mask(aridityIndex$gt(aridityThreshold))$rename("prob")$addBands(ee$Image(108))
 
-  ##########/
-  #SHRUBlowload
+  #SHRUBlowload ----
   shrub=proba$select('discrete_classification')$eq(20)
-shrubLowLoad=clcplus$eq(5)$And(shrub)$And(ndviMax$lt(0.2))$multiply(99)$reduceResolution(reducer=ee$ Reducer$ mean())$reproject(proj)
-##dry
-figure1_1_scottBurgan$a141=shrubLowLoad$mask(aridityIndex$ lte(aridityThreshold))$rename("prob")$addBands(ee$Image(141));
-##wet
-figure1_1_scottBurgan$a146=shrubLowLoad$mask(aridityIndex$ gt(aridityThreshold))$rename("prob")$addBands(ee$Image(146))
+shrubLowLoad=clcplus$eq(5)$And(shrub)$And(ndviMax$lt(0.2))$multiply(99)$reduceResolution(reducer=ee$Reducer$mean())$reproject(proj)
+## 141 dry ----
+figure1_1_scottBurgan$a141=shrubLowLoad$mask(aridityIndex$lte(aridityThreshold))$rename("prob")$addBands(ee$Image(141));
+## 146 wet ----
+figure1_1_scottBurgan$a146=shrubLowLoad$mask(aridityIndex$gt(aridityThreshold))$rename("prob")$addBands(ee$Image(146))
 
-#############
-#SHRUBmoderateload
+
+#SHRUBmoderateload ----
 shrubModerateLoad=clcplus$eq(5)$And(shrub)$And(ndviMax$gte(0.2)$Or(ndviMax$lt(.4)))$multiply(99)$reduceResolution(reducer=ee$Reducer$mean())$reproject(proj)
-##dry
-figure1_1_scottBurgan$a142=shrubModerateLoad$mask(aridityIndex$ lte(aridityThreshold))$rename("prob")$addBands(ee$Image(142));
-##wet
-figure1_1_scottBurgan$a143=shrubModerateLoad$mask(aridityIndex$ gt(aridityThreshold))$rename("prob")$addBands(ee$Image(143))
+## 142 dry ----
+figure1_1_scottBurgan$a142=shrubModerateLoad$mask(aridityIndex$lte(aridityThreshold))$rename("prob")$addBands(ee$Image(142));
+## 143 wet ----
+figure1_1_scottBurgan$a143=shrubModerateLoad$mask(aridityIndex$gt(aridityThreshold))$rename("prob")$addBands(ee$Image(143))
+
+
+#SHRUB high load ----
+shrubHighLoad=clcplus$eq(5)$And(shrub)$And(ndviMax$gte(0.4)$Or(ndviMax$lt(0.6)))$multiply(99)$reduceResolution(reducer=ee$Reducer$mean())$reproject(proj)
+## 145 dry ----
+figure1_1_scottBurgan$a145=shrubHighLoad$mask(aridityIndex$lte(aridityThreshold))$rename("prob")$addBands(ee$Image(145));
+## 148 wet ----
+figure1_1_scottBurgan$a148=shrubHighLoad$mask(aridityIndex$gt(aridityThreshold))$rename("prob")$addBands(ee$Image(148))
 
 #############
-#SHRUBhighload
-shrubHighLoad=clcplus$eq(5)$And(shrub)$And(ndviMax$gte(0.4)$Or(ndviMax$lt(0.6)))$multiply(99)$reduceResolution(reducer=ee$ Reducer$ mean())$reproject(proj)
-##dry
-figure1_1_scottBurgan$a145=shrubHighLoad$mask(aridityIndex$ lte(aridityThreshold))$rename("prob")$addBands(ee$Image(145));
-##wet
-figure1_1_scottBurgan$a148=shrubHighLoad$mask(aridityIndex$ gt(aridityThreshold))$rename("prob")$addBands(ee$Image(148))
-
-#############
-#SHRUBVERYhighload
-shrubVeryHighLoad=clcplus$eq(5)$And(shrub)$And(ndviMax$gte(0.6))$multiply(99)$reduceResolution(reducer=ee$ Reducer$ mean())$reproject(proj)
-##dry
-figure1_1_scottBurgan$a147=shrubVeryHighLoad$mask(aridityIndex$ lte(aridityThreshold))$rename("prob")$addBands(ee$Image(147));
-##wet
-figure1_1_scottBurgan$a149=shrubVeryHighLoad$mask(aridityIndex$ gt(aridityThreshold))$rename("prob")$addBands(ee$Image(149))
+#SHRUBVERYhighload ----
+shrubVeryHighLoad=clcplus$eq(5)$And(shrub)$And(ndviMax$gte(0.6))$multiply(99)$reduceResolution(reducer=ee$Reducer$mean())$reproject(proj)
+## 147 dry ----
+figure1_1_scottBurgan$a147=shrubVeryHighLoad$mask(aridityIndex$lte(aridityThreshold))$rename("prob")$addBands(ee$Image(147));
+## 149 wet ----
+figure1_1_scottBurgan$a149=shrubVeryHighLoad$mask(aridityIndex$gt(aridityThreshold))$rename("prob")$addBands(ee$Image(149))
 
 
 #############
-#TIMBERUNDERSTOREYLOW+MEDIUMMODERATEload$
+#TIMBERUNDERSTOREYLOW+MEDIUMMODERATEload  ----
 proba12x=proba$select('discrete_classification')$divide(10)$floor()$toByte()$eq(12)
 
-timberUnderstoreyLowMediumLoad=clcplus$gt(1)$Or(clcplus$  lt(7))$And(proba12x)$And(ndviMax$lte(0.6))$multiply(99)$reduceResolution(reducer=ee$ Reducer$ mean())$reproject(proj)
-  ##dry
-  figure1_1_scottBurgan$a161=timberUnderstoreyLowMediumLoad$mask(aridityIndex$ lte(aridityThreshold))$rename("prob")$addBands(ee$Image(161));
-##wet
-figure1_1_scottBurgan$a162=timberUnderstoreyLowMediumLoad$mask(aridityIndex$ gt(aridityThreshold))$rename("prob")$addBands(ee$Image(162))
+timberUnderstoreyLowMediumLoad=clcplus$gt(1)$Or(clcplus$ lt(7))$And(proba12x)$And(ndviMax$lte(0.6))$multiply(99)$reduceResolution(reducer=ee$Reducer$mean())$reproject(proj)
+## 161 dry  ----
+  figure1_1_scottBurgan$a161=timberUnderstoreyLowMediumLoad$mask(aridityIndex$lte(aridityThreshold))$rename("prob")$addBands(ee$Image(161));
+## 162 wet  ----
+figure1_1_scottBurgan$a162=timberUnderstoreyLowMediumLoad$mask(aridityIndex$gt(aridityThreshold))$rename("prob")$addBands(ee$Image(162))
 
 #############
-#TIMBERUNDERSTOREYhighload
-timberUnderstoreyHighLoad=clcplus$gt(1)$Or(clcplus$  lt(7))$And(proba12x)$And(ndviMax$gt(0.6))$multiply(99)$reduceResolution(reducer=ee$ Reducer$ mean())$reproject(proj)
-  ##dry
-  figure1_1_scottBurgan$a165=timberUnderstoreyHighLoad$mask(aridityIndex$ lte(aridityThreshold))$rename("prob")$addBands(ee$Image(165));
-##wet
-figure1_1_scottBurgan$a163=timberUnderstoreyHighLoad$mask(aridityIndex$ gt(aridityThreshold))$rename("prob")$addBands(ee$Image(163))
+#TIMBERUNDERSTOREY highload  ----
+timberUnderstoreyHighLoad=clcplus$gt(1)$Or(clcplus$ lt(7))$And(proba12x)$And(ndviMax$gt(0.6))$multiply(99)$reduceResolution(reducer=ee$Reducer$mean())$reproject(proj)
+## 165 dry ----
+  figure1_1_scottBurgan$a165=timberUnderstoreyHighLoad$mask(aridityIndex$lte(aridityThreshold))$rename("prob")$addBands(ee$Image(165));
+## 163 wet ----
+figure1_1_scottBurgan$a163=timberUnderstoreyHighLoad$mask(aridityIndex$gt(aridityThreshold))$rename("prob")$addBands(ee$Image(163))
 
 
 #############
-#TIMBERLITTERCONIFER$
+#TIMBER LITTER CONIFER  -----
 proba11x=proba$select('discrete_classification')$divide(10)$floor()$toByte()$eq(11)
-  #Low-mediumLoadCompactLitter
+
+## 183 Low-mediumLoadCompactLitter -----
   #weassumethatifcanopycoversallpixelandcanopyheightis20orabove,
   #wehaveamatureforestwithlowloadoflitter
 figure1_1_scottBurgan$a183=clcplus$eq(2)$And(proba11x)$And(figure1_1$updatedHansen$gt(80))$And(canopy_height$gt(20))$multiply(99)$reduceResolution(reducer=ee$Reducer$mean())$reproject(proj)$rename("prob")$addBands(ee$Image(183))
 
-#HighLoadCompactLitter
+## 185 HighLoadCompactLitter -----
 #weassumethatifcanopycoversallpixelandcanopyheightis20orabove,
 #wehaveamatureforestwithlowloadoflitter
-figure1_1_scottBurgan$a185=clcplus$eq(2)$And(proba11x)$And(figure1_1$updatedHansen$lte(80)$Or(canopy_height$lte(20)))$multiply(99)$reduceResolution(reducer=ee$ Reducer$ mean())$reproject(proj)$rename("prob")$addBands(ee$Image(185))
+figure1_1_scottBurgan$a185=clcplus$eq(2)$And(proba11x)$And(figure1_1$updatedHansen$lte(80)$Or(canopy_height$lte(20)))$multiply(99)$reduceResolution(reducer=ee$Reducer$mean())$reproject(proj)$rename("prob")$addBands(ee$Image(185))
 
-#############
-#TIMBERLITTERBROADLEAVES
-#Low-mediumLoadCompactLitter
-#weassumethatifcanopycoversallpixelandcanopyheightis20orabove,
-#wehaveamatureforestwithlowloadoflitter
-figure1_1_scottBurgan$a184=clcplus$eq(3)$Or(clcplus$  eq(4))$And(proba11x)$And(figure1_1$updatedHansen$gt(80))$And(canopy_height$gt(20))$multiply(99)$reduceResolution(reducer=ee$ Reducer$ mean())$reproject(proj)$rename("prob")$addBands(ee$Image(184))
 
-#HighLoadCompactLitter
+#TIMBER LITTER BROADLEAVES -----
+## 184 Low-mediumLoadCompactLitter -----
 #weassumethatifcanopycoversallpixelandcanopyheightis20orabove,
 #wehaveamatureforestwithlowloadoflitter
-figure1_1_scottBurgan$a186=clcplus$eq(3)$Or(clcplus$eq(4))$And(proba11x)$And(figure1_1$updatedHansen$lte(80)$Or(canopy_height$lte(20)))$multiply(99)$reduceResolution(reducer=ee$ Reducer$ mean())$reproject(proj)$rename("prob")$addBands(ee$Image(186))
+figure1_1_scottBurgan$a184=clcplus$eq(3)$Or(clcplus$ eq(4))$And(proba11x)$And(figure1_1$updatedHansen$gt(80))$And(canopy_height$gt(20))$multiply(99)$reduceResolution(reducer=ee$Reducer$mean())$reproject(proj)$rename("prob")$addBands(ee$Image(184))
+
+## 186 High Load Compact Litter -----
+#weassumethatifcanopycoversallpixelandcanopyheightis20orabove,
+#wehaveamatureforestwithlowloadoflitter
+figure1_1_scottBurgan$a186=clcplus$eq(3)$Or(clcplus$eq(4))$And(proba11x)$And(figure1_1$updatedHansen$lte(80)$Or(canopy_height$lte(20)))$multiply(99)$reduceResolution(reducer=ee$Reducer$mean())$reproject(proj)$rename("prob")$addBands(ee$Image(186))
 
 
 figure1_1_scottBurgan$a254=clcplus$eq(6)$And(proba11x$Or(proba12x))$And(figure1_1$updatedHansen$gt(20))$multiply(99)$reduceResolution(reducer=ee$Reducer$mean())$reproject(proj)$rename("prob")$addBands(ee$Image(254))
@@ -329,4 +331,4 @@ for( i in 1:n){
   # task_img_container[[assetid ]]$cancel()
 
 }
-
+ee_imagecollection_to_local( ee$ImageCollection('projects/progetto-eu-h2020-cirgeo/assets/wildfire/fuelModelV1'),region= gg )
