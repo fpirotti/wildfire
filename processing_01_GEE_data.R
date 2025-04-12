@@ -4,8 +4,18 @@ library("inborutils")
 library("parallel")
 library("terra")
 
+
+rgee::ee_install_upgrade()
+HOME <- Sys.getenv("HOME")
+# Sys.setenv("RETICULATE_PYTHON" = sprintf("%s/.virtualenvs/rgee/bin/python3", HOME))
+Sys.setenv("RETICULATE_PYTHON" = sprintf("%s/.local/share/r-miniconda/bin/python3", HOME))
+Sys.setenv("EARTHENGINE_GCLOUD" = sprintf("%s/google-cloud-sdk/bin/", HOME))
+
+ee_install() 
+
+
 ee_Initialize(quiet = T)
-ee_Initialize(user = 'cirgeo' )
+ee_Initialize(user = 'cirgeo', project = "progetto-eu-h2020-cirgeo" )
 
 
 
