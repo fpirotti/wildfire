@@ -203,20 +203,21 @@ figure1_1_scottBurgan$a149=shrubVeryHighLoad$mask(aridityIndex$gt(aridityThresho
 
 
 #############
-#TIMBERUNDERSTOREYLOW+MEDIUMMODERATEload  ----
-proba12x=proba$select('discrete_classification')$divide(10)$floor()$toByte()$eq(12)
+# TIMBER UNDERSTOREY LOW+MEDIUM MODERATE load  ----
+proba12x = proba$select('discrete_classification')$divide(10)$floor()$toByte()$eq(12)
 
-timberUnderstoreyLowMediumLoad=clcplus$gt(1)$Or(clcplus$ lt(7))$And(proba12x)$And(ndviMax$lte(0.6))$multiply(99)$reduceResolution(reducer=ee$Reducer$mean())$reproject(proj)
+timberUnderstoreyLowMediumLoad = clcplus$gt(1)$Or(clcplus$ lt(7))$And(ndviMax$lte(0.6))$And(proba12x)$multiply(99)$reduceResolution(reducer=ee$Reducer$mean())$reproject(proj)
+
 ## 161 dry  ----
-  figure1_1_scottBurgan$a161=timberUnderstoreyLowMediumLoad$mask(aridityIndex$lte(aridityThreshold))$rename("prob")$addBands(ee$Image(161));
+figure1_1_scottBurgan$a161=timberUnderstoreyLowMediumLoad$mask(aridityIndex$lte(aridityThreshold))$rename("prob")$addBands(ee$Image(161));
 ## 162 wet  ----
 figure1_1_scottBurgan$a162=timberUnderstoreyLowMediumLoad$mask(aridityIndex$gt(aridityThreshold))$rename("prob")$addBands(ee$Image(162))
 
 #############
-#TIMBERUNDERSTOREY highload  ----
-timberUnderstoreyHighLoad=clcplus$gt(1)$Or(clcplus$ lt(7))$And(proba12x)$And(ndviMax$gt(0.6))$multiply(99)$reduceResolution(reducer=ee$Reducer$mean())$reproject(proj)
+#TIMBER UNDERSTOREY highload  ----
+timberUnderstoreyHighLoad=clcplus$gt(1)$Or(clcplus$ lt(7))$And(ndviMax$gt(0.6))$And(proba12x)$multiply(99)$reduceResolution(reducer=ee$Reducer$mean())$reproject(proj)
 ## 165 dry ----
-  figure1_1_scottBurgan$a165=timberUnderstoreyHighLoad$mask(aridityIndex$lte(aridityThreshold))$rename("prob")$addBands(ee$Image(165));
+figure1_1_scottBurgan$a165=timberUnderstoreyHighLoad$mask(aridityIndex$lte(aridityThreshold))$rename("prob")$addBands(ee$Image(165));
 ## 163 wet ----
 figure1_1_scottBurgan$a163=timberUnderstoreyHighLoad$mask(aridityIndex$gt(aridityThreshold))$rename("prob")$addBands(ee$Image(163))
 
