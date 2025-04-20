@@ -140,7 +140,7 @@ figure1_1_scottBurgan$a141=shrubLowLoad$mask(aridityIndex$lte(aridityThreshold))
 figure1_1_scottBurgan$a146=shrubLowLoad$mask(aridityIndex$gt(aridityThreshold))$rename("prob")$addBands(ee$Image(146))
 
 
-#SHRUBmoderateload ----
+#SHRUB MODERATE load ----
 shrubModerateLoad=shrubCLCplus$And(shrubProba)$And(ndviMax$gte(0.2)$Or(ndviMax$lt(.4)))$multiply(99)$reduceResolution(reducer=ee$Reducer$mean())$reproject(proj)
 ## 142 dry ----
 figure1_1_scottBurgan$a142=shrubModerateLoad$mask(aridityIndex$lte(aridityThreshold))$rename("prob")$addBands(ee$Image(142));
@@ -165,9 +165,10 @@ figure1_1_scottBurgan$a149=shrubVeryHighLoad$mask(aridityIndex$gt(aridityThresho
 
 
 #############
-#TIMBERUNDERSTOREYLOW+MEDIUMMODERATEload  ----
+# TIMBER UNDERSTOREY  ----
 proba12x=proba$select('discrete_classification')$divide(10)$floor()$toByte()$eq(12)
 
+# TIMBER UNDERSTOREY LOW+MEDIUMMODERATEload  ----
 timberUnderstoreyLowMediumLoad=clcplus$gt(1)$Or(clcplus$ lt(7))$And(proba12x)$And(ndviMax$lte(0.6))$multiply(99)$reduceResolution(reducer=ee$Reducer$mean())$reproject(proj)
 ## 161 dry  ----
   figure1_1_scottBurgan$a161=timberUnderstoreyLowMediumLoad$mask(aridityIndex$lte(aridityThreshold))$rename("prob")$addBands(ee$Image(161));
