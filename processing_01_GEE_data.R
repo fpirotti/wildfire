@@ -12,14 +12,14 @@ ee_Initialize(user = 'cirgeo' )
 
 proj3035_30m = ee$Projection('EPSG:3035')$atScale(30);
 
-dir.exists(outputdir) dir.create(outputdir)
+# dir.exists(outputdir) dir.create(outputdir)
 
 library(stars)
 # Main fuel types ESA World  Cover:
   # tree, shrub, grass, crop,  wet/peat,
 # urban, nonfuel,
 dsm = ee$ImageCollection('JAXA/ALOS/AW3D30/V3_2');
-tcd = ee$Image("projects/progetto-eu-h2020-cirgeo/assets/copernicus/TCD_2018_010m_eu_03035_V2_4326")
+tcd = ee$Image("projects/progetto-eu-h2020-cirgeo/assets/copernicus/TCD_2018_010m_eu_03035_V2_4326")$select("b1")
 
 
 #Map.addLayer(tileEEA, {}, 'tiles EEA' )
@@ -73,6 +73,7 @@ clcplus = ee$Image('projects/progetto-eu-h2020-cirgeo/assets/copernicus/CLMS_CLC
 figure1_1 = { };
 figure1_1_scottBurgan = { };
 
+##HANSEN COVER -----
 canopy_cover = ee$Image("UMD/hansen/global_forest_change_2023_v1_11")
 onlyNonDisturbedPixels =  canopy_cover$select("lossyear")$unmask()$eq(0);
 hansenLossPost2019 =      canopy_cover$select("lossyear")$unmask()$gt(19);
@@ -100,7 +101,7 @@ figure1_1_scottBurgan$a92 = clcplus$eq(11)$multiply(100)$reduceResolution(reduce
 # conservative approach as if permanent herbaceaus it is better it goes in GR code of
 # scott and burgan
 
-figure1_1_scottBurgan$a93=shrubCLCplus$Or(clcplus$ eq(6))$Or(clcplus$ eq(7))$
+figure1_1_scottBurgan$a93=clcplus$eq(5)$Or(clcplus$ eq(6))$Or(clcplus$ eq(7))$
   And(proba$select('discrete_classification')$eq(40))$
   multiply(100)$reduceResolution(reducer=ee$Reducer$mean())$reproject(proj)$rename("prob")$addBands(ee$Image(93))
 
@@ -177,7 +178,7 @@ proba12x=proba$select('discrete_classification')$divide(10)$floor()$toByte()$eq(
 # TIMBER UNDERSTOREY LOW+MEDIUM MODERATE load  ----
 timberUnderstoreyLowMediumLoad=clcplus$gt(1)$Or(clcplus$ lt(7))$And(proba12x)$And(ndviMax$lte(0.6))$multiply(99)$reduceResolution(reducer=ee$Reducer$mean())$reproject(proj)
 ## 161 dry  ----
-  figure1_1_scottBurgan$a161=timberUnderstoreyLowMediumLoad$mask(aridityIndex$lte(aridityThreshold))$rename("prob")$addBands(ee$Image(161));
+figure1_1_scottBurgan$a161=timberUnderstoreyLowMediumLoad$mask(aridityIndex$lte(aridityThreshold))$rename("prob")$addBands(ee$Image(161));
 ## 162 wet  ----
 figure1_1_scottBurgan$a162=timberUnderstoreyLowMediumLoad$mask(aridityIndex$gt(aridityThreshold))$rename("prob")$addBands(ee$Image(162))
 
@@ -192,7 +193,8 @@ figure1_1_scottBurgan$a163=timberUnderstoreyHighLoad$mask(aridityIndex$gt(aridit
 #############
 #TIMBER LITTER CONIFER  -----
 proba11x=proba$select('discrete_classification')$divide(10)$floor()$toByte()$eq(11)
-clcplusTimber = clcplus$neq(3)$And( tcd$ )
+
+clcplusTimber = clcplus$gt(1)$Or(clcplus$ lt(7))$And(proba12x$Or(proba11x))
 ## 183 Low-mediumLoadCompactLitter -----
   #weassumethatifcanopycoversallpixelandcanopyheightis20orabove,
   #wehaveamatureforestwithlowloadoflitter
@@ -216,23 +218,21 @@ figure1_1_scottBurgan$a184=clcplus$eq(3)$Or(clcplus$ eq(4))$And(proba11x)$And(fi
 figure1_1_scottBurgan$a186=clcplus$eq(3)$Or(clcplus$eq(4))$And(proba11x)$And(figure1_1$updatedHansen$lte(80)$Or(canopy_height$lte(20)))$multiply(99)$reduceResolution(reducer=ee$Reducer$mean())$reproject(proj)$rename("prob")$addBands(ee$Image(186))
 
 
-figure1_1_scottBurgan$a254=grassCLCplus$And(proba11x$Or(proba12x))$And(figure1_1$updatedHansen$gt(20))$multiply(99)$reduceResolution(reducer=ee$Reducer$mean())$reproject(proj)$rename("prob")$addBands(ee$Image(254))
+########## SLASH BLOWDOWN USING HANSEN LOSS -------
+## areas with 100% canopy cover and trees 25 meters or above will have class 204 high load.
+## load is lowered depending on density and tree height
+sb = clcplusTimber$multiply(tcd)$multiply(canopy_height)$divide(2500)$multiply(4L)$multiply(hansenLossPost2019)
 
+figure1_1_scottBurgan$a201 = sb$eq(1L)$multiply(99)$reduceResolution(reducer=ee$Reducer$mean())$reproject(proj)$rename("prob")$addBands(ee$Image(254))
+figure1_1_scottBurgan$a202 = sb$eq(2L)$multiply(99)$reduceResolution(reducer=ee$Reducer$mean())$reproject(proj)$rename("prob")$addBands(ee$Image(254))
+figure1_1_scottBurgan$a203 = sb$eq(3L)$multiply(99)$reduceResolution(reducer=ee$Reducer$mean())$reproject(proj)$rename("prob")$addBands(ee$Image(254))
+figure1_1_scottBurgan$a204 = sb$eq(4L)$multiply(99)$reduceResolution(reducer=ee$Reducer$mean())$reproject(proj)$rename("prob")$addBands(ee$Image(254))
 
-########## SLASH BLOWDOWN USING HANSEN LOSS
 ########## +++ USE COPERNICUS FOREST 10 m
 
 for( imgn in names(figure1_1_scottBurgan) ){
   figure1_1_scottBurgan[[imgn]] = figure1_1_scottBurgan[[imgn]]$toByte()$reproject(proj)
 }
-
-
-
-
-
-
-
-
 
 ScottBurganProbs=ee$ImageCollection( unname(figure1_1_scottBurgan) )
 
@@ -259,36 +259,36 @@ for( i in 1:n){
   idp = paste0(idf,'_ScottBurganFuelClassProb')
 
 
-
-  if(0==1 && is.null(task_img_container[[id ]])){
-
-    task_img_container[[  id ]] <- ee_image_to_drive(
-      image= ScottBurganFiltered$toByte()$clip(gg),
-      description= id,
-      timePrefix = F,
-      folder= "wildfireOut",
-      region= gg ,
-      scale= 30,
-      crs= 'EPSG:3035',
-      maxPixels= 1e13
-    )
-    task_img_container[[id ]]$start()
-
-    task_img_container[[  idp ]] <- ee_image_to_drive(
-      image= ScottBurganProbFiltered$toByte()$clip(gg),
-      description= idp,
-      folder= "wildfireOut",
-      timePrefix = F,
-      region= gg ,
-      scale= 30,
-      crs= 'EPSG:3035',
-      maxPixels= 1e13
-    )
-    task_img_container[[idp ]]$start()
-
-  }
-  # task_img_container[[id ]]$status()
-  # task_img_container[[id ]]$cancel()
+#
+#   if(0==1 && is.null(task_img_container[[id ]])){
+#
+#     task_img_container[[  id ]] <- ee_image_to_drive(
+#       image= ScottBurganFiltered$toByte()$clip(gg),
+#       description= id,
+#       timePrefix = F,
+#       folder= "wildfireOut",
+#       region= gg ,
+#       scale= 30,
+#       crs= 'EPSG:3035',
+#       maxPixels= 1e13
+#     )
+#     task_img_container[[id ]]$start()
+#
+#     task_img_container[[  idp ]] <- ee_image_to_drive(
+#       image= ScottBurganProbFiltered$toByte()$clip(gg),
+#       description= idp,
+#       folder= "wildfireOut",
+#       timePrefix = F,
+#       region= gg ,
+#       scale= 30,
+#       crs= 'EPSG:3035',
+#       maxPixels= 1e13
+#     )
+#     task_img_container[[idp ]]$start()
+#
+#   }
+#   # task_img_container[[id ]]$status()
+#   # task_img_container[[id ]]$cancel()
 
   assetid <- paste0('projects/progetto-eu-h2020-cirgeo/assets/wildfire/fuelModelV2/',  id)
   message(assetid)
@@ -313,4 +313,4 @@ for( i in 1:n){
   # task_img_container[[assetid ]]$cancel()
 
 }
-ee_imagecollection_to_local( ee$ImageCollection('projects/progetto-eu-h2020-cirgeo/assets/wildfire/fuelModelV1'),region= gg )
+# ee_imagecollection_to_local( ee$ImageCollection('projects/progetto-eu-h2020-cirgeo/assets/wildfire/fuelModelV1'),region= gg )
