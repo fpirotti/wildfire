@@ -19,6 +19,9 @@ library(stars)
   # tree, shrub, grass, crop,  wet/peat,
 # urban, nonfuel,
 dsm = ee$ImageCollection('JAXA/ALOS/AW3D30/V3_2');
+tcd = ee$Image("projects/progetto-eu-h2020-cirgeo/assets/copernicus/TCD_2018_010m_eu_03035_V2_4326")
+
+
 #Map.addLayer(tileEEA, {}, 'tiles EEA' )
 aridityThreshold = 3;
 
@@ -70,15 +73,16 @@ clcplus = ee$Image('projects/progetto-eu-h2020-cirgeo/assets/copernicus/CLMS_CLC
 figure1_1 = { };
 figure1_1_scottBurgan = { };
 
-
-
 canopy_cover = ee$Image("UMD/hansen/global_forest_change_2023_v1_11")
-onlyNonDisturbedPixels =  canopy_cover$select("lossyear")$unmask()$eq(0)$Or(canopy_cover$select("lossyear")$unmask()$gt(21) );
+onlyNonDisturbedPixels =  canopy_cover$select("lossyear")$unmask()$eq(0);
+hansenLossPost2019 =      canopy_cover$select("lossyear")$unmask()$gt(19);
+hansenLossPost2010  =     canopy_cover$select("lossyear")$unmask()$gt(10);
+hansenLossPost2010upTo2019 = hansenLossPost2010$And( canopy_cover$select("lossyear")$unmask()$lt(20)  ) ;
+hansenLossPost2000   =  canopy_cover$select("lossyear")$unmask()$gt(0)
+hansenLossPost2000upTo2009   =  hansenLossPost2000$And( canopy_cover$select("lossyear")$unmask()$lt(11) ) ;
+
 figure1_1$updatedHansen = canopy_cover$select(0)$unmask()$mask(onlyNonDisturbedPixels)
-# then we draw consensus from WorldCover map and tree height map
-# if world map and tree height map says that there are trees
-# in loss pixel, then we bring back hansen's tree cover
-forestPercCover = esaWorldCover10m$eq(10)$multiply(100)
+
 
 # 91 Urban or suburban development; insufficient wildland fuel ----
 figure1_1_scottBurgan$a91 = clcplus$eq(1)$Or(proba$select('discrete_classification')$eq(50))$multiply(100)$reduceResolution(reducer = ee$Reducer$mean())$reproject(proj)$rename("prob")$addBands(ee$Image(91));
@@ -130,9 +134,11 @@ figure1_1_scottBurgan$a107=grassHighLoad$mask(aridityIndex$lte(aridityThreshold)
 ## 108 wet ----
 figure1_1_scottBurgan$a108=grassHighLoad$mask(aridityIndex$gt(aridityThreshold))$rename("prob")$addBands(ee$Image(108))
 
-#SHRUB lowload ----
+#SHRUB  ----
 shrubProba=proba$select('discrete_classification')$eq(20)
 shrubCLCplus=clcplus$eq(5)
+
+#SHRUB low load ----
 shrubLowLoad=shrubCLCplus$And(shrubProba)$And(ndviMax$lt(0.2))$multiply(99)$reduceResolution(reducer=ee$Reducer$mean())$reproject(proj)
 ## 141 dry ----
 figure1_1_scottBurgan$a141=shrubLowLoad$mask(aridityIndex$lte(aridityThreshold))$rename("prob")$addBands(ee$Image(141));
@@ -141,7 +147,7 @@ figure1_1_scottBurgan$a146=shrubLowLoad$mask(aridityIndex$gt(aridityThreshold))$
 
 
 #SHRUB MODERATE load ----
-shrubModerateLoad=shrubCLCplus$And(shrubProba)$And(ndviMax$gte(0.2)$Or(ndviMax$lt(.4)))$multiply(99)$reduceResolution(reducer=ee$Reducer$mean())$reproject(proj)
+shrubModerateLoad=shrubCLCplus$And(shrubProba)$And(ndviMax$gte(0.2)$Or(ndviMax$lt(0.4)))$multiply(99)$reduceResolution(reducer=ee$Reducer$mean())$reproject(proj)
 ## 142 dry ----
 figure1_1_scottBurgan$a142=shrubModerateLoad$mask(aridityIndex$lte(aridityThreshold))$rename("prob")$addBands(ee$Image(142));
 ## 143 wet ----
@@ -168,7 +174,7 @@ figure1_1_scottBurgan$a149=shrubVeryHighLoad$mask(aridityIndex$gt(aridityThresho
 # TIMBER UNDERSTOREY  ----
 proba12x=proba$select('discrete_classification')$divide(10)$floor()$toByte()$eq(12)
 
-# TIMBER UNDERSTOREY LOW+MEDIUMMODERATEload  ----
+# TIMBER UNDERSTOREY LOW+MEDIUM MODERATE load  ----
 timberUnderstoreyLowMediumLoad=clcplus$gt(1)$Or(clcplus$ lt(7))$And(proba12x)$And(ndviMax$lte(0.6))$multiply(99)$reduceResolution(reducer=ee$Reducer$mean())$reproject(proj)
 ## 161 dry  ----
   figure1_1_scottBurgan$a161=timberUnderstoreyLowMediumLoad$mask(aridityIndex$lte(aridityThreshold))$rename("prob")$addBands(ee$Image(161));
@@ -176,18 +182,17 @@ timberUnderstoreyLowMediumLoad=clcplus$gt(1)$Or(clcplus$ lt(7))$And(proba12x)$An
 figure1_1_scottBurgan$a162=timberUnderstoreyLowMediumLoad$mask(aridityIndex$gt(aridityThreshold))$rename("prob")$addBands(ee$Image(162))
 
 #############
-#TIMBERUNDERSTOREY highload  ----
+#TIMBER UNDERSTOREY high load  ----
 timberUnderstoreyHighLoad=clcplus$gt(1)$Or(clcplus$ lt(7))$And(proba12x)$And(ndviMax$gt(0.6))$multiply(99)$reduceResolution(reducer=ee$Reducer$mean())$reproject(proj)
 ## 165 dry ----
 figure1_1_scottBurgan$a165=timberUnderstoreyHighLoad$mask(aridityIndex$lte(aridityThreshold))$rename("prob")$addBands(ee$Image(165));
 ## 163 wet ----
 figure1_1_scottBurgan$a163=timberUnderstoreyHighLoad$mask(aridityIndex$gt(aridityThreshold))$rename("prob")$addBands(ee$Image(163))
 
-
 #############
 #TIMBER LITTER CONIFER  -----
 proba11x=proba$select('discrete_classification')$divide(10)$floor()$toByte()$eq(11)
-
+clcplusTimber = clcplus$neq(3)$And( tcd$ )
 ## 183 Low-mediumLoadCompactLitter -----
   #weassumethatifcanopycoversallpixelandcanopyheightis20orabove,
   #wehaveamatureforestwithlowloadoflitter
