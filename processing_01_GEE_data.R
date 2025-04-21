@@ -36,7 +36,8 @@ endDate = '2024-09-30';
 # Function to mask clouds and shadows using the SCL band
 maskS2clouds <- function(image) {
   scl = image$select('SCL');
-  cloudShadowMask = scl$neq(3)$And(scl$neq(8))$And(scl$neq(9))$And(scl$neq(10))$And(scl$neq(1));
+  red = image$select('B4');
+  cloudShadowMask = red$gt(10)$And(scl$neq(3))$And(scl$neq(8))$And(scl$neq(9))$And(scl$neq(10))$And(scl$neq(1));
 
   return(image$updateMask(cloudShadowMask)$copyProperties(image, list('system:time_start') ))
 }
@@ -53,11 +54,11 @@ s2 = ee$ImageCollection("COPERNICUS/S2_SR_HARMONIZED")$filterDate(startDate, end
 # Create composite using pixel with highest NDVI
 ndviMax = s2$qualityMosaic('NDVI');#$clip(pilotSites);
 # biomass in t/ac
-biomassGrass = ndviMax$multiply(1270)$subtract(200)$multiply(0.008924)$mask(ndviMax$gt(0.1)$And(ndviMax$lt(0.8) ) )
+biomassGrass = ndviMax$multiply(1270)$subtract(200)$multiply(0.008924)$multiply(ndviMax$gt(0.1)$And(ndviMax$lt(0.8) ) )
 
 aridityIndex = ee$ImageCollection('projects/progetto-eu-h2020-cirgeo/assets/global/AridityIndex')$mosaic();
 
-canopy_height = ee$Image('users/nlang/ETH_GlobalCanopyHeight_2020_10m_v1')
+canopy_height = ee$Image('users/nlang/ETH_GlobalCanopyHeight_2020_10m_v1')$unmask()
 pilotSites = ee$FeatureCollection("projects/progetto-eu-h2020-cirgeo/assets/wildfire/wildfire_pilot_sites_v3") ;
 corine = ee$Image("COPERNICUS/CORINE/V20/100m/2018");
 proba = ee$Image('COPERNICUS/Landcover/100m/Proba-V-C3/Global/2019')
@@ -86,16 +87,16 @@ figure1_1$updatedHansen = canopy_cover$select(0)$unmask()$mask(onlyNonDisturbedP
 
 
 # 91 Urban or suburban development; insufficient wildland fuel ----
-figure1_1_scottBurgan$a91 = clcplus$eq(1)$Or(proba$select('discrete_classification')$eq(50))$multiply(100)$reduceResolution(reducer = ee$Reducer$mean())$reproject(proj)$rename("prob")$addBands(ee$Image(91));
+figure1_1_scottBurgan$a91 = clcplus$eq(1)$Or(proba$select('discrete_classification')$eq(50))$multiply(100)$reduceResolution(reducer = ee$Reducer$mean())$reproject(proj)$rename("prob")
 
 # 98 water ----
-figure1_1_scottBurgan$a98 = clcplus$gt(253)$Or(clcplus$eq(10))$multiply(100)$reduceResolution(reducer = ee$Reducer$mean())$reproject(proj)$rename("prob")$addBands(ee$Image(98));
+figure1_1_scottBurgan$a98 = clcplus$gt(253)$Or(clcplus$eq(10))$multiply(100)$reduceResolution(reducer = ee$Reducer$mean())$reproject(proj)$rename("prob")
 
 # 99 barren ----
-figure1_1_scottBurgan$a99 = clcplus$gt(253)$Or(clcplus$gt(7)$And(clcplus$lt(10) ))$multiply(100)$reduceResolution(reducer = ee$Reducer$mean())$reproject(proj)$rename("prob")$addBands(ee$Image(99));
+figure1_1_scottBurgan$a99 = clcplus$gt(253)$Or(clcplus$gt(7)$And(clcplus$lt(10) ))$multiply(100)$reduceResolution(reducer = ee$Reducer$mean())$reproject(proj)$rename("prob")
 
 # 92 snow ice ----
-figure1_1_scottBurgan$a92 = clcplus$eq(11)$multiply(100)$reduceResolution(reducer = ee$Reducer$mean())$reproject(proj)$rename("prob")$addBands(ee$Image(92));
+figure1_1_scottBurgan$a92 = clcplus$eq(11)$multiply(100)$reduceResolution(reducer = ee$Reducer$mean())$reproject(proj)$rename("prob")
 
 # agriculture in CLC+ is  5 or 7, but also check consensus with 100 m PROBA land cover
 # conservative approach as if permanent herbaceaus it is better it goes in GR code of
@@ -103,10 +104,10 @@ figure1_1_scottBurgan$a92 = clcplus$eq(11)$multiply(100)$reduceResolution(reduce
 
 figure1_1_scottBurgan$a93=clcplus$eq(5)$Or(clcplus$ eq(6))$Or(clcplus$ eq(7))$
   And(proba$select('discrete_classification')$eq(40))$
-  multiply(100)$reduceResolution(reducer=ee$Reducer$mean())$reproject(proj)$rename("prob")$addBands(ee$Image(93))
+  multiply(100)$reduceResolution(reducer=ee$Reducer$mean())$reproject(proj)$rename("prob")
 
 # 101 grasssparse ----
-grassSparse=proba$select('discrete_classification')$eq(60)$And(clcplus$eq(6))$multiply(99)$reduceResolution(reducer=ee$Reducer$mean())$reproject(proj)$rename("prob")$addBands(ee$Image(101))
+grassSparse=proba$select('discrete_classification')$eq(60)$And(clcplus$eq(6))$multiply(99)$reduceResolution(reducer=ee$Reducer$mean())$reproject(proj)$rename("prob")
 
 figure1_1_scottBurgan$a101=grassSparse
 
@@ -117,23 +118,23 @@ grassCLCplus=clcplus$eq(6)
 # GRASS LOW load ----
 grassLowLoad=grassCLCplus$And(grassProba)$And(ndviMax$lt(0.2))$multiply(99)$reduceResolution(reducer=ee$Reducer$mean())$reproject(proj)
 ## 102 dry ----
-figure1_1_scottBurgan$a102=grassLowLoad$mask(aridityIndex$lte(aridityThreshold))$rename("prob")$addBands(ee$Image(102));
+figure1_1_scottBurgan$a102=grassLowLoad$multiply(aridityIndex$lte(aridityThreshold))$rename("prob")
 ## 105 wet ----
-figure1_1_scottBurgan$a105=grassLowLoad$mask(aridityIndex$gt(aridityThreshold))$rename("prob")$addBands(ee$Image(105))
+figure1_1_scottBurgan$a105=grassLowLoad$multiply(aridityIndex$gt(aridityThreshold))$rename("prob")
 
 # grass MOD load ----
 grassModerateLoad=grassCLCplus$And(grassProba)$And(ndviMax$gte(0.2)$Or(ndviMax$lt(0.4)))$multiply(99)$reduceResolution(reducer=ee$Reducer$mean())$reproject(proj)
 ## 104 dry ----
-figure1_1_scottBurgan$a104=grassModerateLoad$mask(aridityIndex$lte(aridityThreshold))$rename("prob")$addBands(ee$Image(104));
+figure1_1_scottBurgan$a104=grassModerateLoad$multiply(aridityIndex$lte(aridityThreshold))$rename("prob")
 ## 106 wet ----
-figure1_1_scottBurgan$a106=grassModerateLoad$mask(aridityIndex$gt(aridityThreshold))$rename("prob")$addBands(ee$Image(106))
+figure1_1_scottBurgan$a106=grassModerateLoad$multiply(aridityIndex$gt(aridityThreshold))$rename("prob")
 
 # grass HIGH load ----
 grassHighLoad=grassCLCplus$And(grassProba)$And(ndviMax$gte(0.4))$multiply(99)$reduceResolution(reducer=ee$Reducer$mean())$reproject(proj)
 ## 107 dry ----
-figure1_1_scottBurgan$a107=grassHighLoad$mask(aridityIndex$lte(aridityThreshold))$rename("prob")$addBands(ee$Image(107));
+figure1_1_scottBurgan$a107=grassHighLoad$multiply(aridityIndex$lte(aridityThreshold))$rename("prob")
 ## 108 wet ----
-figure1_1_scottBurgan$a108=grassHighLoad$mask(aridityIndex$gt(aridityThreshold))$rename("prob")$addBands(ee$Image(108))
+figure1_1_scottBurgan$a108=grassHighLoad$multiply(aridityIndex$gt(aridityThreshold))$rename("prob")
 
 #SHRUB  ----
 shrubProba=proba$select('discrete_classification')$eq(20)
@@ -142,33 +143,33 @@ shrubCLCplus=clcplus$eq(5)
 #SHRUB low load ----
 shrubLowLoad=shrubCLCplus$And(shrubProba)$And(ndviMax$lt(0.2))$multiply(99)$reduceResolution(reducer=ee$Reducer$mean())$reproject(proj)
 ## 141 dry ----
-figure1_1_scottBurgan$a141=shrubLowLoad$mask(aridityIndex$lte(aridityThreshold))$rename("prob")$addBands(ee$Image(141));
+figure1_1_scottBurgan$a141=shrubLowLoad$multiply(aridityIndex$lte(aridityThreshold))$rename("prob")
 ## 146 wet ----
-figure1_1_scottBurgan$a146=shrubLowLoad$mask(aridityIndex$gt(aridityThreshold))$rename("prob")$addBands(ee$Image(146))
+figure1_1_scottBurgan$a146=shrubLowLoad$multiply(aridityIndex$gt(aridityThreshold))$rename("prob")
 
 
 #SHRUB MODERATE load ----
 shrubModerateLoad=shrubCLCplus$And(shrubProba)$And(ndviMax$gte(0.2)$Or(ndviMax$lt(0.4)))$multiply(99)$reduceResolution(reducer=ee$Reducer$mean())$reproject(proj)
 ## 142 dry ----
-figure1_1_scottBurgan$a142=shrubModerateLoad$mask(aridityIndex$lte(aridityThreshold))$rename("prob")$addBands(ee$Image(142));
+figure1_1_scottBurgan$a142=shrubModerateLoad$multiply(aridityIndex$lte(aridityThreshold))$rename("prob")
 ## 143 wet ----
-figure1_1_scottBurgan$a143=shrubModerateLoad$mask(aridityIndex$gt(aridityThreshold))$rename("prob")$addBands(ee$Image(143))
+figure1_1_scottBurgan$a143=shrubModerateLoad$multiply(aridityIndex$gt(aridityThreshold))$rename("prob")
 
 
 #SHRUB high load ----
 shrubHighLoad=shrubCLCplus$And(shrubProba)$And(ndviMax$gte(0.4)$Or(ndviMax$lt(0.6)))$multiply(99)$reduceResolution(reducer=ee$Reducer$mean())$reproject(proj)
 ## 145 dry ----
-figure1_1_scottBurgan$a145=shrubHighLoad$mask(aridityIndex$lte(aridityThreshold))$rename("prob")$addBands(ee$Image(145));
+figure1_1_scottBurgan$a145=shrubHighLoad$multiply(aridityIndex$lte(aridityThreshold))$rename("prob")
 ## 148 wet ----
-figure1_1_scottBurgan$a148=shrubHighLoad$mask(aridityIndex$gt(aridityThreshold))$rename("prob")$addBands(ee$Image(148))
+figure1_1_scottBurgan$a148=shrubHighLoad$multiply(aridityIndex$gt(aridityThreshold))$rename("prob")
 
 #############
 # SHRUB VERY high load ----
 shrubVeryHighLoad=shrubCLCplus$And(shrubProba)$And(ndviMax$gte(0.6))$multiply(99)$reduceResolution(reducer=ee$Reducer$mean())$reproject(proj)
 ## 147 dry ----
-figure1_1_scottBurgan$a147=shrubVeryHighLoad$mask(aridityIndex$lte(aridityThreshold))$rename("prob")$addBands(ee$Image(147));
+figure1_1_scottBurgan$a147=shrubVeryHighLoad$multiply(aridityIndex$lte(aridityThreshold))$rename("prob")
 ## 149 wet ----
-figure1_1_scottBurgan$a149=shrubVeryHighLoad$mask(aridityIndex$gt(aridityThreshold))$rename("prob")$addBands(ee$Image(149))
+figure1_1_scottBurgan$a149=shrubVeryHighLoad$multiply(aridityIndex$gt(aridityThreshold))$rename("prob")
 
 
 #############
@@ -178,17 +179,17 @@ proba12x=proba$select('discrete_classification')$divide(10)$floor()$toByte()$eq(
 # TIMBER UNDERSTOREY LOW+MEDIUM MODERATE load  ----
 timberUnderstoreyLowMediumLoad=clcplus$gt(1)$Or(clcplus$ lt(7))$And(proba12x)$And(ndviMax$lte(0.6))$multiply(99)$reduceResolution(reducer=ee$Reducer$mean())$reproject(proj)
 ## 161 dry  ----
-figure1_1_scottBurgan$a161=timberUnderstoreyLowMediumLoad$mask(aridityIndex$lte(aridityThreshold))$rename("prob")$addBands(ee$Image(161));
+figure1_1_scottBurgan$a161=timberUnderstoreyLowMediumLoad$multiply(aridityIndex$lte(aridityThreshold))$rename("prob")
 ## 162 wet  ----
-figure1_1_scottBurgan$a162=timberUnderstoreyLowMediumLoad$mask(aridityIndex$gt(aridityThreshold))$rename("prob")$addBands(ee$Image(162))
+figure1_1_scottBurgan$a162=timberUnderstoreyLowMediumLoad$multiply(aridityIndex$gt(aridityThreshold))$rename("prob")
 
 #############
 #TIMBER UNDERSTOREY high load  ----
 timberUnderstoreyHighLoad=clcplus$gt(1)$Or(clcplus$ lt(7))$And(proba12x)$And(ndviMax$gt(0.6))$multiply(99)$reduceResolution(reducer=ee$Reducer$mean())$reproject(proj)
 ## 165 dry ----
-figure1_1_scottBurgan$a165=timberUnderstoreyHighLoad$mask(aridityIndex$lte(aridityThreshold))$rename("prob")$addBands(ee$Image(165));
+figure1_1_scottBurgan$a165=timberUnderstoreyHighLoad$multiply(aridityIndex$lte(aridityThreshold))$rename("prob")
 ## 163 wet ----
-figure1_1_scottBurgan$a163=timberUnderstoreyHighLoad$mask(aridityIndex$gt(aridityThreshold))$rename("prob")$addBands(ee$Image(163))
+figure1_1_scottBurgan$a163=timberUnderstoreyHighLoad$multiply(aridityIndex$gt(aridityThreshold))$rename("prob")
 
 #############
 #TIMBER LITTER CONIFER  -----
@@ -198,24 +199,24 @@ clcplusTimber = clcplus$gt(1)$Or(clcplus$ lt(7))$And(proba12x$Or(proba11x))
 ## 183 Low-mediumLoadCompactLitter -----
   #weassumethatifcanopycoversallpixelandcanopyheightis20orabove,
   #wehaveamatureforestwithlowloadoflitter
-figure1_1_scottBurgan$a183=clcplus$eq(2)$And(proba11x)$And(figure1_1$updatedHansen$gt(80))$And(canopy_height$gt(20))$multiply(99)$reduceResolution(reducer=ee$Reducer$mean())$reproject(proj)$rename("prob")$addBands(ee$Image(183))
+figure1_1_scottBurgan$a183=clcplus$eq(2)$And(proba11x)$And(tcd$gt(80))$And(canopy_height$gt(20))$multiply(99)$reduceResolution(reducer=ee$Reducer$mean())$reproject(proj)$rename("prob")
 
 ## 185 HighLoadCompactLitter -----
 #weassumethatifcanopycoversallpixelandcanopyheightis20orabove,
 #wehaveamatureforestwithlowloadoflitter
-figure1_1_scottBurgan$a185=clcplus$eq(2)$And(proba11x)$And(figure1_1$updatedHansen$lte(80)$Or(canopy_height$lte(20)))$multiply(99)$reduceResolution(reducer=ee$Reducer$mean())$reproject(proj)$rename("prob")$addBands(ee$Image(185))
+figure1_1_scottBurgan$a185=clcplus$eq(2)$And(proba11x)$And(tcd$lte(80)$Or(canopy_height$lte(20)))$multiply(99)$reduceResolution(reducer=ee$Reducer$mean())$reproject(proj)$rename("prob")
 
 
 #TIMBER LITTER BROADLEAVES -----
 ## 184 Low-mediumLoadCompactLitter -----
 #weassumethatifcanopycoversallpixelandcanopyheightis20orabove,
 #wehaveamatureforestwithlowloadoflitter
-figure1_1_scottBurgan$a184=clcplus$eq(3)$Or(clcplus$ eq(4))$And(proba11x)$And(figure1_1$updatedHansen$gt(80))$And(canopy_height$gt(20))$multiply(99)$reduceResolution(reducer=ee$Reducer$mean())$reproject(proj)$rename("prob")$addBands(ee$Image(184))
+figure1_1_scottBurgan$a184=clcplus$eq(3)$Or(clcplus$ eq(4))$And(proba11x)$And(tcd$gt(80))$And(canopy_height$gt(20))$multiply(99)$reduceResolution(reducer=ee$Reducer$mean())$reproject(proj)$rename("prob")
 
 ## 186 High Load Compact Litter -----
 #weassumethatifcanopycoversallpixelandcanopyheightis20orabove,
 #wehaveamatureforestwithlowloadoflitter
-figure1_1_scottBurgan$a186=clcplus$eq(3)$Or(clcplus$eq(4))$And(proba11x)$And(figure1_1$updatedHansen$lte(80)$Or(canopy_height$lte(20)))$multiply(99)$reduceResolution(reducer=ee$Reducer$mean())$reproject(proj)$rename("prob")$addBands(ee$Image(186))
+figure1_1_scottBurgan$a186=clcplus$eq(3)$Or(clcplus$eq(4))$And(proba11x)$And(tcd$lte(80)$Or(canopy_height$lte(20)))$multiply(99)$reduceResolution(reducer=ee$Reducer$mean())$reproject(proj)$rename("prob")
 
 
 ########## SLASH BLOWDOWN USING HANSEN LOSS -------
@@ -223,15 +224,15 @@ figure1_1_scottBurgan$a186=clcplus$eq(3)$Or(clcplus$eq(4))$And(proba11x)$And(fig
 ## load is lowered depending on density and tree height
 sb = clcplusTimber$multiply(tcd)$multiply(canopy_height)$divide(2500)$multiply(4L)$multiply(hansenLossPost2019)
 
-figure1_1_scottBurgan$a201 = sb$eq(1L)$multiply(99)$reduceResolution(reducer=ee$Reducer$mean())$reproject(proj)$rename("prob")$addBands(ee$Image(254))
-figure1_1_scottBurgan$a202 = sb$eq(2L)$multiply(99)$reduceResolution(reducer=ee$Reducer$mean())$reproject(proj)$rename("prob")$addBands(ee$Image(254))
-figure1_1_scottBurgan$a203 = sb$eq(3L)$multiply(99)$reduceResolution(reducer=ee$Reducer$mean())$reproject(proj)$rename("prob")$addBands(ee$Image(254))
-figure1_1_scottBurgan$a204 = sb$eq(4L)$multiply(99)$reduceResolution(reducer=ee$Reducer$mean())$reproject(proj)$rename("prob")$addBands(ee$Image(254))
+figure1_1_scottBurgan$a201 = sb$eq(1L)$multiply(99)$reduceResolution(reducer=ee$Reducer$mean())$reproject(proj)$rename("prob")
+figure1_1_scottBurgan$a202 = sb$eq(2L)$multiply(99)$reduceResolution(reducer=ee$Reducer$mean())$reproject(proj)$rename("prob")
+figure1_1_scottBurgan$a203 = sb$eq(3L)$multiply(99)$reduceResolution(reducer=ee$Reducer$mean())$reproject(proj)$rename("prob")
+figure1_1_scottBurgan$a204 = sb$eq(4L)$multiply(99)$reduceResolution(reducer=ee$Reducer$mean())$reproject(proj)$rename("prob")
 
 ########## +++ USE COPERNICUS FOREST 10 m
 
 for( imgn in names(figure1_1_scottBurgan) ){
-  figure1_1_scottBurgan[[imgn]] = figure1_1_scottBurgan[[imgn]]$toByte()$reproject(proj)
+  figure1_1_scottBurgan[[imgn]] = figure1_1_scottBurgan[[imgn]]$select("prob")$addBands(ee$Image(as.numeric(gsub("a", "", imgn) ) ))$toByte()$reproject(proj)
 }
 
 ScottBurganProbs=ee$ImageCollection( unname(figure1_1_scottBurgan) )
@@ -259,35 +260,35 @@ for( i in 1:n){
   idp = paste0(idf,'_ScottBurganFuelClassProb')
 
 
-#
-#   if(0==1 && is.null(task_img_container[[id ]])){
-#
-#     task_img_container[[  id ]] <- ee_image_to_drive(
-#       image= ScottBurganFiltered$toByte()$clip(gg),
-#       description= id,
-#       timePrefix = F,
-#       folder= "wildfireOut",
-#       region= gg ,
-#       scale= 30,
-#       crs= 'EPSG:3035',
-#       maxPixels= 1e13
-#     )
-#     task_img_container[[id ]]$start()
-#
-#     task_img_container[[  idp ]] <- ee_image_to_drive(
-#       image= ScottBurganProbFiltered$toByte()$clip(gg),
-#       description= idp,
-#       folder= "wildfireOut",
-#       timePrefix = F,
-#       region= gg ,
-#       scale= 30,
-#       crs= 'EPSG:3035',
-#       maxPixels= 1e13
-#     )
-#     task_img_container[[idp ]]$start()
-#
-#   }
-#   # task_img_container[[id ]]$status()
+
+  if(0==0 && is.null(task_img_container[[id ]])){
+
+    task_img_container[[  id ]] <- ee_image_to_drive(
+      image= ScottBurganFiltered$toByte()$clip(gg),
+      description= id,
+      timePrefix = F,
+      folder= "wildfireOut",
+      region= gg ,
+      scale= 30,
+      crs= 'EPSG:3035',
+      maxPixels= 1e13
+    )
+    task_img_container[[id ]]$start()
+
+    task_img_container[[  idp ]] <- ee_image_to_drive(
+      image= ScottBurganProbFiltered$toByte()$clip(gg),
+      description= idp,
+      folder= "wildfireOut",
+      timePrefix = F,
+      region= gg ,
+      scale= 30,
+      crs= 'EPSG:3035',
+      maxPixels= 1e13
+    )
+    task_img_container[[idp ]]$start()
+
+  }
+  task_img_container[[id ]]$status()
 #   # task_img_container[[id ]]$cancel()
 
   assetid <- paste0('projects/progetto-eu-h2020-cirgeo/assets/wildfire/fuelModelV2/',  id)
@@ -304,7 +305,7 @@ for( i in 1:n){
       crs= 'EPSG:4326',
       maxPixels= 1e13
     )
-    task_img_containerAsset[[id ]]$start()
+     task_img_containerAsset[[id ]]$start()
 
 
 
