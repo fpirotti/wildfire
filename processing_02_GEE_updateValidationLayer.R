@@ -1,7 +1,6 @@
-library(rgee)
+
 library("sf")
 
-ee_Initialize(user = 'cirgeo' )
 
 sheetUrl = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRNluJSVc0aOzqLHRp_oomgCvQN8BFtZQkDvPk4aOnd592mosFUTxiYqis5A46w7-6U6FcnuBE2AXXt/pub?gid=0&single=true&output=csv';
 
@@ -13,12 +12,17 @@ validationPoints <- na.omit(validationPoints)
 load(file="validationPoints.rds")
 
 if(identical( validationPoints.bkp, validationPoints)){
-  cat(as.character(date()) , " - No updates\n", file = "updateValidationLog.log")
+  cat(as.character(date()) , "------No updates\n", file = "updateValidationLog.log")
 } else {
+
+  library(rgee)
+  ee_Initialize(user = 'cirgeo' )
+
+
   validationPoints.bkp <- validationPoints
   save(validationPoints.bkp, file="validationPoints.rds")
 
-  cat(as.character(date()) , " - Yes updates\n", file = "updateValidationLog.log")
+  cat(as.character(date()) , "Yes updates....\n", file = "updateValidationLog.log")
 
   points_sf <- st_as_sf(validationPoints, coords = c("lon", "lat"), crs = 4326)
 

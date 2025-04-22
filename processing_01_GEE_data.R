@@ -3,42 +3,31 @@ library(rgeeExtra)
 library("inborutils")
 library("parallel")
 library("terra")
+library(stars)
 
 ee_Initialize(quiet = T)
 ee_Initialize(user = 'cirgeo' )
 
-
-
-
 proj3035_30m = ee$Projection('EPSG:3035')$atScale(30);
 
-# dir.exists(outputdir) dir.create(outputdir)
 
-library(stars)
-# Main fuel types ESA World  Cover:
-  # tree, shrub, grass, crop,  wet/peat,
-# urban, nonfuel,
-dsm = ee$ImageCollection('JAXA/ALOS/AW3D30/V3_2');
+## Tree Canopy Density from Copernicus  10 m 2018
 tcd = ee$Image("projects/progetto-eu-h2020-cirgeo/assets/copernicus/TCD_2018_010m_eu_03035_V2_4326")$select("b1")
-
-
-#Map.addLayer(tileEEA, {}, 'tiles EEA' )
+## very high threshold to consider all arid
 aridityThreshold = 3;
 
-# Time range
+# Time range for NDVI stack
 startDate = '2022-01-01';
 endDate = '2024-09-30';
-
-
-
-
 
 # Function to mask clouds and shadows using the SCL band
 maskS2clouds <- function(image) {
   scl = image$select('SCL');
+  # because we need at least a bit of reflectance, we
+  # also mask for red band above 10...
+  # e.g. if B4 is 0 then NDVI will always be 1
   red = image$select('B4');
   cloudShadowMask = red$gt(10)$And(scl$neq(3))$And(scl$neq(8))$And(scl$neq(9))$And(scl$neq(10))$And(scl$neq(1));
-
   return(image$updateMask(cloudShadowMask)$copyProperties(image, list('system:time_start') ))
 }
 
@@ -48,27 +37,21 @@ addNDVI <-function(image) {
   return(ndvi);
 }
 
-# Load and process collection
+# Load and process S2 collection
 s2 = ee$ImageCollection("COPERNICUS/S2_SR_HARMONIZED")$filterDate(startDate, endDate)$filter(ee$Filter$lt('CLOUDY_PIXEL_PERCENTAGE', 50))$map(maskS2clouds)$map(addNDVI);
 
-# Create composite using pixel with highest NDVI
+##  NDVI -----
 ndviMax = s2$qualityMosaic('NDVI');#$clip(pilotSites);
-# biomass in t/ac
-biomassGrass = ndviMax$multiply(1270)$subtract(200)$multiply(0.008924)$multiply(ndviMax$gt(0.1)$And(ndviMax$lt(0.8) ) )
-
+## aridity -----
 aridityIndex = ee$ImageCollection('projects/progetto-eu-h2020-cirgeo/assets/global/AridityIndex')$mosaic();
 
+## canopy height LANG -----
 canopy_height = ee$Image('users/nlang/ETH_GlobalCanopyHeight_2020_10m_v1')$unmask()
+
 pilotSites = ee$FeatureCollection("projects/progetto-eu-h2020-cirgeo/assets/wildfire/wildfire_pilot_sites_v3") ;
-corine = ee$Image("COPERNICUS/CORINE/V20/100m/2018");
+## Copernicus Global Land Cover 100 m 2019 -----
 proba = ee$Image('COPERNICUS/Landcover/100m/Proba-V-C3/Global/2019')
-esaWorldCover10m = ee$ImageCollection('ESA/WorldCover/v200')$first();
-
-
-proj3035_30m = ee$Projection('EPSG:3035')$atScale(30);
-proj = ee$Projection('EPSG:3035')$atScale(30);
-
-#corine.filterDate('2017-12-01', '2018-12-01').first()
+## corine land cover plus backbone 10 m 2018 ----
 clcplus = ee$Image('projects/progetto-eu-h2020-cirgeo/assets/copernicus/CLMS_CLCplus_2021')$select('b1')
 
 figure1_1 = { };
@@ -220,7 +203,8 @@ figure1_1_scottBurgan$a186=clcplus$eq(3)$Or(clcplus$eq(4))$And(proba11x)$And(tcd
 
 
 ########## SLASH BLOWDOWN USING HANSEN LOSS -------
-## areas with 100% canopy cover and trees 25 meters or above will have class 204 high load.
+## areas with 100% canopy cover and trees 25 meters or above
+## will have class 204 high load.
 ## load is lowered depending on density and tree height
 sb = clcplusTimber$multiply(tcd)$multiply(canopy_height)$divide(2500)$multiply(4L)$multiply(hansenLossPost2019)
 
@@ -228,8 +212,6 @@ figure1_1_scottBurgan$a201 = sb$eq(1L)$multiply(99)$reduceResolution(reducer=ee$
 figure1_1_scottBurgan$a202 = sb$eq(2L)$multiply(99)$reduceResolution(reducer=ee$Reducer$mean())$reproject(proj)$rename("prob")
 figure1_1_scottBurgan$a203 = sb$eq(3L)$multiply(99)$reduceResolution(reducer=ee$Reducer$mean())$reproject(proj)$rename("prob")
 figure1_1_scottBurgan$a204 = sb$eq(4L)$multiply(99)$reduceResolution(reducer=ee$Reducer$mean())$reproject(proj)$rename("prob")
-
-########## +++ USE COPERNICUS FOREST 10 m
 
 for( imgn in names(figure1_1_scottBurgan) ){
   figure1_1_scottBurgan[[imgn]] = figure1_1_scottBurgan[[imgn]]$select("prob")$addBands(ee$Image(as.numeric(gsub("a", "", imgn) ) ))$toByte()$reproject(proj)
@@ -240,11 +222,12 @@ ScottBurganProbs=ee$ImageCollection( unname(figure1_1_scottBurgan) )
 ScottBurgan=ScottBurganProbs$qualityMosaic('prob')$rename(c('scottburgan_cprob',
                                                             'scottburgan_class') )
 
+
+
+
+
 ss=ScottBurgan$getInfo()
 n = pilotSites$size()$getInfo()
-
-print(n)
-
 
 task_img_container <- list()
 task_img_containerAsset <- list()
@@ -258,8 +241,6 @@ for( i in 1:n){
   id = paste0(idf,'_ScottBurganFuelMapClass')
   ScottBurganProbFiltered = ScottBurgan$select('scottburgan_cprob')
   idp = paste0(idf,'_ScottBurganFuelClassProb')
-
-
 
   if(0==0 && is.null(task_img_container[[id ]])){
 
@@ -314,4 +295,3 @@ for( i in 1:n){
   # task_img_container[[assetid ]]$cancel()
 
 }
-# ee_imagecollection_to_local( ee$ImageCollection('projects/progetto-eu-h2020-cirgeo/assets/wildfire/fuelModelV1'),region= gg )
