@@ -5,6 +5,7 @@ library("parallel")
 library("terra")
 library(stars)
 
+version = 2
 ee_Initialize(quiet = T)
 ee_Initialize(user = 'cirgeo' )
 
@@ -238,9 +239,9 @@ for( i in 1:n){
   idf = feature$get("pilot_id")$getInfo() ;
 
   ScottBurganFiltered = ScottBurgan$select('scottburgan_class')
-  id = paste0(idf,'_ScottBurganFuelMapClass')
+  id = paste0(idf,'_ScottBurganFuelMapClassV', version)
   ScottBurganProbFiltered = ScottBurgan$select('scottburgan_cprob')
-  idp = paste0(idf,'_ScottBurganFuelClassProb')
+  idp = paste0(idf,'_ScottBurganFuelClassProbV', version)
 
   if(0==0 && is.null(task_img_container[[id ]])){
 
@@ -275,7 +276,7 @@ for( i in 1:n){
   assetid <- paste0('projects/progetto-eu-h2020-cirgeo/assets/wildfire/fuelModelV2/',  id)
   message(assetid)
 
-  if(is.null(task_img_containerAsset[[id ]])){
+  if(is.null(task_img_containerAsset[[ assetid ]])){
 
     task_img_containerAsset[[id ]] <- ee_image_to_asset(
       image= ScottBurgan$toByte()$clip(gg) ,
@@ -288,10 +289,29 @@ for( i in 1:n){
     )
      task_img_containerAsset[[id ]]$start()
 
-
-
   }
   # task_img_container[[assetid ]]$status()
   # task_img_container[[assetid ]]$cancel()
 
 }
+
+
+for( assetid in names(task_img_containerAsset)){
+  message("checking ", assetid)
+  task <-  task_img_containerAsset[[assetid]]
+  while (task$status()$state %in% c('READY', 'RUNNING')) {
+    cat("Task status:", task$status()$state, "\n", file = "procssing_01_GEE_data.log",append = T)
+    Sys.sleep(10)
+  }
+
+bb <- system(sprintf("earthengine acl set public %s", assetid),intern = T)
+cat(bb, "\n", file = "procssing_01_GEE_data.log",append = T)
+
+}
+
+classHistogram = fuelModel$first()$select(1)$reduceRegion(
+  reducer= ee.Reducer$frequencyHistogram(),
+  geometry= fuelModel$first()$geometry(),
+  scale= 30,
+  maxPixels= 1e13
+)
