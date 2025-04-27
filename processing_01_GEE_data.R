@@ -4,6 +4,13 @@ library("inborutils")
 library("parallel")
 library("terra")
 library(stars)
+library(googledrive)
+
+# 1. Authenticate
+drive_auth(email = "cirgeo@unipd.it")
+
+
+cat(as.character(date()), "\n", file = "processing_01_GEE_data.log" )
 
 version = 2
 ee_Initialize(quiet = T)
@@ -61,7 +68,7 @@ figure1_1_scottBurgan = { };
 ##HANSEN COVER -----
 canopy_cover = ee$Image("UMD/hansen/global_forest_change_2023_v1_11")
 onlyNonDisturbedPixels =  canopy_cover$select("lossyear")$unmask()$eq(0);
-hansenLossPost2018 =      canopy_cover$select("lossyear")$unmask()$gt(18);
+hansenLossPost2018 =      canopy_cover$select("lossyear")$unmask()$gt(18L);
 hansenLossPost2010  =     canopy_cover$select("lossyear")$unmask()$gt(10);
 hansenLossPost2010upTo2019 = hansenLossPost2010$And( canopy_cover$select("lossyear")$unmask()$lt(19)  ) ;
 hansenLossPost2000   =  canopy_cover$select("lossyear")$unmask()$gt(0)
@@ -82,12 +89,16 @@ figure1_1_scottBurgan$a99 = clcplus$gt(253)$Or(clcplus$gt(7)$And(clcplus$lt(10) 
 # 92 snow ice ----
 figure1_1_scottBurgan$a92 = clcplus$eq(11)$multiply(100)
 
-# agriculture in CLC+ is  5 or 7, but also check consensus with 100 m PROBA land cover
-# conservative approach as if permanent herbaceaus it is better it goes in GR code of
-# scott and burgan
 
-figure1_1_scottBurgan$a93=clcplus$eq(5)$Or(clcplus$ eq(7))$
-  add(proba$select('discrete_classification')$eq(40))$
+
+# 93 agriculture ----
+# we use eurocrop map from JRC
+eucropmap = ee$ImageCollection('JRC/D5/EUCROPMAP/V1')$filterDate(
+  '2018-01-01', '2019-01-01')$first();
+
+eucropmapAgric = eucropmap$gt(100)$And(eucropmap$lt(300))
+
+figure1_1_scottBurgan$a93=eucropmapAgric$
   multiply(100)
 
 
@@ -96,7 +107,7 @@ grassProba=proba$select('discrete_classification')$eq(30)
 grassCLCplus=clcplus$eq(6)$Or(tcd$lt(1))
 
 # 101 grasssparse ----
-grassSparse= grassCLCplus$Or(proba$select('discrete_classification')$eq(60))$multiply(99)
+grassSparse= grassCLCplus$And(proba$select('discrete_classification')$eq(60))$multiply(99)
 
 figure1_1_scottBurgan$a101=grassSparse
 
@@ -183,7 +194,7 @@ probaClass = proba$select('discrete_classification')
 proba11x=probaClass$divide(10)$floor()$toByte()$eq(11)
 
 fuelLoadEstimation = tcd$divide(100)$multiply(ndviMax)$multiply(canopy_height$divide(30))
-clcplusTimber = clcplus$gt(1)$Or(clcplus$ lt(6))$And(proba12x$Or(proba11x))$And(fuelLoadEstimation$gt(0.1))
+clcplusTimber = clcplus$gt(1)$And(clcplus$ lt(6))$And(proba12x$Or(proba11x))$And(fuelLoadEstimation$gt(0.1))
 
 clcplusTimberConifer = clcplusTimber$And( probaClass$eq(111)$Or(probaClass$eq(113))$Or(probaClass$eq(115))$Or(probaClass$eq(121))$Or(probaClass$eq(123))$Or(probaClass$eq(125))  )
 clcplusTimberBroadleaf = clcplusTimber$And( probaClass$eq(112)$Or(probaClass$eq(114))$Or(probaClass$eq(116))$Or(probaClass$eq(122))$Or(probaClass$eq(124))$Or(probaClass$eq(126))  )
@@ -203,7 +214,7 @@ highLoad = fuelLoadEstimation$gte(0.66);
   figure1_1_scottBurgan$a183=clcplusTimberConifer$add(medLoad)$multiply(50)
 
 ##  186 Moderate Load Broadleaf Litter -----
-  figure1_1_scottBurgan$a184= clcplusTimberBroadleaf$add(medLoad)$multiply(50)
+  figure1_1_scottBurgan$a186= clcplusTimberBroadleaf$add(medLoad)$multiply(50)
 
 ##  185 High Load Conifer Litter -----
   figure1_1_scottBurgan$a185=clcplusTimberConifer$And(highLoad)$multiply(50)
@@ -217,7 +228,7 @@ highLoad = fuelLoadEstimation$gte(0.66);
 ## areas with 100% canopy cover and trees 25 meters or above
 ## will have class 204 high load.
 ## load is lowered depending on density and tree height
-sb = clcplusTimber$multiply(tcd)$multiply(canopy_height)$divide(2500)$multiply(4L)$multiply(hansenLossPost2018)
+sb = clcplusTimber$multiply(tcd)$multiply(canopy_height)$divide(2500)$multiply(4L)$multiply(hansenLossPost2018)$unmask()$toByte()
 
 figure1_1_scottBurgan$a201 = sb$eq(1L)$multiply(100)
 figure1_1_scottBurgan$a202 = sb$eq(2L)$multiply(100)
@@ -252,11 +263,13 @@ n = pilotSites$size()$getInfo()
 
 task_img_container <- list()
 task_img_containerAsset <- list()
+
 for( i in 1:n){
 
   feature =ee$Feature(pilotSites$toList(12)$get(i-1))
   gg = feature$geometry();
   idf = feature$get("pilot_id")$getInfo() ;
+
 
   ScottBurganFiltered = ScottBurgan$select('scottburgan_class')
   id = paste0(idf,'_ScottBurganFuelMapClassV', version)
@@ -265,11 +278,22 @@ for( i in 1:n){
 
   if(0==0 && is.null(task_img_container[[id ]])){
 
+    folder <- sprintf("wildfireOutProgettoEU/%s",idf)
+    # 2. Get the folder
+    folder2rm <- drive_get(folder)
+
+    # 3. List files
+    files_in_folder <- drive_ls(path = folder2rm)
+
+    # 4. Remove all files
+    drive_rm(files_in_folder)
+
+
     task_img_container[[  id ]] <- ee_image_to_drive(
       image= ScottBurganFiltered$toByte()$clip(gg),
       description= id,
       timePrefix = F,
-      folder= "wildfireOut",
+      folder=folder,
       region= gg ,
       scale= 30,
       crs= 'EPSG:3035',
@@ -280,7 +304,7 @@ for( i in 1:n){
     task_img_container[[  idp ]] <- ee_image_to_drive(
       image= ScottBurganProbFiltered$toByte()$clip(gg),
       description= idp,
-      folder= "wildfireOut",
+      folder=folder,
       timePrefix = F,
       region= gg ,
       scale= 30,
@@ -295,6 +319,9 @@ for( i in 1:n){
 
   assetid <- paste0('projects/progetto-eu-h2020-cirgeo/assets/wildfire/fuelModelV2/',  id)
   message(assetid)
+
+  bb <- system( sprintf("earthengine rm %s", assetid), intern = T)
+  if(length(bb)) cat(bb, "\n", file = "processing_01_GEE_data.log",append = T) else cat(bb, "SUCCESS\n", file = "processing_01_GEE_data.log",append = T)
 
   if(is.null(task_img_containerAsset[[ assetid ]])){
 
@@ -318,21 +345,87 @@ for( i in 1:n){
 
 
 for( assetid in names(task_img_containerAsset)){
+
   message("checking ", assetid)
+
+  cat("checking ", assetid, "\n", file = "processing_01_GEE_data.log",append = T)
+
   task <-  task_img_containerAsset[[assetid]]
   while (task$status()$state %in% c('READY', 'RUNNING')) {
-    cat("Task status:", task$status()$state, "\n", file = "procssing_01_GEE_data.log",append = T)
+    cat("Task status:", task$status()$state, "\n", file = "processing_01_GEE_data.log",append = T)
     Sys.sleep(10)
   }
 
-  bb <- system(sprintf("earthengine acl set public %s", assetid),intern = T)
-  cat(bb, "\n", file = "procssing_01_GEE_data.log",append = T)
-
+  if(task$status()$state=="FAILED"){
+    cat("Task status:", task$status()$error_message, "\n", file = "processing_01_GEE_data.log",append = T)
+  } else{
+    cat("Task status: ", task$status()$state, "\n", file = "processing_01_GEE_data.log",append = T)
+  }
 }
 
-classHistogram = fuelModel$first()$select(1)$reduceRegion(
-  reducer= ee.Reducer$frequencyHistogram(),
-  geometry= fuelModel$first()$geometry(),
-  scale= 30,
-  maxPixels= 1e13
-)
+bb <- system("earthengine acl set public projects/progetto-eu-h2020-cirgeo/assets/wildfire/fuelModelV2",intern = T)
+if(length(bb)) cat(bb, "\n", file = "processing_01_GEE_data.log",append = T) else cat(bb, "SUCCESS\n", file = "processing_01_GEE_data.log",append = T)
+
+classHistogram <- {}
+for( assetid in names(task_img_containerAsset)){
+  message("histogram ", assetid)
+
+  cat("histogram ", assetid, "\n", file = "processing_01_GEE_data.log",append = T)
+  imgname <- paste0('projects/progetto-eu-h2020-cirgeo/assets/wildfire/fuelModelV2/',  assetid)
+
+  fuelModel = ee$Image(imgname)
+  nm <- substr(assetid, 1, 5)
+  classHistogram[[nm]] = fuelModel$select(1)$reduceRegion(
+    reducer= ee$Reducer$frequencyHistogram(),
+    geometry= fuelModel$geometry(),
+    scale= 30,
+    maxPixels= 1e13
+  )$getInfo()
+}
+
+dt2 <- lapply(classHistogram, function(ll){
+  ll <- as.data.frame(ll) / 1e6 * 900
+  message("tot km2 ", sum(ll))
+  names(ll) <- gsub("\\.","_", names(ll))
+
+  ll
+} )
+
+featuresHist <- {}
+for( i in 1:n){
+  feature =ee$Feature(pilotSites$toList(12)$get(i-1))
+  gg = feature$geometry();
+  idf = feature$get("pilot_id")$getInfo() ;
+  message(idf)
+  featuresHist[[idf]] <- ee$Feature(gg, as.list(dt2[[idf]]) )
+}
+
+amk_fc <-ee$FeatureCollection( unname(featuresHist)  )
+
+assetIdh= sprintf('projects/progetto-eu-h2020-cirgeo/assets/wildfire/fuelModelV%dHFD', version)
+
+task <- ee_table_to_asset(
+  collection= amk_fc ,
+  description="Histogram",
+  assetId= assetIdh
+  )
+
+bb <- system( sprintf("earthengine rm %s", assetIdh), intern = T)
+if(length(bb)) cat(bb, "\n", file = "processing_01_GEE_data.log",append = T) else cat(bb, "SUCCESS\n", file = "processing_01_GEE_data.log",append = T)
+
+task$start()
+
+cat("Task status HISTOGRAM:", task$status()$state, "\n", file = "processing_01_GEE_data.log",append = T)
+while (task$status()$state %in% c('READY', 'RUNNING')) {
+  cat("Task status:", task$status()$state, "\n", file = "processing_01_GEE_data.log",append = T)
+  Sys.sleep(10)
+}
+if(task$status()$state=="FAILED"){
+  cat("Task status:", task$status()$error_message, "\n", file = "processing_01_GEE_data.log",append = T)
+} else{
+  cat("Task status: ", task$status()$state, "\n", file = "processing_01_GEE_data.log",append = T)
+}
+bb <- system( sprintf("earthengine acl set public %s", assetIdh), intern = T)
+if(length(bb)) cat(bb, "\n", file = "processing_01_GEE_data.log",append = T) else cat(bb, "SUCCESS\n", file = "processing_01_GEE_data.log",append = T)
+
+
