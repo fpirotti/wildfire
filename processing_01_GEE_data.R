@@ -92,7 +92,7 @@ figure1_1_scottBurgan$a93=clcplus$eq(5)$Or(clcplus$ eq(7))$
 
 
 ## GRASS  ----
-grassProba=probaselect('discrete_classification').eq(30)
+grassProba=proba$select('discrete_classification')$eq(30)
 grassCLCplus=clcplus$eq(6)$Or(tcd$lt(1))
 
 # 101 grasssparse ----
@@ -188,28 +188,29 @@ clcplusTimber = clcplus$gt(1)$Or(clcplus$ lt(6))$And(proba12x$Or(proba11x))$And(
 clcplusTimberConifer = clcplusTimber$And( probaClass$eq(111)$Or(probaClass$eq(113))$Or(probaClass$eq(115))$Or(probaClass$eq(121))$Or(probaClass$eq(123))$Or(probaClass$eq(125))  )
 clcplusTimberBroadleaf = clcplusTimber$And( probaClass$eq(112)$Or(probaClass$eq(114))$Or(probaClass$eq(116))$Or(probaClass$eq(122))$Or(probaClass$eq(124))$Or(probaClass$eq(126))  )
 
-
-## 183 Low-mediumLoadCompactLitter -----
-  #weassumethatifcanopycoversallpixelandcanopyheightis20orabove,
-  #wehaveamatureforestwithlowloadoflitter
-figure1_1_scottBurgan$a183=clcplus$eq(2)$And(proba11x)$And(tcd$gt(80))$And(canopy_height$gt(20))$multiply(99)
-
-## 185 HighLoadCompactLitter -----
-#weassumethatifcanopycoversallpixelandcanopyheightis20orabove,
-#wehaveamatureforestwithlowloadoflitter
-figure1_1_scottBurgan$a185=clcplus$eq(2)$And(proba11x)$And(tcd$lte(80)$Or(canopy_height$lte(20)))$multiply(99)
+lowLoad = fuelLoadEstimation$gt(0)$And(fuelLoadEstimation$lt(0.33));
+medLoad = fuelLoadEstimation$gte(0.33)$And(fuelLoadEstimation$lt(0.66));
+highLoad = fuelLoadEstimation$gte(0.66);
 
 
-#TIMBER LITTER BROADLEAVES -----
-## 184 Low-mediumLoadCompactLitter -----
-#weassumethatifcanopycoversallpixelandcanopyheightis20orabove,
-#wehaveamatureforestwithlowloadoflitter
-figure1_1_scottBurgan$a184=clcplus$eq(3)$Or(clcplus$ eq(4))$And(proba11x)$And(tcd$gt(80))$And(canopy_height$gt(20))$multiply(99)
 
-## 186 High Load Compact Litter -----
-#weassumethatifcanopycoversallpixelandcanopyheightis20orabove,
-#wehaveamatureforestwithlowloadoflitter
-figure1_1_scottBurgan$a186=clcplus$eq(3)$Or(clcplus$eq(4))$And(proba11x)$And(tcd$lte(80)$Or(canopy_height$lte(20)))$multiply(99)
+##  181 Low Load Compact Conifer Litter -----
+  figure1_1_scottBurgan$a181=clcplusTimberConifer$add(lowLoad)$multiply(50)
+##  182 Low Load Compact Broadleaves Litter -----
+  figure1_1_scottBurgan$a182=clcplusTimberBroadleaf$add(lowLoad)$multiply(50)
+
+##  183 Moderate Load Conifer Litter -----
+  figure1_1_scottBurgan$a183=clcplusTimberConifer$add(medLoad)$multiply(50)
+
+##  186 Moderate Load Broadleaf Litter -----
+  figure1_1_scottBurgan$a184= clcplusTimberBroadleaf$add(medLoad)$multiply(50)
+
+##  185 High Load Conifer Litter -----
+  figure1_1_scottBurgan$a185=clcplusTimberConifer$And(highLoad)$multiply(50)
+
+##  189 very High Load broadleaf Compact Litter -----
+  figure1_1_scottBurgan$a189= clcplusTimberBroadleaf$add(highLoad)$multiply(50)
+
 
 
 ########## SLASH BLOWDOWN USING HANSEN LOSS -------
@@ -218,25 +219,35 @@ figure1_1_scottBurgan$a186=clcplus$eq(3)$Or(clcplus$eq(4))$And(proba11x)$And(tcd
 ## load is lowered depending on density and tree height
 sb = clcplusTimber$multiply(tcd)$multiply(canopy_height)$divide(2500)$multiply(4L)$multiply(hansenLossPost2018)
 
-figure1_1_scottBurgan$a201 = sb$eq(1L)$multiply(99)
-figure1_1_scottBurgan$a202 = sb$eq(2L)$multiply(99)
-figure1_1_scottBurgan$a203 = sb$eq(3L)$multiply(99)
-figure1_1_scottBurgan$a204 = sb$eq(4L)$multiply(99)
+figure1_1_scottBurgan$a201 = sb$eq(1L)$multiply(100)
+figure1_1_scottBurgan$a202 = sb$eq(2L)$multiply(100)
+figure1_1_scottBurgan$a203 = sb$eq(3L)$multiply(100)
+figure1_1_scottBurgan$a204 = sb$eq(4L)$multiply(100)
 
-for( imgn in names(figure1_1_scottBurgan) ){
-  figure1_1_scottBurgan[[imgn]] = figure1_1_scottBurgan[[imgn]]$select("prob")$addBands(ee$Image(as.numeric(gsub("a", "", imgn) ) ))$toByte()
+for( k in names(figure1_1_scottBurgan) ){
+   bv = as.integer(substr(k, 2,6))
+   if(is.na(bv)){
+     browser()
+   }
+   nouse =  figure1_1_scottBurgan[[k]]$select(0)$projection()
+   newBand = ee$Image$constant( bv )$
+                rename('new_band')$
+                setDefaultProjection(nouse)$toByte();
+
+   figure1_1_scottBurgan[[k]] = figure1_1_scottBurgan[[k]]$unmask()$toFloat()$addBands(newBand)$rename(c("prob","class") );
+
 }
 
 ScottBurganProbs=ee$ImageCollection( unname(figure1_1_scottBurgan) )
+nouse = ScottBurganProbs$first()$projection()
 
-ScottBurgan=ScottBurganProbs$qualityMosaic('prob')$rename(c('scottburgan_cprob',
-                                                            'scottburgan_class') )
+ScottBurgan=ScottBurganProbs$qualityMosaic('prob')$
+  setDefaultProjection(nouse)$
+  rename(c('scottburgan_cprob', 'scottburgan_class') )
 
 
 
 
-
-ss=ScottBurgan$getInfo()
 n = pilotSites$size()$getInfo()
 
 task_img_container <- list()
