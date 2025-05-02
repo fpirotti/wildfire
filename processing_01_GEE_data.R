@@ -13,7 +13,7 @@ drive_auth(email = "cirgeo@unipd.it")
 cat(as.character(date()), "\n", file = "processing_01_GEE_data.log" )
 
 version = 2
-ee_Initialize(quiet = T)
+# ee_Initialize(quiet = T)
 ee_Initialize(user = 'cirgeo' )
 
 proj3035_30m = ee$Projection('EPSG:3035')$atScale(30);
@@ -288,34 +288,32 @@ for( i in 1:n){
     # 4. Remove all files
     drive_rm(files_in_folder)
 
-
     task_img_container[[  id ]] <- ee_image_to_drive(
       image= ScottBurganFiltered$toByte()$clip(gg),
       description= id,
       timePrefix = F,
-      folder=folder,
+      folder=NULL,
       region= gg ,
       scale= 30,
       crs= 'EPSG:3035',
       maxPixels= 1e13
     )
     task_img_container[[id ]]$start()
-
-    task_img_container[[  idp ]] <- ee_image_to_drive(
-      image= ScottBurganProbFiltered$toByte()$clip(gg),
-      description= idp,
-      folder=folder,
-      timePrefix = F,
-      region= gg ,
-      scale= 30,
-      crs= 'EPSG:3035',
-      maxPixels= 1e13
-    )
-    task_img_container[[idp ]]$start()
+#
+#     task_img_container[[  idp ]] <- ee_image_to_drive(
+#       image= ScottBurganProbFiltered$toByte()$clip(gg),
+#       description= idp,
+#       folder="wildfireOutProgettoEU",
+#       timePrefix = F,
+#       region= gg ,
+#       scale= 30,
+#       crs= 'EPSG:3035',
+#       maxPixels= 1e13
+#     )
+#     task_img_container[[idp ]]$start()
 
   }
-  task_img_container[[id ]]$status()
-#   # task_img_container[[id ]]$cancel()
+
 
   assetid <- paste0('projects/progetto-eu-h2020-cirgeo/assets/wildfire/fuelModelV2/',  id)
   message(assetid)
@@ -345,23 +343,44 @@ for( i in 1:n){
 
 
 for( assetid in names(task_img_containerAsset)){
+  id <- assetid
 
+  folder <- sprintf("wildfireOutProgettoEU/%s", substr(assetid,1,5))
   message("checking ", assetid)
 
-  cat("checking ", assetid, "\n", file = "processing_01_GEE_data.log",append = T)
+  cat("checking exports...", assetid, "\n", file = "processing_01_GEE_data.log",append = T)
 
   task <-  task_img_containerAsset[[assetid]]
   while (task$status()$state %in% c('READY', 'RUNNING')) {
     cat("Task status:", task$status()$state, "\n", file = "processing_01_GEE_data.log",append = T)
     Sys.sleep(10)
   }
-
   if(task$status()$state=="FAILED"){
     cat("Task status:", task$status()$error_message, "\n", file = "processing_01_GEE_data.log",append = T)
   } else{
     cat("Task status: ", task$status()$state, "\n", file = "processing_01_GEE_data.log",append = T)
   }
+
+  task <-  task_img_container[[assetid]]
+  while (task$status()$state %in% c('READY', 'RUNNING')) {
+    cat("Task status:", task$status()$state, "\n", file = "processing_01_GEE_data.log",append = T)
+    Sys.sleep(10)
+  }
+  if(task$status()$state=="FAILED"){
+    cat("Task status:", task$status()$error_message, "\n", file = "processing_01_GEE_data.log",append = T)
+  } else{
+
+    drive_mv(sprintf("%s.tif", id), sprintf("%s/%s.tif", folder, id))
+
+
+    cat("Task status: ", task$status()$state, "\n", file = "processing_01_GEE_data.log",append = T)
+  }
+
 }
+
+
+
+
 
 bb <- system("earthengine acl set public projects/progetto-eu-h2020-cirgeo/assets/wildfire/fuelModelV2",intern = T)
 if(length(bb)) cat(bb, "\n", file = "processing_01_GEE_data.log",append = T) else cat(bb, "SUCCESS\n", file = "processing_01_GEE_data.log",append = T)
