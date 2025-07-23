@@ -56,3 +56,20 @@ mosaic <- gdalUtilities::gdalbuildvrt(list.files("output", full.names = T, patte
 mosaic2 <- terra::rast(mosaic)
 
 terra::writeRaster(mosaic2, "corine2023plus10m.tif",datatype="INT1U",  overwrite=T)
+
+
+library(ssh)
+
+# Create SSH connection (will prompt for password unless SSH key is used)
+
+# session <- ssh_connect("pirotti@www.cirgeo.unipd.it:5055")
+session <- ssh_connect(
+  host = "pirotti@www.cirgeo.unipd.it:5055",
+  key = "~/.ssh/id_ed25519"  # or your actual key file path
+)
+
+scp_upload(
+  session,
+  files = "corine2023plus10m.tif",  # Local file path
+  to = "./uploads/"                       # Remote destination folder (on the server)
+)
