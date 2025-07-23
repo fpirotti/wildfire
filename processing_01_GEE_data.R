@@ -16,12 +16,13 @@ version = 2
 # ee_Initialize(quiet = T)
 ee_Initialize(user = 'cirgeo' )
 
+
 proj3035_30m = ee$Projection('EPSG:3035')$atScale(30);
 
 
 ## Tree Canopy Density from Copernicus  10 m 2018
 tcd = ee$Image("projects/progetto-eu-h2020-cirgeo/assets/copernicus/TCD_2018_010m_eu_03035_V2_4326")$select("b1")
-## very high threshold to consider all arid
+## very high threshold to consider all arid ?
 aridityThreshold = 3;
 
 # Time range for NDVI stack
@@ -44,29 +45,31 @@ addNDVI <-function(image) {
   ndvi = image$normalizedDifference(c('B8', 'B4'))$rename('NDVI');
   return(ndvi);
 }
+# LAYERS ------
+## pilot sites ----
+pilotSites = ee$FeatureCollection("projects/progetto-eu-h2020-cirgeo/assets/wildfire/wildfire_pilot_sites_v3") ;
 
 # Load and process S2 collection
 s2 = ee$ImageCollection("COPERNICUS/S2_SR_HARMONIZED")$filterDate(startDate, endDate)$filter(ee$Filter$lt('CLOUDY_PIXEL_PERCENTAGE', 50))$map(maskS2clouds)$map(addNDVI);
 
 ##  NDVI -----
 ndviMax = s2$qualityMosaic('NDVI');#$clip(pilotSites);
-## aridity -----
+## Aridity -----
 aridityIndex = ee$ImageCollection('projects/progetto-eu-h2020-cirgeo/assets/global/AridityIndex')$mosaic()$divide(10000);
-
-## canopy height LANG -----
+## Canopy height LANG -----
 canopy_height = ee$Image('users/nlang/ETH_GlobalCanopyHeight_2020_10m_v1')$unmask()
+## Canopy COVER -----
+canopy_cover = ee$Image("UMD/hansen/global_forest_change_2023_v1_11")
 
-pilotSites = ee$FeatureCollection("projects/progetto-eu-h2020-cirgeo/assets/wildfire/wildfire_pilot_sites_v3") ;
 ## Copernicus Global Land Cover 100 m 2019 -----
 proba = ee$Image('COPERNICUS/Landcover/100m/Proba-V-C3/Global/2019')
-## corine land cover plus backbone 10 m 2018 ----
+## CLC+ backbone 10 m 2018 ----
 clcplus = ee$Image('projects/progetto-eu-h2020-cirgeo/assets/copernicus/CLMS_CLCplus_2021')$select('b1')
 
 figure1_1 = { };
 figure1_1_scottBurgan = { };
 
-##HANSEN COVER -----
-canopy_cover = ee$Image("UMD/hansen/global_forest_change_2023_v1_11")
+## CANOPY LOSS MAP ----
 onlyNonDisturbedPixels =  canopy_cover$select("lossyear")$unmask()$eq(0);
 hansenLossPost2018 =      canopy_cover$select("lossyear")$unmask()$gt(18L);
 hansenLossPost2010  =     canopy_cover$select("lossyear")$unmask()$gt(10);
@@ -88,7 +91,6 @@ figure1_1_scottBurgan$a99 = clcplus$gt(253)$Or(clcplus$gt(7)$And(clcplus$lt(10) 
 
 # 92 snow ice ----
 figure1_1_scottBurgan$a92 = clcplus$eq(11)$multiply(100)
-
 
 
 # 93 agriculture ----
@@ -273,6 +275,8 @@ for( i in 1:n){
 
   ScottBurganFiltered = ScottBurgan$select('scottburgan_class')
   id = paste0(idf,'_ScottBurganFuelMapClassV', version)
+  # task_img_containerAsset[[id ]] <-"s"
+  # next
   ScottBurganProbFiltered = ScottBurgan$select('scottburgan_cprob')
   idp = paste0(idf,'_ScottBurganFuelClassProbV', version)
 
@@ -385,6 +389,7 @@ for( assetid in names(task_img_containerAsset)){
 bb <- system("earthengine acl set public projects/progetto-eu-h2020-cirgeo/assets/wildfire/fuelModelV2",intern = T)
 if(length(bb)) cat(bb, "\n", file = "processing_01_GEE_data.log",append = T) else cat(bb, "SUCCESS\n", file = "processing_01_GEE_data.log",append = T)
 
+
 classHistogram <- {}
 for( assetid in names(task_img_containerAsset)){
   message("histogram ", assetid)
@@ -403,12 +408,26 @@ for( assetid in names(task_img_containerAsset)){
 }
 
 dt2 <- lapply(classHistogram, function(ll){
-  ll <- as.data.frame(ll) / 1e6 * 900
-  message("tot km2 ", sum(ll))
-  names(ll) <- gsub("\\.","_", names(ll))
+  ll <- as.data.frame(ll) / 1e6 * 900 * 100
+  ll[ ll< 1 ]  <- NA
+
+  message("tot ha ", sum(ll))
+
+  names(ll) <- sprintf("ha_class%03d",
+                       as.integer(gsub('[^(-?(\\d*\\.)?\\d+)]', "",
+                                       gsub('\\.','',names(ll) ) ) ) )
 
   ll
 } )
+
+dt3 <- data.table::rbindlist(dt2, idcol = "site", fill = T)
+dt4<- reshape2::melt(dt3)
+
+dt3.dt <- as.data.frame(t(dt3[,-1]))
+names(dt3.dt)<-dt3[,1][[1]]
+dt3.dt$class<-  as.integer(gsub('[^(-?(\\d*\\.)?\\d+)]', "", rownames(dt3.dt) ) )
+
+writexl::write_xlsx(dt3.dt, "fuelmodelPilotSite.xlsx")
 
 featuresHist <- {}
 for( i in 1:n){
@@ -416,13 +435,16 @@ for( i in 1:n){
   gg = feature$geometry();
   idf = feature$get("pilot_id")$getInfo() ;
   message(idf)
-  featuresHist[[idf]] <- ee$Feature(gg, as.list(dt2[[idf]]) )
+  llfeat <- as.list(dt2[[idf]])
+  names(llfeat)<- sprintf("class%03d", as.integer(gsub('[^(-?(\\d*\\.)?\\d+)]', "", names(llfeat))) )
+  llfeat[["site"]] <- idf
+  featuresHist[[idf]] <- ee$Feature(gg,  )
 }
 
 amk_fc <-ee$FeatureCollection( unname(featuresHist)  )
 
+## HISTOGRAM -----
 assetIdh= sprintf('projects/progetto-eu-h2020-cirgeo/assets/wildfire/fuelModelV%dHFD', version)
-
 task <- ee_table_to_asset(
   collection= amk_fc ,
   description="Histogram",
