@@ -35,5 +35,24 @@ matches$download(output_directory)
 sapply(matches$results, FUN = function(x) { x$id })
 
 
-sapply(matches$results, FUN = function(x) { x$id })
-mosaic <- terra::rast(list.files("output/", full.names = T))
+sapply(list.files("output/", full.names = T, pattern = "\\.zip$"),
+       FUN = function(x) {
+         tryCatch( {
+           unzip(x,exdir = "output/")
+           },
+           error = function(e) {
+             stop()
+             } )
+      })
+
+
+sapply(list.files("output/", full.names = T, pattern = "\\.zip$"),
+       FUN = function(x) {
+         file.remove(x)
+       })
+
+mosaic <- gdalUtilities::gdalbuildvrt(list.files("output", full.names = T, pattern = "\\.tif$"),
+                                      output.vrt = "virtual.vrt")
+mosaic2 <- terra::rast(mosaic)
+
+terra::writeRaster(mosaic2, "corine2023plus10m.tif",datatype="INT1U",  overwrite=T)
