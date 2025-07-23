@@ -1,6 +1,7 @@
 if(!require("hdar")){install.packages("hdar")}
 library(hdar)
 library(jsonlite)
+library(terra)
 
 username <- "fpirotti"
 password <-"XfLUrVLtfuSD94M!!!"
@@ -27,3 +28,12 @@ query <- '{
 
 matches <- client$search(query)
 
+output_directory <- "output"
+matches$download(output_directory)
+
+
+sapply(matches$results, FUN = function(x) { x$id })
+
+
+sapply(matches$results, FUN = function(x) { x$id })
+mosaic <- terra::rast(list.files("output/", full.names = T))
