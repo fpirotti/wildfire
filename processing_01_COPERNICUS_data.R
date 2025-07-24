@@ -17,22 +17,30 @@ query <- '{
   "resolution": "10m",
   "year": "2023",
   "bbox": [
-    6.6008900105198265,
-    43.57167703997222,
-    17.57836121702079,
-    50.29123679099156
+    -10,
+    24.0,
+    26,
+    53.0
   ],
-  "itemsPerPage": 200,
+  "itemsPerPage": 100,
   "startIndex": 0
 }'
 
 matches <- client$search(query)
 
-output_directory <- "output"
-matches$download(output_directory)
+output_directory <- "/archivio/shared/geodati/raster/CLMS_CLCplus_RASTER_2023/"
 
 
-sapply(matches$results, FUN = function(x) { x$id })
+existInFolder <- sapply(matches$results, FUN = function(x) {
+  file.exists(paste0(file.path(output_directory,x$id), ".zip"))
+  })
+
+matches2 <- matches$clone(deep = T)
+matches2$results <- matches2$results[!existInFolder]
+matches2$download(output_directory,
+                 stop_at_failure = FALSE)
+
+
 
 
 sapply(list.files("output/", full.names = T, pattern = "\\.zip$"),
