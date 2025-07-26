@@ -121,7 +121,7 @@ while(i==0){
 
   message(length(matches2$results), " to do be done out of ", length(matches$results))
 
-  tryCatch({
+  outp <- tryCatch({
     matches2$download(output_directory, prompt = F, stop_at_failure = FALSE)
 
   },
@@ -129,10 +129,16 @@ while(i==0){
     message("======== Error, will wait 10 min then retry... the EU server stops
             when too many requests are done too fast  (but does not provide a way to fix this...)")
     print(e)
-    next
   })
 
-  i=1
+  if(is.element("error", class(outp))) {
+    i<-0
+    message("sleeping 8 minutes...")
+    Sys.sleep(500)
+    next
+  }
+
+  i<-1
 }
 
 
