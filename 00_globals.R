@@ -5,3 +5,4 @@ filename <- function(fullname){
 sameFileNoExt <- function(fullname, fullname2){
   filename(fullname) == filename(fullname2)
 }
+`%+%` <- function(a, b) paste0(a, b)

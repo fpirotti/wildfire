@@ -4,15 +4,15 @@ library(jsonlite)
 library(terra)
 
 
-username.hdar <- "fpirotti"
-password.hdar <-"XfLUrVLtfuSD94M!!!"
+username.hdar <- "*****"
+password.hdar <-"*****"
 client <- Client$new(username.hdar, password.hdar, save_credentials = TRUE)
 
 client <- Client$new()
 client$get_token()
 
 ### COPERNICUS LAND COVER+ -----
-query <- '{
+query <- list("CLMS_CLCplus_RASTER_2023"='{
   "dataset_id": "EO:EEA:DAT:CLC-PLUS",
   "product_type": "Raster Layer",
   "resolution": "10m",
@@ -25,9 +25,8 @@ query <- '{
   ],
   "itemsPerPage": 10,
   "startIndex": 0
-}'
-
-query <- '{
+}',
+ "CLMS_CLCplus_RASTER_2023confidence"= '{
   "dataset_id": "EO:EEA:DAT:CLC-PLUS",
   "product_type": "Confidence Layer",
   "resolution": "10m",
@@ -41,32 +40,39 @@ query <- '{
   "itemsPerPage": 100,
   "startIndex": 0
 }'
+ )
+for(q in names(query)){
+  qcont <- query[[q]]
+  matches <- client$search(qcont)
 
-client$generate_query_template("EO:EEA:DAT:CLC-PLUS")
+# client$generate_query_template("EO:EEA:DAT:CLC-PLUS")
 
-matches <- client$search(query)
-
-output_directory <- "/archivio/shared/geodati/raster/CLMS_CLCplus_RASTER_2023confidence"
-
+output_directory <- sprintf("/archivio/shared/geodati/raster/%s", q)
+if(!file.exists(output_directory)){
+  dir.create(output_directory)
+}
+output_directory_tif <- file.path(output_directory, "unzipped")
+if(!file.exists(output_directory_tif)){
+  dir.create(output_directory_tif)
+}
 
 existInFolder <- sapply(matches$results, FUN = function(x) {
   file.exists(paste0(file.path(output_directory,x$id), ".zip"))
-  })
-sum(existInFolder)
+})
+message(sum(existInFolder), " already done out of ", length(matches$results))
 
 matches2 <- matches$clone(deep = T)
 matches2$results <- matches2$results[!existInFolder]
-length(matches2$results)
-matches2$download(output_directory, prompt = F,
-                 stop_at_failure = FALSE)
+
+message(length(matches2$results), " to do be done out of ", length(matches$results))
+
+matches2$download(output_directory, prompt = F, stop_at_failure = FALSE)
 
 
-
-output_directory_tif <- file.path(output_directory, "unzipped")
 
 exist<-tools::file_path_sans_ext(list.files(output_directory_tif))
 
-sapply(list.files(output_directory, full.names = T, pattern = "\\.zip$"),
+noret <- sapply(list.files(output_directory, full.names = T, pattern = "\\.zip$"),
        FUN = function(x) {
         if( is.element( filename(x) , exist ) ){
           return(NA)
@@ -87,14 +93,17 @@ sapply(list.files(output_directory_tif, full.names = T, pattern = "\\.xml$"),
        })
 
 mosaic <- gdalUtilities::gdalbuildvrt(list.files(output_directory_tif, full.names = T, pattern = "\\.tif$"),
-                                      output.vrt = "CLCplus2023.vrt")
+                                      output.vrt = sprinft("%s.vrt", q) )
 
-gdalUtilities::gdal_translate()
-mosaic2 <- terra::rast("CLCplus2023.vrt")
+# gdalUtilities::gdal_translate()
+mosaic2 <- terra::rast(sprinft("%s.vrt", q))
 
-terra::writeRaster(mosaic2, "corine2023plus10m.tif",datatype="INT1U",  overwrite=T)
-gdalUtils::gdaladdo("corine2023plus10m.tif", ro=T)
+terra::writeRaster(mosaic2, sprintf("%s.tif", q),
+                   datatype="INT1U",
+                   overwrite=T)
+gdalUtils::gdaladdo(sprintf("%s.tif", q), ro=T)
 
+}
 # library(ssh)
 #
 # # Create SSH connection (will prompt for password unless SSH key is used)
