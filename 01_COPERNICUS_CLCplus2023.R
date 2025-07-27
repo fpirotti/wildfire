@@ -1,10 +1,13 @@
 if(!require("hdar")){install.packages("hdar")}
 library(hdar)
 library(jsonlite)
+library(gdalUtilities)
 library(terra)
 library(parallel)
-
+source("00_globals.R")
 output_base_dir <- "/archivio/shared/geodati/raster"
+
+ncores <- min(30, parallel::detectCores())
 ## bounding box with
 ## West-most (lower) X, South-most Y,
 ## East-most (higher) X, North-most Y
@@ -90,12 +93,12 @@ for(q in names(query)){
   qcont <- query[[q]]
 
   message("Querying ", q)
-  qcont2 <- jsonlite::fromJSON(qcont)
+  qcont2 <-  qcont
   if(is.null(query[[q]]$bbox)) query[[q]]$bbox <- bbox
   if(is.null(query[[q]]$startIndex)) query[[q]]$startIndex <- startIndex
   if(is.null(query[[q]]$itemsPerPage)) query[[q]]$itemsPerPage <- itemsPerPage
 
-  jsonlite::toJSON(query[[q]],auto_unbox = T)
+  qcont <- jsonlite::toJSON(query[[q]],auto_unbox = T)
 
   matches <- client$search(qcont)
 
@@ -155,13 +158,15 @@ done too fast  (but does not provide a way to fix this...)")
 
     leftToDownload <- length(matches2$results)
     i<-1
+
+    message("FINISHED")
   }
 
 
 message("Unzipping all and keeping only tif files")
 exist<-tools::file_path_sans_ext(list.files(output_directory_tif))
 
-noret <- mcapply(list.files(output_directory, full.names = T, pattern = "\\.zip$"),
+noret <- mclapply(list.files(output_directory, full.names = T, pattern = "\\.zip$"),
                  mc.cores = 10,
        FUN = function(x) {
         if( is.element( filename(x) , exist ) ){
@@ -174,6 +179,7 @@ noret <- mcapply(list.files(output_directory, full.names = T, pattern = "\\.zip$
            error = function(e) {
              return(e)
         })
+         return(TRUE)
 })
 
 
@@ -185,17 +191,29 @@ sapply(list.files(output_directory_tif, full.names = T, pattern = "\\.xml$"),
 
 
   message("Creating VRT")
-  mosaic <- gdalUtilities::gdalbuildvrt(list.files(output_directory_tif, full.names = T, pattern = "\\.tif$"),
-                                        output.vrt = sprintf("%s.vrt", q) )
+  mosaic <- sf::gdal_utils("buildvrt",
+                           list.files(output_directory_tif, full.names = T, pattern = "\\.tif$"),
+                           destination = sprintf("%s/%s.vrt",output_directory, q) )
 
-  # gdalUtilities::gdal_translate()
+
+  if(!mosaic){
+    warning_log("VRT not successful while creating ", q)
+  }
+  sf::gdal_utils()
+  gdalUtilities::gdal_translate(mosaic,
+                                sprintf("%s/%s.tif",output_directory,  q),
+                                ot="Byte"
+                                )
   # mosaic2 <- terra::rast(sprintf("%s.vrt", q))
   #
   #
   # terra::writeRaster(mosaic2, sprintf("%s.tif", q),
   #                    datatype="INT1U",
   #                    overwrite=T)
-  # gdalUtils::gdaladdo(sprintf("%s.tif", q), ro=T)
+  sf::gdal_addo(sprintf("%s/%s.tif",output_directory,  q),
+                          read_only = T,
+                         config_options= c("GDAL_NUM_THREADS"=sprintf("\"%d\"", ncores) )
+                         )
 
 }
 # library(ssh)
