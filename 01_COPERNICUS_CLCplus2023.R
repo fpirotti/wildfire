@@ -127,7 +127,7 @@ while(i==0){
   message(sum(existInFolder), " already done out of ", length(matches$results))
 
   if(length(matches$results) == sum(existInFolder) ){
-    message("Done!=======")
+    message_log("Done!=======")
     break
   }
 
@@ -181,7 +181,7 @@ noret <- mclapply(list.files(output_directory, full.names = T, pattern = "\\.zip
         })
          return(TRUE)
 })
-
+message_log("Unzipped ", sum(unlist(noret)), " zip files" )
 
 message_log("Removing XMLs")
 sapply(list.files(output_directory_tif, full.names = T, pattern = "\\.xml$"),
@@ -191,31 +191,28 @@ sapply(list.files(output_directory_tif, full.names = T, pattern = "\\.xml$"),
 
 
   message_log("Creating VRT")
-  destTif <- sprintf("%s/%s.vrt",output_directory, q)
+  vrtPath <- sprintf("%s/%s.vrt",output_directory, q)
   mosaic <- sf::gdal_utils("buildvrt",
                            list.files(output_directory_tif, full.names = T, pattern = "\\.tif$"),
-                           destination = destTif )
+                           destination = vrtPath )
 
 
   if(!mosaic){
     warning_log("VRT not successful while creating ", q)
   }
 
-  sf::gdal_utils("warp", destTif,
-                 sprintf("%s/%s.tif",output_directory, q),
-                 options = c("-ot", "Byte", "-multi"),
-                 config_options= c("GDAL_NUM_THREADS"=sprintf("\"%d\"", ncores) )
 
-                 )
-  # mosaic2 <- terra::rast(sprintf("%s.vrt", q))
-  #
-  #
-  # terra::writeRaster(mosaic2, sprintf("%s.tif", q),
-  #                    datatype="INT1U",
-  #                    overwrite=T)
+  sf:: gdal_utils(util = "translate", vrtPath,
+             destination = sprintf("%s/%s__.tif",output_directory, q),
+             options = c("-ot", "Byte"),
+             config_options= c("GDAL_NUM_THREADS"=sprintf("\"%d\"", ncores),
+                               "COMPRESS"="DEFLATE")
+  )
+
   sf::gdal_addo(sprintf("%s/%s.tif",output_directory,  q),
                           read_only = T,
-                         config_options= c("GDAL_NUM_THREADS"=sprintf("\"%d\"", ncores) )
+                         config_options= c("GDAL_NUM_THREADS"=sprintf("\"%d\"", ncores,
+                                           "COMPRESS"="DEFLATE") )
                          )
 
 }
