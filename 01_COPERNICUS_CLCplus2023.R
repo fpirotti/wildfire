@@ -202,17 +202,24 @@ sapply(list.files(output_directory_tif, full.names = T, pattern = "\\.xml$"),
   }
 
 
-  sf:: gdal_utils(util = "translate", vrtPath,
-             destination = sprintf("%s/%s__.tif",output_directory, q),
-             options = c("-ot", "Byte"),
-             config_options= c("GDAL_NUM_THREADS"=sprintf("\"%d\"", ncores),
-                               "COMPRESS"="DEFLATE")
+   message_log("STARTED writing final file TIF - compressed with predictor=2
+deflate and tiled=yes for ", q)
+
+   sf:: gdal_utils(util = "translate", vrtPath,
+             destination = sprintf("%s/%s.tif",output_directory, q),
+             options = c("-ot", "Byte",
+                         "-co", "TILED=YES",
+                         "-co", "COMPRESS=DEFLATE",
+                         "-co", "PREDICTOR=2")
   )
 
+   message_log("FINISHED writing final file TIF for ", q)
+
+  sf:: gdal_utils(util = "info",   sprintf("%s/%s.tif",output_directory, q) )
   sf::gdal_addo(sprintf("%s/%s.tif",output_directory,  q),
                           read_only = T,
-                         config_options= c("GDAL_NUM_THREADS"=sprintf("\"%d\"", ncores,
-                                           "COMPRESS"="DEFLATE") )
+                          overviews = c(2, 4, 8, 16, 32, 64, 128, 256),
+                         config_options= c("GDAL_NUM_THREADS"=sprintf("%d", ncores))
                          )
 
 }
