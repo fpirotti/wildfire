@@ -36,8 +36,8 @@ query <- list(
     "year"=  "2023"
   ),
 "CLMS_TCF_TreeDensity_RASTER_2021" = list(
-  "dataset_id": "EO:EEA:DAT:HRL:TCF",
-  "product_type": "Tree Cover Density 100",
+  "dataset_id"= "EO:EEA:DAT:HRL:TCF",
+  "product_type"="Tree Cover Density 100",
   "resolution"=  "10m",
   "year"=  "2021"
 ),
@@ -69,8 +69,8 @@ query <- list(
   "year"=  "2021"
 ),
 "CLMS_CropTypes_RASTER_2021_Conf" = list(
-  "dataset_id": "EO:EEA:DAT:HRL:CRL",
-  "product_type": "Crop Types Confidence Layer",
+  "dataset_id"= "EO:EEA:DAT:HRL:CRL",
+  "product_type"= "Crop Types Confidence Layer",
   "resolution"=  "10m"
 ),
 "CLMS_SurfaceSoilMoisture_2024"=list(
