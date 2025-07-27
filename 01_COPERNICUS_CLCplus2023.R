@@ -7,14 +7,14 @@ library(parallel)
 source("00_globals.R")
 output_base_dir <- "/archivio/shared/geodati/raster"
 
-ncores <- min(30, parallel::detectCores())
+ncores <- min(40, parallel::detectCores())
 ## bounding box with
 ## West-most (lower) X, South-most Y,
 ## East-most (higher) X, North-most Y
 bbox=c(-10,20,30,53)
 startIndex=0
 itemsPerPage=100
-
+forceTifCreation <- FALSE
 username.hdar <- "fpirotti"
 password.hdar <-"XfLUrVLtfuSD94M!!!"
 client <- Client$new(username.hdar, password.hdar, save_credentials = TRUE)
@@ -100,10 +100,13 @@ for(q in names(query)){
 
   qcont <- jsonlite::toJSON(query[[q]],auto_unbox = T)
 
-  matches <- client$search(qcont)
-
-  # client$generate_query_template("EO:EEA:DAT:CLC-PLUS")
   output_directory <- sprintf("%s/%s", output_base_dir, q)
+  if(file.exists(sprintf("%s/%s.tif",output_directory, q))){
+    message_log("File TIF exists for ", q)
+    next
+  }
+
+  matches <- client$search(qcont)
 
   if(!file.exists(output_directory)){
     message_log("Creating directory ", output_directory)
@@ -202,27 +205,35 @@ sapply(list.files(output_directory_tif, full.names = T, pattern = "\\.xml$"),
   }
 
 
-   message_log("STARTED writing final file TIF - compressed with predictor=2
+
+   if(forceTifCreation || !file.exists(sprintf("%s/%s.tif",output_directory, q))){
+
+     message_log("START writing final file TIF - compressed with predictor=2
 deflate and tiled=yes for ", q)
+     sf:: gdal_utils(util = "translate", vrtPath,
+                     destination = sprintf("%s/%s.tif",output_directory, q),
+                     options = c("-ot", "Byte",
+                                 "-co", "TILED=YES",
+                                 "-co", "COMPRESS=DEFLATE",
+                                 "-co", "PREDICTOR=2")
+     )
 
-   sf:: gdal_utils(util = "translate", vrtPath,
-             destination = sprintf("%s/%s.tif",output_directory, q),
-             options = c("-ot", "Byte",
-                         "-co", "TILED=YES",
-                         "-co", "COMPRESS=DEFLATE",
-                         "-co", "PREDICTOR=2")
-  )
+     message_log("FINISHED writing final file TIF for ", q)
 
-   message_log("FINISHED writing final file TIF for ", q)
+     # sf:: gdal_utils(util = "info",   sprintf("%s/%s.tif",output_directory, q) )
+     sf::gdal_addo(sprintf("%s/%s.tif",output_directory,  q),
+                   read_only = T,
+                   overviews = c(2, 4, 8, 16, 32, 64, 128, 256),
+                   config_options= c("GDAL_NUM_THREADS"=sprintf("%d", ncores))
+     )
 
-  sf:: gdal_utils(util = "info",   sprintf("%s/%s.tif",output_directory, q) )
-  sf::gdal_addo(sprintf("%s/%s.tif",output_directory,  q),
-                          read_only = T,
-                          overviews = c(2, 4, 8, 16, 32, 64, 128, 256),
-                         config_options= c("GDAL_NUM_THREADS"=sprintf("%d", ncores))
-                         )
+   } else {
+
+     message_log("Final file TIF exists for ", q)
+   }
 
 }
+
 # library(ssh)
 #
 # # Create SSH connection (will prompt for password unless SSH key is used)
