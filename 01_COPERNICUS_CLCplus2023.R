@@ -92,7 +92,7 @@ query <- list(
 for(q in names(query)){
   qcont <- query[[q]]
 
-  message("Querying ", q)
+  message_log("Querying ", q)
   qcont2 <-  qcont
   if(is.null(query[[q]]$bbox)) query[[q]]$bbox <- bbox
   if(is.null(query[[q]]$startIndex)) query[[q]]$startIndex <- startIndex
@@ -106,14 +106,14 @@ for(q in names(query)){
   output_directory <- sprintf("%s/%s", output_base_dir, q)
 
   if(!file.exists(output_directory)){
-    message("Creating directory ", output_directory)
+    message_log("Creating directory ", output_directory)
     dir.create(output_directory)
   }
 
   output_directory_tif <- file.path(output_directory, "TIFFs")
 
   if(!file.exists(output_directory_tif)){
-    message("Creating TIF directory ", output_directory_tif)
+    message_log("Creating TIF directory ", output_directory_tif)
     dir.create(output_directory_tif)
   }
 
@@ -143,7 +143,7 @@ while(i==0){
     matches2$download(output_directory, prompt = F, stop_at_failure = FALSE)
     },
     error = function(e) {
-      message("======== Error, will wait 10 min then retry...
+      message_log("======== Error, will wait 10 min then retry...
 the EU server stops when too many requests are
 done too fast  (but does not provide a way to fix this...)")
       print(e)
@@ -159,11 +159,11 @@ done too fast  (but does not provide a way to fix this...)")
     leftToDownload <- length(matches2$results)
     i<-1
 
-    message("FINISHED")
+    message_log("FINISHED download")
   }
 
 
-message("Unzipping all and keeping only tif files")
+message_log("Unzipping all and keeping only tif files")
 exist<-tools::file_path_sans_ext(list.files(output_directory_tif))
 
 noret <- mclapply(list.files(output_directory, full.names = T, pattern = "\\.zip$"),
@@ -183,27 +183,30 @@ noret <- mclapply(list.files(output_directory, full.names = T, pattern = "\\.zip
 })
 
 
-message("Removing XMLs")
+message_log("Removing XMLs")
 sapply(list.files(output_directory_tif, full.names = T, pattern = "\\.xml$"),
        FUN = function(x) {
          file.remove(x)
 })
 
 
-  message("Creating VRT")
+  message_log("Creating VRT")
+  destTif <- sprintf("%s/%s.vrt",output_directory, q)
   mosaic <- sf::gdal_utils("buildvrt",
                            list.files(output_directory_tif, full.names = T, pattern = "\\.tif$"),
-                           destination = sprintf("%s/%s.vrt",output_directory, q) )
+                           destination = destTif )
 
 
   if(!mosaic){
     warning_log("VRT not successful while creating ", q)
   }
-  sf::gdal_utils()
-  gdalUtilities::gdal_translate(mosaic,
-                                sprintf("%s/%s.tif",output_directory,  q),
-                                ot="Byte"
-                                )
+
+  sf::gdal_utils("warp", destTif,
+                 sprintf("%s/%s.tif",output_directory, q),
+                 options = c("-ot", "Byte", "-multi"),
+                 config_options= c("GDAL_NUM_THREADS"=sprintf("\"%d\"", ncores) )
+
+                 )
   # mosaic2 <- terra::rast(sprintf("%s.vrt", q))
   #
   #
