@@ -1,3 +1,6 @@
+logfile <- "logMessage.log"
+warnfile <- "logWarning.log"
+
 filename <- function(fullname){
   basename(tools::file_path_sans_ext(fullname))
 }
@@ -7,15 +10,16 @@ sameFileNoExt <- function(fullname, fullname2){
 }
 `%+%` <- function(a, b) paste0(a, b)
 
-if(file.exists("message.log")) file.remove("message.log")
-if(file.exists("warnings.log"))file.remove("warnings.log")
-warning_log <- function(..., logfile = "warnings.log", call. = TRUE, immediate. = FALSE) {
+if(file.exists(logfile)) file.remove(logfile)
+if(file.exists(warnfile))file.remove(warnfile)
+warning_log <- function(...,   call. = TRUE, immediate. = FALSE) {
   # Write to logfile
+  cat(format(Sys.time(), "%Y-%m-%d %H:%M:%S"), "-", paste(..., concatenate=" "), "\n", file = warnfile, append = TRUE)
   cat(format(Sys.time(), "%Y-%m-%d %H:%M:%S"), "-", paste(..., concatenate=" "), "\n", file = logfile, append = TRUE)
-  # Emit warning
+
   warning(..., call. = call., immediate. = immediate.)
 }
-message_log <- function(..., logfile = "message.log", call. = TRUE, immediate. = FALSE) {
+message_log <- function(..., call. = TRUE, immediate. = FALSE) {
   # Write to logfile
   cat(format(Sys.time(), "%Y-%m-%d %H:%M:%S"), "-", paste(..., concatenate=" "), "\n", file = logfile, append = TRUE)
   # Emit warning

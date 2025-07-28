@@ -30,51 +30,59 @@ query <- list(
     "dataset_id"=  "EO:EEA:DAT:CLC-PLUS",
     "product_type"=  "Raster Layer",
     "resolution"=  "10m",
-    "year"=  "2023"
+    "year"=  "2023",
+    "type"="Byte"
   ),
 "CLMS_CLCplus_RASTER_2023confidence"= list(
     "dataset_id"=  "EO:EEA:DAT:CLC-PLUS",
     "product_type"=  "Confidence Layer",
     "resolution"=  "10m",
-    "year"=  "2023"
+    "year"=  "2023",
+    "type"="Byte"
   ),
 "CLMS_TCF_TreeDensity_RASTER_2021" = list(
   "dataset_id"= "EO:EEA:DAT:HRL:TCF",
   "product_type"="Tree Cover Density 100",
   "resolution"=  "10m",
-  "year"=  "2021"
+  "year"=  "2021",
+  "type"="Byte"
 ),
 "CLMS_TCF_TreeDensity_RASTER_2021_Conf" = list(
   "dataset_id"=  "EO:EEA:DAT:HRL:TCF",
   "product_type"=  "Tree Cover Density Confidence Layer",
   "resolution"=  "10m",
-  "year"=  "2021"
+  "year"=  "2021",
+  "type"="Byte"
 ),
 
 "CLMS_TCF_DominantLeafType_RASTER_2021" = list(
   "dataset_id"=  "EO:EEA:DAT:HRL:TCF",
   "product_type"=  "Dominant Leaf Type",
   "resolution"=  "10m",
-  "year"=  "2021"
+  "year"=  "2021",
+  "type"="Byte"
 ),
 
 "CLMS_TCF_DominantLeafType_RASTER_2021_Conf" = list(
   "dataset_id"=  "EO:EEA:DAT:HRL:TCF",
   "product_type"=  "Dominant Leaf Type Confidence Layer",
   "resolution"=  "10m",
-  "year"=  "2021"
+  "year"=  "2021",
+  "type"="Byte"
 ),
 
 "CLMS_CropTypes_RASTER_2021" = list(
   "dataset_id"=  "EO:EEA:DAT:HRL:CRL",
   "product_type"=  "Crop Types",
   "resolution"=  "10m",
-  "year"=  "2021"
+  "year"=  "2021",
+  "type"="ConvToByte"
 ),
 "CLMS_CropTypes_RASTER_2021_Conf" = list(
   "dataset_id"= "EO:EEA:DAT:HRL:CRL",
   "product_type"= "Crop Types Confidence Layer",
-  "resolution"=  "10m"
+  "resolution"=  "10m",
+  "type"="ConvToByte"
 ),
 "CLMS_SurfaceSoilMoisture_2024"=list(
   "dataset_id"= "EO:CLMS:DAT:CLMS_GLOBAL_SSM_1KM_V1_DAILY_NETCDF",
@@ -209,38 +217,44 @@ sapply(list.files(output_directory_tif, full.names = T, pattern = "\\.xml$"),
 
   tifs<-tools::file_path_sans_ext(list.files(output_directory_tif, pattern = "\\.tif$"))
   zips<-tools::file_path_sans_ext(list.files(output_directory, pattern = "\\.zip$"))
-
-  if(any(!is.element( zips, tifs))){
-    warning_log()
+  hasTif <- is.element( zips, tifs)
+  if(any(!hasTif)){
+    warning_log("Not all zip files are converted to TIFs! Check problem!!")
   }
+  message_log("Removing ZIPs")
+  noret <- sapply(list.files(output_directory, full.names = T, pattern = "\\.zip$")[hasTif],
+         FUN = function(x) {
+           file.remove(x)
+         })
 
 
    if(forceTifCreation || !file.exists(sprintf("%s/%s.tif",output_directory, q))){
 
      message_log("START writing final file TIF - compressed with predictor=2
 deflate and tiled=yes for ", q)
-     tryCatch( {
+     ret <- tryCatch( {
      sf:: gdal_utils(util = "translate", vrtPath,
                      destination = sprintf("%s/%s.tif",output_directory, q),
                      options = c("-ot", "Byte",
                                  "-co", "TILED=YES",
                                  "-co", "BIGTIFF=YES",
                                  "-co", "COMPRESS=DEFLATE")  )
+       return(TRUE)
      },
      error = function(e) {
-       return(e)
-     } )
+       return(FALSE)
+     })
 
-
-     message_log("FINISHED writing final file TIF for ", q)
-
-     # sf:: gdal_utils(util = "info",   sprintf("%s/%s.tif",output_directory, q) )
-     sf::gdal_addo(sprintf("%s/%s.tif",output_directory,  q),
-                   read_only = T,
-                   overviews = c(2, 4, 8, 16, 32, 64, 128, 256),
-                   config_options= c("GDAL_NUM_THREADS"=sprintf("%d", ncores))
-     )
-
+     if(!ret){
+       warning_log("PROBLEM WRITING TIFs! Check problem!!")
+     } else {
+       message_log("FINISHED writing final file TIF for ", q)
+       sf::gdal_addo(sprintf("%s/%s.tif",output_directory,  q),
+                     read_only = T,
+                     overviews = c(2, 4, 8, 16, 32, 64, 128, 256, 512),
+                     config_options= c("GDAL_NUM_THREADS"=sprintf("%d", ncores))
+       )
+     }
    } else {
 
      message_log("Final file TIF exists for ", q)
