@@ -7,7 +7,7 @@ library(parallel)
 source("00_globals.R")
 output_base_dir <- "/archivio/shared/geodati/raster"
 
-ncores <- min(40, parallel::detectCores())
+ncores <- min(40, max(1,abs(parallel::detectCores()-2) ) )
 ## bounding box with
 ## West-most (lower) X, South-most Y,
 ## East-most (higher) X, North-most Y
@@ -42,9 +42,9 @@ query <- list(
   ),
 "CLMS_TCF_TreeDensity_RASTER_2021" = list(
   "dataset_id"= "EO:EEA:DAT:HRL:TCF",
-  "product_type"="Tree Cover Density 100",
-  "resolution"=  "10m",
-  "year"=  "2021",
+  "product_type"="Tree Cover Density",
+  "resolution"= "10m",
+  "year"= "2021",
   "type"="Byte"
 ),
 "CLMS_TCF_TreeDensity_RASTER_2021_Conf" = list(
@@ -99,7 +99,8 @@ query <- list(
 
 for(q in names(query)){
   qcont <- query[[q]]
-
+  type <- query[[q]]$type
+  query[[q]]$type <- NULL
   message_log("Querying ", q)
   qcont2 <-  qcont
   if(is.null(query[[q]]$bbox)) query[[q]]$bbox <- bbox
@@ -115,7 +116,9 @@ for(q in names(query)){
   }
 
   matches <- client$search(qcont)
-
+  if(length(matches$results) < 10) {
+    browser()
+  }
   if(!file.exists(output_directory)){
     message_log("Creating directory ", output_directory)
     dir.create(output_directory)
@@ -135,6 +138,7 @@ while(i==0){
   existInFolder <- sapply(matches$results, FUN = function(x) {
     file.exists(paste0(file.path(output_directory_tif,x$id), ".tif"))
   })
+  existInFolder <- unlist(existInFolder)
   message(sum(existInFolder), " already done out of ", length(matches$results))
 
   if(length(matches$results) == sum(existInFolder) ){
@@ -201,7 +205,9 @@ sapply(list.files(output_directory_tif, full.names = T, pattern = "\\.xml$"),
          file.remove(x)
 })
 
-
+  if(grepl("CropTypes", q)){
+    browser()
+  }
   message_log("Creating VRT")
   vrtPath <- sprintf("%s/%s.vrt",output_directory, q)
   mosaic <- sf::gdal_utils("buildvrt",
