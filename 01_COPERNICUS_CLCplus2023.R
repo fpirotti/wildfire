@@ -167,6 +167,7 @@ done too fast  (but does not provide a way to fix this...)")
 
 
 message_log("Unzipping all and keeping only tif files")
+
 exist<-tools::file_path_sans_ext(list.files(output_directory_tif))
 
 noret <- mclapply(list.files(output_directory, full.names = T, pattern = "\\.zip$"),
@@ -206,17 +207,30 @@ sapply(list.files(output_directory_tif, full.names = T, pattern = "\\.xml$"),
 
 
 
+  tifs<-tools::file_path_sans_ext(list.files(output_directory_tif, pattern = "\\.tif$"))
+  zips<-tools::file_path_sans_ext(list.files(output_directory, pattern = "\\.zip$"))
+
+  if(any(!is.element( zips, tifs))){
+    warning_log()
+  }
+
+
    if(forceTifCreation || !file.exists(sprintf("%s/%s.tif",output_directory, q))){
 
      message_log("START writing final file TIF - compressed with predictor=2
 deflate and tiled=yes for ", q)
+     tryCatch( {
      sf:: gdal_utils(util = "translate", vrtPath,
                      destination = sprintf("%s/%s.tif",output_directory, q),
                      options = c("-ot", "Byte",
                                  "-co", "TILED=YES",
-                                 "-co", "COMPRESS=DEFLATE",
-                                 "-co", "PREDICTOR=2")
-     )
+                                 "-co", "BIGTIFF=YES",
+                                 "-co", "COMPRESS=DEFLATE")  )
+     },
+     error = function(e) {
+       return(e)
+     } )
+
 
      message_log("FINISHED writing final file TIF for ", q)
 
