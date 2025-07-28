@@ -19,7 +19,6 @@ username.hdar <- "fpirotti"
 password.hdar <-"XfLUrVLtfuSD94M!!!"
 client <- Client$new(username.hdar, password.hdar, save_credentials = TRUE)
 
-client <- Client$new()
 client$get_token()
 
 
@@ -115,16 +114,23 @@ for(q in names(query)){
     next
   }
 
+  message_log("Querying starting ", q)
   matches <- client$search(qcont)
   if(length(matches$results) < 10) {
     browser()
   }
+
+  message_log("Querying finished with  ", length(matches$results), " results;" )
+
   if(!file.exists(output_directory)){
     message_log("Creating directory ", output_directory)
     dir.create(output_directory)
   }
 
   output_directory_tif <- file.path(output_directory, "TIFFs")
+
+  message_log("Output TIF dir   ", output_directory_tif)
+
 
   if(!file.exists(output_directory_tif)){
     message_log("Creating TIF directory ", output_directory_tif)
@@ -136,10 +142,10 @@ leftToDownload=9999
 while(i==0){
 
   existInFolder <- sapply(matches$results, FUN = function(x) {
-    file.exists(paste0(file.path(output_directory_tif,x$id), ".tif"))
+    file.exists(paste0(file.path(output_directory,x$id), ".zip"))
   })
   existInFolder <- unlist(existInFolder)
-  message(sum(existInFolder), " already done out of ", length(matches$results))
+  message(q, ":", sum(existInFolder), " already done out of ", length(matches$results))
 
   if(length(matches$results) == sum(existInFolder) ){
     message_log("Done!=======")
