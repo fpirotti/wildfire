@@ -1,10 +1,10 @@
 if(!require("hdar")){install.packages("hdar")}
 library(hdar)
 library(jsonlite)
-library(gdalUtilities)
 library(terra)
 library(parallel)
-source("00_globals.R")
+library(httr2)
+source("00_globalsHDAR.R")
 output_base_dir <- "/archivio/shared/geodati/raster"
 
 ncores <- min(40, max(1,abs(parallel::detectCores()-2) ) )
@@ -24,21 +24,21 @@ client$get_token()
 
 ### COPERNICUS DATA -----
 query <- list(
-
-"CLMS_CLCplus_RASTER_2023"=list(
-    "dataset_id"=  "EO:EEA:DAT:CLC-PLUS",
-    "product_type"=  "Raster Layer",
-    "resolution"=  "10m",
-    "year"=  "2023",
-    "type"="Byte"
-  ),
-"CLMS_CLCplus_RASTER_2023confidence"= list(
-    "dataset_id"=  "EO:EEA:DAT:CLC-PLUS",
-    "product_type"=  "Confidence Layer",
-    "resolution"=  "10m",
-    "year"=  "2023",
-    "type"="Byte"
-  ),
+#
+# "CLMS_CLCplus_RASTER_2023"=list(
+#     "dataset_id"=  "EO:EEA:DAT:CLC-PLUS",
+#     "product_type"=  "Raster Layer",
+#     "resolution"=  "10m",
+#     "year"=  "2023",
+#     "type"="Byte"
+#   ),
+# "CLMS_CLCplus_RASTER_2023confidence"= list(
+#     "dataset_id"=  "EO:EEA:DAT:CLC-PLUS",
+#     "product_type"=  "Confidence Layer",
+#     "resolution"=  "10m",
+#     "year"=  "2023",
+#     "type"="Byte"
+#   ),
 "CLMS_TCF_TreeDensity_RASTER_2021" = list(
   "dataset_id"= "EO:EEA:DAT:HRL:TCF",
   "product_type"="Tree Cover Density",
@@ -140,12 +140,13 @@ for(q in names(query)){
 i=0
 leftToDownload=9999
 while(i==0){
-
+browser()
   existInFolder <- sapply(matches$results, FUN = function(x) {
-    file.exists(paste0(file.path(output_directory,x$id), ".zip"))
+    file.exists(paste0(file.path(output_directory,x$id), ".zip"))||
+      file.exists(paste0(file.path(output_directory_tif,x$id), ".tif"))
   })
   existInFolder <- unlist(existInFolder)
-  message(q, ":", sum(existInFolder), " already done out of ", length(matches$results))
+  message(q, ": ", sum(existInFolder), " already done out of ", length(matches$results))
 
   if(length(matches$results) == sum(existInFolder) ){
     message_log("Done!=======")
@@ -160,22 +161,43 @@ while(i==0){
     message("still same number of files left to download (",leftToDownload,"), strange... will break")
     break
   }
-  outp <- tryCatch({
-    matches2$download(output_directory, prompt = F, stop_at_failure = FALSE)
-    },
-    error = function(e) {
-      message_log("======== Error, will wait 10 min then retry...
-the EU server stops when too many requests are
-done too fast  (but does not provide a way to fix this...)")
-      print(e)
-  })
 
-    if(is.element("error", class(outp))) {
-      i<-0
-      message("sleeping 8 minutes...")
-      Sys.sleep(500)
+  for(result in matches2$results){
+    outfile <- file.path(output_directory, result$id%+%".zip")
+    outfile_tif <- file.path(output_directory_tif, result$id%+%".tif")
+    message_log("Doing ", result$id  )
+    if(file.exists(outfile) || file.exists(outfile_tif)){
+      message_log(outfile , " exists already, skipping....")
       next
     }
+    getids <- hdar.getId(client$get_token(),
+                         dataset_id  = qcont2$dataset_id,
+                         product_id = result$id,
+                         location = result$properties$location )
+
+    hdar.download(client$get_token(),
+                  getids$Location,
+                  file.path(output_directory, result$id%+%".zip") )
+    Sys.sleep(3)
+  }
+
+
+#   outp <- tryCatch({
+#     qcont2$dataset_id
+#     matches2$download(output_directory, prompt = F, stop_at_failure = FALSE,verbose = T)
+#     }, error = function(e) {
+#       message_log("======== Error, will wait 10 min then retry...
+# the EU server stops when too many requests are
+# done too fast  (but does not provide a way to fix this...)")
+#       print(e)
+#   })
+
+    # if(is.element("error", class(outp))) {
+    #   i<-0
+    #   message("sleeping 8 minutes...")
+    #   Sys.sleep(500)
+    #   next
+    # }
 
     leftToDownload <- length(matches2$results)
     i<-1
