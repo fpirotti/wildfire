@@ -139,10 +139,7 @@ for(q in names(query)){
     dir.create(output_directory_tif)
   }
 
-# i=0
-# leftToDownload=9999
-# while(i==0){
-# browser()
+
 
   existInFolder <- sapply(matches$results, FUN = function(x) {
     file.exists(paste0(file.path(output_directory,x$id), ".zip"))||
@@ -165,26 +162,6 @@ for(q in names(query)){
     message("still same number of files left to download (",leftToDownload,"), strange... will break")
     break
   }
-
-  # for(result in matches2$results){
-  #   outfile <- file.path(output_directory, result$id%+%".zip")
-  #   outfile_tif <- file.path(output_directory_tif, result$id%+%".tif")
-  #   message_log("Doing ", result$id  )
-  #   if(file.exists(outfile) || file.exists(outfile_tif)){
-  #     message_log(outfile , " exists already, skipping....")
-  #     next
-  #   }
-  #   getids <- hdar.getId(client$get_token(),
-  #                        dataset_id  = qcont2$dataset_id,
-  #                        product_id = result$id,
-  #                        location = result$properties$location )
-  #
-  #   hdar.download(client$get_token(),
-  #                 getids$Location,
-  #                 file.path(output_directory, result$id%+%".zip") )
-  #   Sys.sleep(3)
-  # }
-
 
 
 
@@ -216,7 +193,7 @@ for(q in names(query)){
       matches2$download(output_directory, prompt = F, stop_at_failure = FALSE, verbose=TRUE)
     },
     error = function(e) {
-      message_log("======== Error, will wait 10 min then retry...
+      message_log("======== Error, will wait 1 hour  then retry...
 the Wekeo API stops if more than 100 requests per hour...you can ask higher quotas")
       print(e)
     })
@@ -243,8 +220,8 @@ message_log("Unzipping all and keeping only tif files")
 
 exist<-tools::file_path_sans_ext(list.files(output_directory_tif))
 
-noret <- lapply(list.files(output_directory, full.names = T, pattern = "\\.zip$"),
-                 # mc.cores = 10,
+noret <- mclapply(list.files(output_directory, full.names = T, pattern = "\\.zip$"),
+                 mc.cores = 10,
        FUN = function(x) {
         if( is.element( filename(x) , exist ) ){
           return("exists")
