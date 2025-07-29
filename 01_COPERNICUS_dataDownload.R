@@ -4,7 +4,7 @@ library(jsonlite)
 library(terra)
 library(parallel)
 library(httr2)
-source("00_globalsHDAR.R")
+source("00_globals.R")
 output_base_dir <- "/archivio/shared/geodati/raster"
 
 ncores <- min(40, max(1,abs(parallel::detectCores()-2) ) )
@@ -100,8 +100,10 @@ for(q in names(query)){
   qcont <- query[[q]]
   type <- query[[q]]$type
   query[[q]]$type <- NULL
-  message_log("Querying ", q)
+    message_log("Querying ", q)
   qcont2 <-  qcont
+  # message(qcont2$dataset_id , " - ", qcont2$product_type)
+
   if(is.null(query[[q]]$bbox)) query[[q]]$bbox <- bbox
   if(is.null(query[[q]]$startIndex)) query[[q]]$startIndex <- startIndex
   if(is.null(query[[q]]$itemsPerPage)) query[[q]]$itemsPerPage <- itemsPerPage
@@ -137,14 +139,16 @@ for(q in names(query)){
     dir.create(output_directory_tif)
   }
 
-i=0
-leftToDownload=9999
-while(i==0){
-browser()
+# i=0
+# leftToDownload=9999
+# while(i==0){
+# browser()
+
   existInFolder <- sapply(matches$results, FUN = function(x) {
     file.exists(paste0(file.path(output_directory,x$id), ".zip"))||
       file.exists(paste0(file.path(output_directory_tif,x$id), ".tif"))
   })
+
   existInFolder <- unlist(existInFolder)
   message(q, ": ", sum(existInFolder), " already done out of ", length(matches$results))
 
@@ -162,45 +166,74 @@ browser()
     break
   }
 
-  for(result in matches2$results){
-    outfile <- file.path(output_directory, result$id%+%".zip")
-    outfile_tif <- file.path(output_directory_tif, result$id%+%".tif")
-    message_log("Doing ", result$id  )
-    if(file.exists(outfile) || file.exists(outfile_tif)){
-      message_log(outfile , " exists already, skipping....")
+  # for(result in matches2$results){
+  #   outfile <- file.path(output_directory, result$id%+%".zip")
+  #   outfile_tif <- file.path(output_directory_tif, result$id%+%".tif")
+  #   message_log("Doing ", result$id  )
+  #   if(file.exists(outfile) || file.exists(outfile_tif)){
+  #     message_log(outfile , " exists already, skipping....")
+  #     next
+  #   }
+  #   getids <- hdar.getId(client$get_token(),
+  #                        dataset_id  = qcont2$dataset_id,
+  #                        product_id = result$id,
+  #                        location = result$properties$location )
+  #
+  #   hdar.download(client$get_token(),
+  #                 getids$Location,
+  #                 file.path(output_directory, result$id%+%".zip") )
+  #   Sys.sleep(3)
+  # }
+
+
+
+
+  i=0
+  leftToDownload=9999
+  while(i==0){
+
+    existInFolder <- sapply(matches$results, FUN = function(x) {
+      file.exists(paste0(file.path(output_directory,x$id), ".zip"))
+    })
+    existInFolder <- unlist(existInFolder)
+    message(q, ": ", sum(existInFolder), " already done out of ", length(matches$results))
+
+    if(length(matches$results) == sum(existInFolder) ){
+      message_log("Done!=======")
+      break
+    }
+
+    matches2 <- matches$clone(deep = T)
+    matches2$results <- matches2$results[!existInFolder]
+
+    message(length(matches2$results), " to do be done out of ", length(matches$results))
+    if(leftToDownload == length(matches2$results) ){
+      message("still same number of files left to download (",leftToDownload,"), strange... will break")
+      break
+    }
+
+    outp <- tryCatch({
+      matches2$download(output_directory, prompt = F, stop_at_failure = FALSE, verbose=TRUE)
+    },
+    error = function(e) {
+      message_log("======== Error, will wait 10 min then retry...
+the Wekeo API stops if more than 100 requests per hour...you can ask higher quotas")
+      print(e)
+    })
+
+    if(is.element("error", class(outp))) {
+      i<-0
+      message("sleeping 1 hour as we reached the 100 tile quota... ridicolo...")
+      Sys.sleep(3601)
       next
     }
-    getids <- hdar.getId(client$get_token(),
-                         dataset_id  = qcont2$dataset_id,
-                         product_id = result$id,
-                         location = result$properties$location )
-
-    hdar.download(client$get_token(),
-                  getids$Location,
-                  file.path(output_directory, result$id%+%".zip") )
-    Sys.sleep(3)
-  }
-
-
-#   outp <- tryCatch({
-#     qcont2$dataset_id
-#     matches2$download(output_directory, prompt = F, stop_at_failure = FALSE,verbose = T)
-#     }, error = function(e) {
-#       message_log("======== Error, will wait 10 min then retry...
-# the EU server stops when too many requests are
-# done too fast  (but does not provide a way to fix this...)")
-#       print(e)
-#   })
-
-    # if(is.element("error", class(outp))) {
-    #   i<-0
-    #   message("sleeping 8 minutes...")
-    #   Sys.sleep(500)
-    #   next
-    # }
 
     leftToDownload <- length(matches2$results)
     i<-1
+
+    message_log("FINISHED download")
+  }
+
 
     message_log("FINISHED download")
   }
@@ -210,11 +243,11 @@ message_log("Unzipping all and keeping only tif files")
 
 exist<-tools::file_path_sans_ext(list.files(output_directory_tif))
 
-noret <- mclapply(list.files(output_directory, full.names = T, pattern = "\\.zip$"),
-                 mc.cores = 10,
+noret <- lapply(list.files(output_directory, full.names = T, pattern = "\\.zip$"),
+                 # mc.cores = 10,
        FUN = function(x) {
         if( is.element( filename(x) , exist ) ){
-          return(TRUE)
+          return("exists")
         }
          tryCatch( {
            unzip(x,exdir = output_directory_tif)
@@ -223,8 +256,18 @@ noret <- mclapply(list.files(output_directory, full.names = T, pattern = "\\.zip
            error = function(e) {
              return(e)
         })
-         return(TRUE)
+         return("should not be here")
 })
+
+
+tifs<-tools::file_path_sans_ext(list.files(output_directory_tif, pattern = "\\.tif$"))
+zips<-tools::file_path_sans_ext(list.files(output_directory, pattern = "\\.zip$"))
+hasTif <- is.element( zips, tifs)
+if(any(!hasTif)){
+  sum(any(!hasTif))
+  warning_log("Not all zip files are converted to TIFs! Check problem!!")
+}
+
 message_log("Unzipped ", sum(unlist(noret)), " zip files" )
 
 message_log("Removing XMLs")
@@ -247,14 +290,6 @@ sapply(list.files(output_directory_tif, full.names = T, pattern = "\\.xml$"),
     warning_log("VRT not successful while creating ", q)
   }
 
-
-
-  tifs<-tools::file_path_sans_ext(list.files(output_directory_tif, pattern = "\\.tif$"))
-  zips<-tools::file_path_sans_ext(list.files(output_directory, pattern = "\\.zip$"))
-  hasTif <- is.element( zips, tifs)
-  if(any(!hasTif)){
-    warning_log("Not all zip files are converted to TIFs! Check problem!!")
-  }
   message_log("Removing ZIPs")
   noret <- sapply(list.files(output_directory, full.names = T, pattern = "\\.zip$")[hasTif],
          FUN = function(x) {

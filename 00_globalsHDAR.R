@@ -18,9 +18,11 @@ hdar.download <- function(access_token,
   # Perform request with error handling and file download
   tryCatch({
     # Download directly to file
-
-    req_perform(req, path = output_file) |>
-      resp_check_status()  # throws error if not 200-level
+    s
+    res <- req_perform(req, path = output_file)
+    resp_status(res)
+    browser()
+    resp_check_status(res)  # throws error if not 200-level
 
     message_log("✅ Download successful: ", output_file)
   }, error = function(e) {
@@ -55,10 +57,18 @@ hdar.getId <- function(token,
   resp <- tryCatch({
     resp <- req_perform(req)
     status <- resp_status(resp)
-    if (status != 200 && status != 201) {
+
+    if (status != 200 &&
+        status != 201 &&
+        status != 429 ) {
       warning_log("Request failed with status: ", status, " - ", resp_status_desc(resp))
       warning_log("Body:\n", resp_body_string(resp))
-      stop("Non-200 HTTP response")
+      if (status == 429 ){
+        warning_log("429 wait 5 min for next")
+        Sys.sleep(550)
+      } else{
+        stop("Non-200 HTTP response")
+      }
     }
     resp
   }, error = function(e) {
