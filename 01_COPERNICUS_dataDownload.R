@@ -112,7 +112,7 @@ for(q in names(query)){
 
   output_directory <- sprintf("%s/%s", output_base_dir, q)
   if(file.exists(sprintf("%s/%s.tif",output_directory, q))){
-    message_log("File TIF exists for ", q)
+    message_log("File bigTIF exists for ", q)
     next
   }
 
@@ -193,14 +193,14 @@ for(q in names(query)){
       matches2$download(output_directory, prompt = F, stop_at_failure = FALSE, verbose=TRUE)
     },
     error = function(e) {
-      message_log("======== Error, will wait 1 hour  then retry...
+      message_log("======== Error, will wait 1 hour from ",format(Sys.time(), "%Y-%m-%d %H:%M:%S"),  " then retry...
 the Wekeo API stops if more than 100 requests per hour...you can ask higher quotas")
       print(e)
     })
 
     if(is.element("error", class(outp))) {
       i<-0
-      message("sleeping 1 hour as we reached the 100 tile quota... ridicolo...")
+      message("sleeping 1 hour as we reached the 100 tile quota... ")
       Sys.sleep(3601)
       next
     }
@@ -212,99 +212,100 @@ the Wekeo API stops if more than 100 requests per hour...you can ask higher quot
   }
 
 
-    message_log("FINISHED download")
+
+
+  message_log("Unzipping all and keeping only tif files")
+
+  exist<-tools::file_path_sans_ext(list.files(output_directory_tif))
+
+  noret <- mclapply(list.files(output_directory, full.names = T, pattern = "\\.zip$"),
+                   mc.cores = 10,
+         FUN = function(x) {
+          if( is.element( filename(x) , exist ) ){
+            return("exists")
+          }
+           tryCatch( {
+             unzip(x,exdir = output_directory_tif)
+             return(TRUE)
+             },
+             error = function(e) {
+               return(e)
+          })
+           return("should not be here")
+  })
+
+
+  tifs<-tools::file_path_sans_ext(list.files(output_directory_tif, pattern = "\\.tif$"))
+  zips<-tools::file_path_sans_ext(list.files(output_directory, pattern = "\\.zip$"))
+  hasTif <- is.element( zips, tifs)
+  if(any(!hasTif)){
+    sum(any(!hasTif))
+    warning_log("Not all zip files are converted to TIFs! Check problem!!")
   }
 
+  message_log("Unzipped ", sum(unlist(noret)), " zip files" )
 
-message_log("Unzipping all and keeping only tif files")
-
-exist<-tools::file_path_sans_ext(list.files(output_directory_tif))
-
-noret <- mclapply(list.files(output_directory, full.names = T, pattern = "\\.zip$"),
-                 mc.cores = 10,
-       FUN = function(x) {
-        if( is.element( filename(x) , exist ) ){
-          return("exists")
-        }
-         tryCatch( {
-           unzip(x,exdir = output_directory_tif)
-           return(TRUE)
-           },
-           error = function(e) {
-             return(e)
-        })
-         return("should not be here")
-})
-
-
-tifs<-tools::file_path_sans_ext(list.files(output_directory_tif, pattern = "\\.tif$"))
-zips<-tools::file_path_sans_ext(list.files(output_directory, pattern = "\\.zip$"))
-hasTif <- is.element( zips, tifs)
-if(any(!hasTif)){
-  sum(any(!hasTif))
-  warning_log("Not all zip files are converted to TIFs! Check problem!!")
-}
-
-message_log("Unzipped ", sum(unlist(noret)), " zip files" )
-
-message_log("Removing XMLs")
-sapply(list.files(output_directory_tif, full.names = T, pattern = "\\.xml$"),
-       FUN = function(x) {
-         file.remove(x)
-})
-
-  if(grepl("CropTypes", q)){
-    browser()
-  }
-  message_log("Creating VRT")
-  vrtPath <- sprintf("%s/%s.vrt",output_directory, q)
-  mosaic <- sf::gdal_utils("buildvrt",
-                           list.files(output_directory_tif, full.names = T, pattern = "\\.tif$"),
-                           destination = vrtPath )
-
-
-  if(!mosaic){
-    warning_log("VRT not successful while creating ", q)
-  }
-
-  message_log("Removing ZIPs")
-  noret <- sapply(list.files(output_directory, full.names = T, pattern = "\\.zip$")[hasTif],
+  message_log("Removing XMLs")
+  sapply(list.files(output_directory_tif, full.names = T, pattern = "\\.xml$"),
          FUN = function(x) {
            file.remove(x)
-         })
+  })
+
+    if(grepl("CropTypes", q)){
+      browser()
+    }
+    message_log("Creating VRT")
+    vrtPath <- sprintf("%s/%s.vrt",output_directory, q)
+    mosaic <- sf::gdal_utils("buildvrt",
+                             list.files(output_directory_tif, full.names = T, pattern = "\\.tif$"),
+                             destination = vrtPath )
 
 
-   if(forceTifCreation || !file.exists(sprintf("%s/%s.tif",output_directory, q))){
+    if(!mosaic){
+      warning_log("VRT not successful while creating ", q)
+    }
 
-     message_log("START writing final file TIF - compressed with predictor=2
-deflate and tiled=yes for ", q)
-     ret <- tryCatch( {
-     sf:: gdal_utils(util = "translate", vrtPath,
-                     destination = sprintf("%s/%s.tif",output_directory, q),
-                     options = c("-ot", "Byte",
-                                 "-co", "TILED=YES",
-                                 "-co", "BIGTIFF=YES",
-                                 "-co", "COMPRESS=DEFLATE")  )
-       return(TRUE)
-     },
-     error = function(e) {
-       return(FALSE)
-     })
+    message_log("Removing ZIPs")
+    noret <- sapply(list.files(output_directory, full.names = T, pattern = "\\.zip$")[hasTif],
+           FUN = function(x) {
+             file.remove(x)
+           })
 
-     if(!ret){
-       warning_log("PROBLEM WRITING TIFs! Check problem!!")
-     } else {
-       message_log("FINISHED writing final file TIF for ", q)
+
+     if(forceTifCreation || !file.exists(sprintf("%s/%s.tif",output_directory, q))){
+
+       message_log("START writing final file TIF - compressed with predictor=2
+  deflate and tiled=yes for ", q)
+       ret <- tryCatch( {
+         rr <- sf:: gdal_utils(util = "translate", vrtPath,
+                       destination = sprintf("%s/%s.tif",output_directory, q),
+                       options = c("-ot", "Byte",
+                                   "-co", "TILED=YES",
+                                   "-co", "BIGTIFF=YES",
+                                   "-co", "COMPRESS=DEFLATE")  )
+         return(TRUE)
+       },
+       error = function(e) {
+         warning_log(e$message)
+         return(FALSE)
+       })
+
+       if(!ret){
+         warning_log("PROBLEM WRITING TIF  ",sprintf("%s/%s.tif",output_directory,  q) ,"! Check problem!!")
+
+       } else {
+         message_log("FINISHED writing final file TIF for ", q)
+       }
+       # sf::gdal_utils("info", sprintf("%s/%s.tif",output_directory,  q) )
        sf::gdal_addo(sprintf("%s/%s.tif",output_directory,  q),
                      read_only = T,
                      overviews = c(2, 4, 8, 16, 32, 64, 128, 256, 512),
                      config_options= c("GDAL_NUM_THREADS"=sprintf("%d", ncores))
        )
-     }
-   } else {
+     } else {
 
-     message_log("Final file TIF exists for ", q)
-   }
+       message_log("Final file TIF exists for ", q)
+     }
 
 }
 
