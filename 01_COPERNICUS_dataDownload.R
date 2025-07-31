@@ -88,14 +88,13 @@ query <- list(
   "dataset_id"= "EO:CLMS:DAT:CLMS_GLOBAL_SSM_1KM_V1_DAILY_NETCDF",
   "productType"= "SSM1km",
   "resolution"= "1000",
-  "startdate"= "2024-01-01T00:00:00.000Z",
+  "startdate"= "2023-01-01T00:00:00.000Z",
   "enddate"= "2025-01-01T23:59:59.999Z"
  )
 )
 ## step 1 query tiles ----
 matches <- list()
 if(file.exists("matches.rda")) load("matches.rda")
-
 for(q in names(query)){
   if(!forceQuery  && !is.null(matches[[q]])){
     message_log("Exists, skipping ", q)
@@ -144,21 +143,21 @@ for(q in names(matches)){
       file.exists(paste0(file.path(output_directory_tif,x$id), ".tif"))
   })
   existInFolder <- unlist(existInFolder)
-  message(q, ": ", sum(existInFolder),
+  message_log(q, ": ", sum(existInFolder),
           " already done out of ",
           length(matches[[q]]$results))
 
   if(length(matches[[q]]$results) == sum(existInFolder) ){
-    message_log("All Done!=======")
-    break
+    message_log("All Done for ",q,"!=======")
+    next
   }
 
-  matches2 <- matches$clone(deep = T)
+  matches2 <- matches[[q]]$clone(deep = T)
   matches2$results <- matches2$results[!existInFolder]
 
-  message(length(matches2$results), " to do be done out of ", length(matches$results))
+  message(length(matches2$results), " to do be done out of ", length(matches[[q]]$results))
   if(leftToDownload == length(matches2$results) ){
-    message("still same number of files left to download (",leftToDownload,"), strange... will break")
+    message_log("still same number of files left to download (",leftToDownload,"), strange... will break")
     break
   }
 
@@ -168,44 +167,46 @@ for(q in names(matches)){
   leftToDownload=9999
   while(i==0){
 
-    existInFolder <- sapply(matches$results, FUN = function(x) {
+    existInFolder <- sapply(matches[[q]]$results, FUN = function(x) {
       file.exists(paste0(file.path(output_directory,x$id), ".zip"))||
         file.exists(paste0(file.path(output_directory_tif,x$id), ".tif"))
     })
     existInFolder <- unlist(existInFolder)
-    message(q, ": ", sum(existInFolder), " already done out of ", length(matches$results))
+    message_log("LOOP: ",q, ": ", sum(existInFolder), " already done out of ",
+                length(matches[[q]]$results))
 
-    if(length(matches$results) == sum(existInFolder) ){
-      message_log("Done!=======")
+    if(length(matches[[q]]$results) == sum(existInFolder) ){
+      message_log("LOOP: Done all ",length(matches[[q]]$results)," tiles!=======")
       break
     }
 
-    matches2 <- matches$clone(deep = T)
+    matches2 <- matches[[q]]$clone(deep = T)
     matches2$results <- matches2$results[!existInFolder]
 
-    message(length(matches2$results), " to do be done out of ", length(matches$results))
+    message(length(matches2$results), " to do be done out of ", length(matches[[q]]$results))
     if(leftToDownload == length(matches2$results) ){
-      message("still same number of files left to download (",leftToDownload,"), strange... will break")
+      warning_log("LOOP: still same number of files left to download again (",leftToDownload,"), strange... will break")
       break
     }
 
     outp <- tryCatch({
       matches2$download(output_directory, prompt = F, stop_at_failure = FALSE, verbose=TRUE)
-    },
-    error = function(e) {
-      message_log("======== Error, will wait 1 hour from ",format(Sys.time(), "%Y-%m-%d %H:%M:%S"),  " then retry...
-the Wekeo API stops if more than 100 requests per hour...you can ask higher quotas")
-      print(e)
+      },
+      error = function(e) {
+        message_log("======== Error, will wait 1 hour from ",format(Sys.time(), "%Y-%m-%d %H:%M:%S"),  " then retry...
+  the Wekeo API stops if more than 100 requests per hour...you can ask higher quotas")
+        print(e)
+        e
     })
 
     if(is.element("error", class(outp))) {
       i<-0
-      message("sleeping 1 hour as we reached the 100 tile quota... ")
+      message_log("LOOP: sleeping 1 hour as we reached the 100 tile quota... ")
       Sys.sleep(3601)
       next
     }
 
-    existInFolder <- sapply(matches$results, FUN = function(x) {
+    existInFolder <- sapply(matches[[q]]$results, FUN = function(x) {
       file.exists(paste0(file.path(output_directory,x$id), ".zip"))||
         file.exists(paste0(file.path(output_directory_tif,x$id), ".tif"))
     })
@@ -213,7 +214,7 @@ the Wekeo API stops if more than 100 requests per hour...you can ask higher quot
 
     if(any(!existInFolder)) {
       i<-0
-      message("sleeping 12 secs to retry to download the ", sum(!existInFolder)," files with errors")
+      message_log("LOOP: sleeping 12 secs to retry to download the ", sum(!existInFolder)," files with errors")
       Sys.sleep(12)
       next
     }
@@ -221,11 +222,14 @@ the Wekeo API stops if more than 100 requests per hour...you can ask higher quot
     leftToDownload <- length(matches2$results)
     i<-1
 
-    message_log("FINISHED download")
+    message_log("LOOP: FINISHED download")
   }
+}
 
 
 
+## step 3 create TIF and overviews  ----
+for(q in names(matches)){
 
   message_log("Unzipping all and keeping only tif files")
 
