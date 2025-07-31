@@ -11,9 +11,10 @@ ncores <- min(40, max(1,abs(parallel::detectCores()-2) ) )
 ## bounding box with
 ## West-most (lower) X, South-most Y,
 ## East-most (higher) X, North-most Y
-bbox=c(-10,20,30,53)
+bbox=c(-10,20,50,83)
 startIndex=0
 itemsPerPage=100
+forceQuery <- FALSE
 forceTifCreation <- FALSE
 username.hdar <- "fpirotti"
 password.hdar <-"XfLUrVLtfuSD94M!!!"
@@ -24,21 +25,21 @@ client$get_token()
 
 ### COPERNICUS DATA -----
 query <- list(
-#
-# "CLMS_CLCplus_RASTER_2023"=list(
-#     "dataset_id"=  "EO:EEA:DAT:CLC-PLUS",
-#     "product_type"=  "Raster Layer",
-#     "resolution"=  "10m",
-#     "year"=  "2023",
-#     "type"="Byte"
-#   ),
-# "CLMS_CLCplus_RASTER_2023confidence"= list(
-#     "dataset_id"=  "EO:EEA:DAT:CLC-PLUS",
-#     "product_type"=  "Confidence Layer",
-#     "resolution"=  "10m",
-#     "year"=  "2023",
-#     "type"="Byte"
-#   ),
+
+"CLMS_CLCplus_RASTER_2023"=list(
+    "dataset_id"=  "EO:EEA:DAT:CLC-PLUS",
+    "product_type"=  "Raster Layer",
+    "resolution"=  "10m",
+    "year"=  "2023",
+    "type"="Byte"
+  ),
+"CLMS_CLCplus_RASTER_2023confidence"= list(
+    "dataset_id"=  "EO:EEA:DAT:CLC-PLUS",
+    "product_type"=  "Confidence Layer",
+    "resolution"=  "10m",
+    "year"=  "2023",
+    "type"="Byte"
+  ),
 "CLMS_TCF_TreeDensity_RASTER_2021" = list(
   "dataset_id"= "EO:EEA:DAT:HRL:TCF",
   "product_type"="Tree Cover Density",
@@ -95,12 +96,19 @@ query <- list(
   "enddate"= "2025-01-01T23:59:59.999Z"
  )
 )
+## step 1 query tiles ----
+matches <- list()
+if(file.exists("matches.rda")) load("matches.rda")
 
 for(q in names(query)){
+  if(!forceQuery  && !is.null(matches[[q]])){
+    message_log("Exists, skipping ", q)
+    next
+  }
   qcont <- query[[q]]
   type <- query[[q]]$type
   query[[q]]$type <- NULL
-    message_log("Querying ", q)
+  message_log("Querying ", q)
   qcont2 <-  qcont
   # message(qcont2$dataset_id , " - ", qcont2$product_type)
 
@@ -110,47 +118,42 @@ for(q in names(query)){
 
   qcont <- jsonlite::toJSON(query[[q]],auto_unbox = T)
 
-  output_directory <- sprintf("%s/%s", output_base_dir, q)
-  if(file.exists(sprintf("%s/%s.tif",output_directory, q))){
-    message_log("File bigTIF exists for ", q)
-    next
-  }
-
   message_log("Querying starting ", q)
-  matches <- client$search(qcont)
-  if(length(matches$results) < 10) {
+  matches[[q]] <- client$search(qcont)
+  if(length(matches[[q]]$results) < 10) {
     browser()
   }
+  save(matches,file="matches.rda")
+  message_log("Querying  ",q," finished with  ", length(matches[[q]]$results), " results;" )
+}
 
-  message_log("Querying finished with  ", length(matches$results), " results;" )
+## step 2 download files ----
+for(q in names(matches)){
 
+  output_directory <- sprintf("%s/%s", output_base_dir, q)
   if(!file.exists(output_directory)){
     message_log("Creating directory ", output_directory)
     dir.create(output_directory)
   }
 
   output_directory_tif <- file.path(output_directory, "TIFFs")
-
   message_log("Output TIF dir   ", output_directory_tif)
-
-
   if(!file.exists(output_directory_tif)){
     message_log("Creating TIF directory ", output_directory_tif)
     dir.create(output_directory_tif)
   }
 
-
-
-  existInFolder <- sapply(matches$results, FUN = function(x) {
+  existInFolder <- sapply(matches[[q]]$results, FUN = function(x) {
     file.exists(paste0(file.path(output_directory,x$id), ".zip"))||
       file.exists(paste0(file.path(output_directory_tif,x$id), ".tif"))
   })
-
   existInFolder <- unlist(existInFolder)
-  message(q, ": ", sum(existInFolder), " already done out of ", length(matches$results))
+  message(q, ": ", sum(existInFolder),
+          " already done out of ",
+          length(matches[[q]]$results))
 
-  if(length(matches$results) == sum(existInFolder) ){
-    message_log("Done!=======")
+  if(length(matches[[q]]$results) == sum(existInFolder) ){
+    message_log("All Done!=======")
     break
   }
 
@@ -170,7 +173,8 @@ for(q in names(query)){
   while(i==0){
 
     existInFolder <- sapply(matches$results, FUN = function(x) {
-      file.exists(paste0(file.path(output_directory,x$id), ".zip"))
+      file.exists(paste0(file.path(output_directory,x$id), ".zip"))||
+        file.exists(paste0(file.path(output_directory_tif,x$id), ".tif"))
     })
     existInFolder <- unlist(existInFolder)
     message(q, ": ", sum(existInFolder), " already done out of ", length(matches$results))
@@ -205,6 +209,19 @@ the Wekeo API stops if more than 100 requests per hour...you can ask higher quot
       next
     }
 
+    existInFolder <- sapply(matches$results, FUN = function(x) {
+      file.exists(paste0(file.path(output_directory,x$id), ".zip"))||
+        file.exists(paste0(file.path(output_directory_tif,x$id), ".tif"))
+    })
+    existInFolder <- unlist(existInFolder)
+
+    if(any(!existInFolder)) {
+      i<-0
+      message("sleeping 12 secs to retry to download the ", sum(!existInFolder)," files with errors")
+      Sys.sleep(12)
+      next
+    }
+
     leftToDownload <- length(matches2$results)
     i<-1
 
@@ -216,20 +233,21 @@ the Wekeo API stops if more than 100 requests per hour...you can ask higher quot
 
   message_log("Unzipping all and keeping only tif files")
 
-  exist<-tools::file_path_sans_ext(list.files(output_directory_tif))
-
-  noret <- mclapply(list.files(output_directory, full.names = T, pattern = "\\.zip$"),
+  exist<-tools::file_path_sans_ext(list.files(output_directory_tif, pattern="\\.tif$"))
+  zips <- list.files(output_directory, full.names = T, pattern = "\\.zip$")
+  noret <- mclapply(zips,
                    mc.cores = 10,
          FUN = function(x) {
           if( is.element( filename(x) , exist ) ){
-            return("exists")
+            return(TRUE)
           }
            tryCatch( {
              unzip(x,exdir = output_directory_tif)
              return(TRUE)
              },
              error = function(e) {
-               return(e)
+               warning_log(e$message)
+               return(FALSE)
           })
            return("should not be here")
   })
@@ -239,8 +257,9 @@ the Wekeo API stops if more than 100 requests per hour...you can ask higher quot
   zips<-tools::file_path_sans_ext(list.files(output_directory, pattern = "\\.zip$"))
   hasTif <- is.element( zips, tifs)
   if(any(!hasTif)){
-    sum(any(!hasTif))
-    warning_log("Not all zip files are converted to TIFs! Check problem!!")
+
+    warning_log("Not all zip files are converted to TIFs!",
+                sum(any(!hasTif)) ," not downloaded. Check problem!!")
   }
 
   message_log("Unzipped ", sum(unlist(noret)), " zip files" )
@@ -274,7 +293,7 @@ the Wekeo API stops if more than 100 requests per hour...you can ask higher quot
 
      if(forceTifCreation || !file.exists(sprintf("%s/%s.tif",output_directory, q))){
 
-       message_log("START writing final file TIF - compressed with predictor=2
+     message_log("START writing final file TIF - compressed with predictor=2
   deflate and tiled=yes for ", q)
        ret <- tryCatch( {
          rr <- sf:: gdal_utils(util = "translate", vrtPath,
@@ -283,16 +302,15 @@ the Wekeo API stops if more than 100 requests per hour...you can ask higher quot
                                    "-co", "TILED=YES",
                                    "-co", "BIGTIFF=YES",
                                    "-co", "COMPRESS=DEFLATE")  )
-         return(TRUE)
+         TRUE
        },
        error = function(e) {
          warning_log(e$message)
-         return(FALSE)
+         FALSE
        })
 
        if(!ret){
          warning_log("PROBLEM WRITING TIF  ",sprintf("%s/%s.tif",output_directory,  q) ,"! Check problem!!")
-
        } else {
          message_log("FINISHED writing final file TIF for ", q)
        }
