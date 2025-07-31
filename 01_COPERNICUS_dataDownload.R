@@ -87,10 +87,6 @@ query <- list(
 "CLMS_SurfaceSoilMoisture_2024"=list(
   "dataset_id"= "EO:CLMS:DAT:CLMS_GLOBAL_SSM_1KM_V1_DAILY_NETCDF",
   "productType"= "SSM1km",
-  "productionStatus"= "ARCHIVED",
-  "acquisitionType"= "NOMINAL",
-  "platform"= "SENTINEL-1",
-  "processingCenter"= "TU_WIEN",
   "resolution"= "1000",
   "startdate"= "2024-01-01T00:00:00.000Z",
   "enddate"= "2025-01-01T23:59:59.999Z"
