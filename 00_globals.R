@@ -1,6 +1,6 @@
 
 output_base_dir <- "/archivio/shared/geodati/raster"
-
+ncores <- min(40, max(1,abs(parallel::detectCores()-2) ) )
 filename <- function(fullname){
   basename(tools::file_path_sans_ext(fullname))
 }
