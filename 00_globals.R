@@ -1,5 +1,5 @@
-logfile <- "logMessage.log"
-warnfile <- "logWarning.log"
+
+output_base_dir <- "/archivio/shared/geodati/raster"
 
 filename <- function(fullname){
   basename(tools::file_path_sans_ext(fullname))
@@ -8,10 +8,15 @@ filename <- function(fullname){
 sameFileNoExt <- function(fullname, fullname2){
   filename(fullname) == filename(fullname2)
 }
+
 `%+%` <- function(a, b) paste0(a, b)
+
+logfile <- "logs/"%+%Sys.getpid()%+%"_logMessage.log"
+warnfile <- "logs/"%+%Sys.getpid()%+%"_logWarning.log"
 
 if(file.exists(logfile)) file.remove(logfile)
 if(file.exists(warnfile))file.remove(warnfile)
+
 warning_log <- function(...,   call. = TRUE, immediate. = FALSE) {
   # Write to logfile
   cat(format(Sys.time(), "%Y-%m-%d %H:%M:%S"), "-", paste(..., concatenate=" "), "\n", file = warnfile, append = TRUE)
@@ -25,3 +30,74 @@ message_log <- function(..., call. = TRUE, immediate. = FALSE) {
   # Emit warning
   message(...)
 }
+
+
+### COPERNICUS DATA -----
+query <- list(
+
+  "CLMS_CLCplus_RASTER_2023"=list(
+    "dataset_id"=  "EO:EEA:DAT:CLC-PLUS",
+    "product_type"=  "Raster Layer",
+    "resolution"=  "10m",
+    "year"=  "2023",
+    "type"="Byte"
+  ),
+  "CLMS_CLCplus_RASTER_2023confidence"= list(
+    "dataset_id"=  "EO:EEA:DAT:CLC-PLUS",
+    "product_type"=  "Confidence Layer",
+    "resolution"=  "10m",
+    "year"=  "2023",
+    "type"="Byte"
+  ),
+  "CLMS_TCF_TreeDensity_RASTER_2021" = list(
+    "dataset_id"= "EO:EEA:DAT:HRL:TCF",
+    "product_type"="Tree Cover Density",
+    "resolution"= "10m",
+    "year"= "2021",
+    "type"="Byte"
+  ),
+  "CLMS_TCF_TreeDensity_RASTER_2021_Conf" = list(
+    "dataset_id"=  "EO:EEA:DAT:HRL:TCF",
+    "product_type"=  "Tree Cover Density Confidence Layer",
+    "resolution"=  "10m",
+    "year"=  "2021",
+    "type"="Byte"
+  ),
+
+  "CLMS_TCF_DominantLeafType_RASTER_2021" = list(
+    "dataset_id"=  "EO:EEA:DAT:HRL:TCF",
+    "product_type"=  "Dominant Leaf Type",
+    "resolution"=  "10m",
+    "year"=  "2021",
+    "type"="Byte"
+  ),
+
+  "CLMS_TCF_DominantLeafType_RASTER_2021_Conf" = list(
+    "dataset_id"=  "EO:EEA:DAT:HRL:TCF",
+    "product_type"=  "Dominant Leaf Type Confidence Layer",
+    "resolution"=  "10m",
+    "year"=  "2021",
+    "type"="Byte"
+  ),
+
+  "CLMS_CropTypes_RASTER_2021" = list(
+    "dataset_id"=  "EO:EEA:DAT:HRL:CRL",
+    "product_type"=  "Crop Types",
+    "resolution"=  "10m",
+    "year"=  "2021",
+    "type"="ConvToByte"
+  ),
+  "CLMS_CropTypes_RASTER_2021_Conf" = list(
+    "dataset_id"= "EO:EEA:DAT:HRL:CRL",
+    "product_type"= "Crop Types Confidence Layer",
+    "resolution"=  "10m",
+    "type"="ConvToByte"
+  ),
+  "CLMS_SurfaceSoilMoisture_2024"=list(
+    "dataset_id"= "EO:CLMS:DAT:CLMS_GLOBAL_SSM_1KM_V1_DAILY_NETCDF",
+    "productType"= "SSM1km",
+    "resolution"= "1000",
+    "startdate"= "2023-01-01T00:00:00.000Z",
+    "enddate"= "2025-01-01T23:59:59.999Z"
+  )
+)
