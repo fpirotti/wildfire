@@ -2,18 +2,23 @@
 library(zen4R)
 zenodo <- ZenodoManager$new(
   url = "https://sandbox.zenodo.org/api",
-  token = Sys.getenv("TOKEN_ZENODO"),
+  token = Sys.getenv("TOKEN_ZENODO_SANDBOX"),
   logger = "INFO"
 )
 
 myrec <- ZenodoRecord$new()
 myrec$setTitle("CLCplus Backbone 2023 (raster 10 m), Europe, 2-yearly, May 2025")
 myrec$setDescription("A description of my R package")
-myrec$setUploadType("software")
+myrec$setResourceType("dataset")
+myrec$setPublisher("Francesco Pirotti")
+myrec$setPublicationDate(as.character(Sys.Date()))
 myrec$addCreator(firstname = "Francesco", lastname = "Pirotti",
                  orcid="0000-0002-4796-6406")
-myrec$setLicense("mit")
 
+myrec$setLicense("cc-by-1.0")
+myrec$setAccessPolicyRecord(access =  "public" )
 myrec <- zenodo$depositRecord(myrec)
+poll <- zenodo$uploadFile("00_globals.R", record=myrec  )
 
-print(zenodo)
+myrecst <- zenodo$publishRecord(myrec$getId())
+

@@ -150,7 +150,7 @@ for(q in names(matches)){
     leftToDownload <- length(matches2$results)
     i<-1
 
-    message_log(Q, ": DOWNLOAD - %%%%%%%%% FINISHED download %%%%%%%%%%%%%%%")
+    message_log(q, ": DOWNLOAD - %%%%%%%%% FINISHED download %%%%%%%%%%%%%%%")
   }
 }
 

@@ -14,7 +14,7 @@ checkTifsMissing <- function(q){
   })
   ids[!tifExistInFolder]
 }
-
+# checkTifsMissing(q)
 ## step 3 UNZIP  ----
 for(q in names(matches)){
 
