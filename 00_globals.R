@@ -91,6 +91,7 @@ query <- list(
     "dataset_id"= "EO:EEA:DAT:HRL:CRL",
     "product_type"= "Crop Types Confidence Layer",
     "resolution"=  "10m",
+    "year"=  "2021",
     "type"="ConvToByte"
   ),
   "CLMS_SurfaceSoilMoisture_2024"=list(

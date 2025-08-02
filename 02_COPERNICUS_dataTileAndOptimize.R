@@ -63,7 +63,7 @@ for(q in names(matches)){
 
   missing <- checkTifsMissing(q)
   if(length(missing)!=0){
-    warning_log(q, ": UNZIP -  ",," missing files to download!")
+    warning_log(q, ": UNZIP -  ", length(missing)," missing files to download!")
     next
   }
 
@@ -135,10 +135,24 @@ for(q in names(matches)){
     sf::gdal_addo(sprintf("%s/%s.tif",output_directory,  q),
                            read_only = T,
                            overviews = c(2, 4, 8, 16, 32, 64, 128, 256, 512,1024),
-                           config_options= c("GDAL_NUM_THREADS"=sprintf("%d", 10))
+                            options = c(
+                              "-overwrite"
+                            ),
+                           config_options= c("GDAL_NUM_THREADS"=sprintf("%d", 50))
      )
   })
 }
+
+
+
+## step 5  tiles   ----
+
+  for(q in names(matches)){
+    output_directory <- sprintf("%s/%s", output_base_dir, q)
+    output_directory_tif <- file.path(output_directory, "TIFFs")
+    system("gdaltindex " %+% output_directory %+% "/" %+% q %+% ".shp " %+%
+             output_directory_tif %+% "/*.tif")
+  }
 
 # library(ssh)
 #

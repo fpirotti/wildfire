@@ -3,7 +3,7 @@ library(hdar)
 library(jsonlite)
 
 source("00_globals.R")
-#
+
 # ncores <- min(40, max(1,abs(parallel::detectCores()-2) ) )
 ## bounding box with
 ## West-most (lower) X, South-most Y,
