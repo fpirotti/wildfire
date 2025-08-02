@@ -16,8 +16,10 @@ checkTifsMissing <- function(q){
 }
 # checkTifsMissing(q)
 ## step 3 UNZIP  ----
-for(q in names(matches)){
+message_log("===================== STEP 3 UNZIP ==============")
 
+for(q in names(matches)){
+  next
   output_directory <- sprintf("%s/%s", output_base_dir, q)
   output_directory_tif <- file.path(output_directory, "TIFFs")
   message_log(q, "...unzipping all in ", output_directory_tif, " and keeping only tif files")
@@ -89,20 +91,26 @@ for(q in names(matches)){
   }
 
 }
-
+message_log("==============finish  STEP 3 UNZIP ==============")
 
 ## step 4  create TIF and overviews  ----
+message_log("============== STEP 4 tif and overviews ==============")
 cores = min(names(matches), 10)
-for(q in names(matches)){
+# for(q in names(matches)){}
 
- lapply(names(matches),
-          # mc.cores = cores,
+forceTifCreation <- FALSE
+  outmc <- mclapply(names(matches),
+         mc.cores = cores,
           FUN=function(q){
 
-    if(grepl("CropTypes", q)){
-      browser()
-    }
+      if(grepl("CropTypes", q)){
+        return("CropTypes")
+      }
 
+      output_directory <- sprintf("%s/%s", output_base_dir, q)
+      output_directory_tif <- file.path(output_directory, "TIFFs")
+      vrtPath <- sprintf("%s/%s.vrt",output_directory, q)
+     message_log(q, " STEP 4 tif and overviews ==============")
 
      if(forceTifCreation || !file.exists(sprintf("%s/%s.tif",output_directory, q))){
 
@@ -119,40 +127,43 @@ for(q in names(matches)){
          TRUE
        },
        error = function(e) {
-         FALSE
+         e$message
        })
 
-       if(!ret){
-         warning_log("PROBLEM WRITING TIF  ",sprintf("%s/%s.tif",output_directory,  q) ,"! Check problem!!")
+       if(!isTRUE(ret) ){
+         warning_log(q, ": PROBLEM WRITING TIF  ",sprintf("%s/%s.tif",output_directory,  q) ,"! Check problem message = '", ret,"'")
        } else {
-         message_log("FINISHED writing final file TIF for ", q)
+         message_log(q, ": FINISHED writing final file TIF"  )
        }
      } else {
 
-       message_log("Final file TIF exists for ", q)
+       message_log(q, ": Final file TIF EXISTS")
      }
 
+  if(!file.exists(sprintf("%s/%s.tif.ovr",output_directory, q))){
     sf::gdal_addo(sprintf("%s/%s.tif",output_directory,  q),
-                           read_only = T,
-                           overviews = c(2, 4, 8, 16, 32, 64, 128, 256, 512,1024),
-                            options = c(
-                              "-overwrite"
-                            ),
-                           config_options= c("GDAL_NUM_THREADS"=sprintf("%d", 50))
-     )
-  })
-}
+                  read_only = T,
+                  overviews = c(2, 4, 8, 16, 32, 64, 128, 256, 512,1024),
+                  options = c(
+                    "-overwrite"
+                  ),
+                  config_options= c("GDAL_NUM_THREADS"=sprintf("%d", 20))
+    )
+  }
+
+ })
+# }
 
 
 
 ## step 5  tiles   ----
-
-  for(q in names(matches)){
-    output_directory <- sprintf("%s/%s", output_base_dir, q)
-    output_directory_tif <- file.path(output_directory, "TIFFs")
-    system("gdaltindex " %+% output_directory %+% "/" %+% q %+% ".shp " %+%
-             output_directory_tif %+% "/*.tif")
-  }
+#
+#   for(q in names(matches)){
+#     output_directory <- sprintf("%s/%s", output_base_dir, q)
+#     output_directory_tif <- file.path(output_directory, "TIFFs")
+#     system("gdaltindex " %+% output_directory %+% "/" %+% q %+% ".shp " %+%
+#              output_directory_tif %+% "/*.tif")
+#   }
 
 # library(ssh)
 #

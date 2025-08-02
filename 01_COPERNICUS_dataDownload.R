@@ -12,7 +12,6 @@ bbox=c(-10,20,50,83)
 startIndex=0
 itemsPerPage=100
 forceQuery <- FALSE
-forceTifCreation <- FALSE
 username.hdar <- "fpirotti"
 password.hdar <-Sys.getenv("HDAR_WEKEO")
 client <- Client$new(username.hdar, password.hdar, save_credentials = TRUE)

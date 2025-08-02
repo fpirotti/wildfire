@@ -7,12 +7,12 @@ clc <- terra::rast("/archivio/shared/geodati/raster/CLMS_CLCplus_RASTER_2023/CLM
 
 SHAPEcatalonia <- terra::project( terra::vect("input/Catalonia.shp"),
                                   clc)
-clc_catal <- terra::crop(clc, SHAPEcatalonia)
-
-
-clc_catalFit <- terra::mask(clc_catal, SHAPEcatalonia)
-terra::writeRaster(clc_catalFit, "CataloniaRasterCLC2023.tif",
-                   datatype="INT1U", overwrite=T)
+# clc_catal <- terra::crop(clc, SHAPEcatalonia)
+#
+#
+# clc_catalFit <- terra::mask(clc_catal, SHAPEcatalonia)
+# terra::writeRaster(clc_catalFit, "CataloniaRasterCLC2023.tif",
+#                    datatype="INT1U", overwrite=T)
 clc_catalFit <- terra::rast( "CataloniaRasterCLC2023.tif")
 
 
@@ -26,7 +26,23 @@ message_log("tot pixels with shrub in Catalonia in km2: ", Area*100/1000000 )
 
 bm <- terra::resample(terra::crop(terra::rast("/archivio/shared/geodati/raster/Biomass/biomass100mEPSG3035.tif"),
                                   clc_catalFit), clc_catalFit)
-bmShrub <- clc_catalFitShrub*bm / 100
+
+boundsCatalonia <- terra::vect( terra::ext(clc_catalFit))
+terra::crs(boundsCatalonia)<-terra::crs("EPSG:3035")
+boundsCatalonia4326 <- terra::project(bounds, terra::crs(bm) )
+
+bm<-terra::rast("/archivio/shared/geodati/raster/Biomass/ESACCI-BIOMASS-L4-AGB-MERGED-100m-2022-fv6.0.nc")
+bmCatalonia<-terra::crop(bm$agb,boundsCatalonia4326)
+# plot(bmCatalonia)
+bmp <- terra::resample(terra::project(bmCatalonia, terra::crs(clc_catalFit)),
+                       clc_catalFit)
+
+terra::writeRaster(bmCatalonia, "CataloniaRasterESACCIbiomass.tif",
+                    overwrite=T)
+
+terra::writeRaster(bmp, "CataloniaRasterESACCIbiomass.tif",
+                   overwrite=T)
+bmShrub <- clc_catalFitShrub*bmp / 100
 Biomass <- sum(bmShrub[], na.rm = T)
 message_log("Mg of  shrub in Catalonia: ", Biomass )
 
