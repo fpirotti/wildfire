@@ -12,21 +12,39 @@ zenodo <- ZenodoManager$new(
   logger = "INFO"
 )
 
-myrec <- ZenodoRecord$new()
-myrec$setTitle("CLCplus Backbone 2023 (raster 10 m), Europe, 2-yearly, May 2025")
-myrec$setDescription("Here we aggregate the CLC+ 2023 in a single 1 byte raster
-file for easier download.  ")
+ myrec <- zenodo$getRecordById(16690962)
+
+ myrecLatest <- zenodo$getRecordByDOI("10.5281/zenodo.16690962")
+# myrec2 <- zenodo$ (myrec$getId() )
+# myrec <- ZenodoRecord$new()
+myrec$setTitle("Latest High Resolution Layers (HRL) from Copernicus Land Cover Services")
+myrec$setDescription("We aggregate some High Resolution Layers (HRL) from the Copernicus Land Cover Service using either 1 or 2 byte rasters
+to save space and make for an  easier download.
+These data are provided by different Data and Information Access services (DIAS) and also by tile.
+Nevertheless it is sometimes better to download the whole grid as one file, instead of the singl 799 tiles to cover the EU contries.
+All data are aligned in the EPSG:3035 grid coordinate system.
+Each layer has its respective confidence layer.
+  - CLCplus Backbone 2023 (raster 10 m)
+  - Tree Cover Density 2021 (raster 10 m)")
 myrec$setResourceType("dataset")
 myrec$setPublisher("Francesco Pirotti")
 myrec$setPublicationDate(as.character(Sys.Date()))
-myrec$addCreator(firstname = "Francesco", lastname = "Pirotti",
-                 orcid="0000-0002-4796-6406")
+# myrec$addCreator(firstname = "Francesco", lastname = "Pirotti",
+#                  orcid="0000-0002-4796-6406")
 
 myrec$setLicense("cc-by-1.0")
+myrec$setPublicationDate(as.character(Sys.Date()))
 myrec$setAccessPolicyRecord(access =  "public" )
-myrec <- zenodo$depositRecord(myrec)
+
+myrec2 <- zenodo$depositRecordVersion(myrec,
+                                      files = "/archivio/shared/geodati/raster/CLMS_TCF_TreeDensity_RASTER_2021/CLMS_TCF_TreeDensity_RASTER_2021.tif",
+                                      delete_latest_files = F)
+
 poll <- zenodo$uploadFile("/archivio/shared/geodati/raster/CLMS_CLCplus_RASTER_2023/CLMS_CLCplus_RASTER_2023.tif",
                           record=myrec  )
 
-myrecst <- zenodo$publishRecord(myrec$getId())
+#
+# poll <- zenodo$uploadFile("/archivio/shared/geodati/raster/CLMS_TCF_TreeDensity_RASTER_2021/CLMS_TCF_TreeDensity_RASTER_2021.tif",
+#                           record=myrec2  )
+myrecst <- zenodo$publishRecord(myrec2$getId())
 

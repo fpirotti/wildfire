@@ -87,12 +87,27 @@ query <- list(
     "year"=  "2021",
     "type"="ConvToByte"
   ),
+
   "CLMS_CropTypes_RASTER_2021_Conf" = list(
     "dataset_id"= "EO:EEA:DAT:HRL:CRL",
     "product_type"= "Crop Types Confidence Layer",
     "resolution"=  "10m",
     "year"=  "2021",
     "type"="ConvToByte"
+  ),
+
+  "CLMS_Grassland_RASTER_2021" = list(
+    "dataset_id"=  "EO:EEA:DAT:HRL:GRA",
+    "product_type"=  "Grassland",
+    "resolution"=  "10m",
+    "year"=  "2021"
+  ),
+
+  "CLMS_Grassland_RASTER_2021_Conf" = list(
+    "dataset_id"= "EO:EEA:DAT:HRL:GRA",
+    "product_type"= "Grassland Confidence Layer",
+    "resolution"=  "10m",
+    "year"=  "2021"
   ),
   "CLMS_SurfaceSoilMoisture_2024"=list(
     "dataset_id"= "EO:CLMS:DAT:CLMS_GLOBAL_SSM_1KM_V1_DAILY_NETCDF",

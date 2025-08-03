@@ -40,10 +40,12 @@ for(q in names(query)){
 
   message_log(q, ": QUERY - Querying starting " )
   matches[[q]] <- client$search(qcont)
+  message_log(q, ": QUERY - Querying FINISHED " )
   if(length(matches[[q]]$results) < 10) {
     message_log(q, ": QUERY - too few matches" )
     next
   }
+  message_log(q, ": QUERY - SAVING..." )
   save(matches,file="matches.rda")
   message_log(q, ": QUERY - Querying   finished with  ", length(matches[[q]]$results), " results;" )
 }
@@ -68,7 +70,8 @@ for(q in names(matches)){
 
   existInFolder <- sapply(matches[[q]]$results, FUN = function(x) {
     file.exists(paste0(file.path(output_directory,x$id), ".zip"))||
-      file.exists(paste0(file.path(output_directory_tif,x$id), ".tif"))
+      file.exists(paste0(file.path(output_directory,x$id), ".nc"))||
+       file.exists(paste0(file.path(output_directory_tif,x$id), ".tif"))
   })
   existInFolder <- unlist(existInFolder)
   message_log(q, ":  DOWNLOAD - ", sum(existInFolder),
@@ -96,6 +99,7 @@ for(q in names(matches)){
 
     existInFolder <- sapply(matches[[q]]$results, FUN = function(x) {
       file.exists(paste0(file.path(output_directory,x$id), ".zip"))||
+        file.exists(paste0(file.path(output_directory,x$id), ".nc"))||
         file.exists(paste0(file.path(output_directory_tif,x$id), ".tif"))
     })
     existInFolder <- unlist(existInFolder)
@@ -135,6 +139,7 @@ for(q in names(matches)){
 
     existInFolder <- sapply(matches[[q]]$results, FUN = function(x) {
       file.exists(paste0(file.path(output_directory,x$id), ".zip"))||
+        file.exists(paste0(file.path(output_directory,x$id), ".nc"))||
         file.exists(paste0(file.path(output_directory_tif,x$id), ".tif"))
     })
     existInFolder <- unlist(existInFolder)

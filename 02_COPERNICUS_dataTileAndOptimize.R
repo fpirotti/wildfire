@@ -103,13 +103,11 @@ forceTifCreation <- FALSE
          mc.cores = cores,
           FUN=function(q){
 
-      if(grepl("CropTypes", q)){
-        return("CropTypes")
-      }
 
       output_directory <- sprintf("%s/%s", output_base_dir, q)
       output_directory_tif <- file.path(output_directory, "TIFFs")
       vrtPath <- sprintf("%s/%s.vrt",output_directory, q)
+
      message_log(q, " STEP 4 tif and overviews ==============")
 
      if(forceTifCreation || !file.exists(sprintf("%s/%s.tif",output_directory, q))){
@@ -119,10 +117,23 @@ forceTifCreation <- FALSE
                  "-co", "BIGTIFF=YES",
                  "-co", "COMPRESS=DEFLATE")
 
-     message_log(q, ": START writing final file TIF - compressed  deflate and tiled=yes for ", q)
+       # if(forceTifCreation) opts <- c(opts, "-overwrite")
+
+       if(grepl("CropTypes", q)){
+         opts <- c(opts, "-scale", "1000" ,"3300")
+       }
+
+
+
+       # rr <- terra::rast(vrtPath)
+       # message_log(q, ": START writing final file TIF - compressed  deflate and tiled=yes for ", q)
+       # writeRaster(rr / 10 -100, sprintf("%s/%s.tif",output_directory, q), datatype="INT1U")
+       # message_log(q, ": STOP writing final file TIF - compressed  deflate and tiled=yes for ", q)
+
        ret <- tryCatch( {
-         rr <- sf:: gdal_utils(util = "translate", vrtPath,
-                       destination = sprintf("%s/%s.tif",output_directory, q),
+         rr <- sf:: gdal_utils(util = "translate",
+                               vrtPath,
+                               destination = sprintf("%s/%s.tif",output_directory, q),
                        options = opts  )
          TRUE
        },
@@ -144,10 +155,7 @@ forceTifCreation <- FALSE
     sf::gdal_addo(sprintf("%s/%s.tif",output_directory,  q),
                   read_only = T,
                   overviews = c(2, 4, 8, 16, 32, 64, 128, 256, 512,1024),
-                  options = c(
-                    "-overwrite"
-                  ),
-                  config_options= c("GDAL_NUM_THREADS"=sprintf("%d", 20))
+                  config_options= c("GDAL_NUM_THREADS"=sprintf("%d", 40))
     )
   }
 
