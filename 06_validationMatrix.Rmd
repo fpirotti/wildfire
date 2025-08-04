@@ -1,0 +1,64 @@
+---
+title: "Untitled"
+author: "CIRGEO - Francesco Pirotti"
+date: "`r Sys.Date()`"
+output: pdf_document
+classoption: landscape
+---
+
+```{r  setup, echo=FALSE, message=FALSE, warning=FALSE, paged.print=FALSE  } 
+
+library(knitr) 
+
+library(kableExtra)
+
+library(Metrics)
+library(gt)
+library(tidyverse)
+library(yardstick)
+m1 <- read.csv("data/validation/WildfireCE_Fuel_map_validation_DE-CZ_CzechGlobe_model.csv")
+levs <- levels(as.factor( c(m1$WildfireCE_class, m1$CzechGlobe_class) ))
+df_tbl <- tibble(
+  predicted =  factor(m1$WildfireCE_class,levels = levs),
+  observed  =  factor(m1$CzechGlobe_class,levels = levs)
+)
+
+conf_mat <- df_tbl %>%
+  conf_mat(truth = observed, estimate = predicted) 
+
+kable(conf_mat$table, caption = "Confusion Matrix") %>%
+  kable_styling(latex_options = c("hold_position", "striped", "scale_down"))
+
+
+levs <- levels(as.factor( c(m1$WildfireCE_class, m1$CzechGlobe_class) ))
+df_tbl <- tibble(
+  predicted =  factor(m1$WildfireCE_class,levels = levs),
+  observed  =  factor(m1$CzechGlobe_class,levels = levs)
+)
+
+```
+
+
+
+```{r  conf2, echo=FALSE, message=FALSE, warning=FALSE, paged.print=FALSE  } 
+ 
+levs <- levels(as.factor( c( trunc(m1$WildfireCE_class/10), trunc(m1$CzechGlobe_class/10) ) ))
+df_tbl <- tibble(
+  predicted =  factor(trunc(m1$WildfireCE_class/10),levels = levs),
+  observed  =  factor(trunc(m1$CzechGlobe_class/10),levels = levs)
+)
+
+conf_mat <- df_tbl %>%
+  conf_mat(truth = observed, estimate = predicted) 
+
+kable(conf_mat$table, caption = "Confusion Matrix MacroClasses") %>%
+  kable_styling(latex_options = c("hold_position", "striped", "scale_down"))
+
+
+levs <- levels(as.factor( c(m1$WildfireCE_class, m1$CzechGlobe_class) ))
+df_tbl <- tibble(
+  predicted =  factor(m1$WildfireCE_class,levels = levs),
+  observed  =  factor(m1$CzechGlobe_class,levels = levs)
+)
+
+```
