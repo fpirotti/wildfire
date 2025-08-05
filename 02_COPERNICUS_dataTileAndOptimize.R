@@ -19,7 +19,6 @@ checkTifsMissing <- function(q){
 message_log("===================== STEP 3 UNZIP ==============")
 
 for(q in names(matches)){
-  next
   output_directory <- sprintf("%s/%s", output_base_dir, q)
   output_directory_tif <- file.path(output_directory, "TIFFs")
   message_log(q, "...unzipping all in ", output_directory_tif, " and keeping only tif files")
@@ -77,12 +76,31 @@ for(q in names(matches)){
 
   message_log(q, ": Creating VRT!")
   vrtPath <- sprintf("%s/%s.vrt",output_directory, q)
-  mosaic <- sf::gdal_utils("buildvrt",
-                           list.files(output_directory_tif, full.names = T, pattern = "\\.tif$"),
-                           destination = vrtPath,
-                           options = c(
-                             "-overwrite"
-                           ))
+  isNC <- grepl("SurfaceSoil", q)
+  files <- list.files(ifelse( isNC, output_directory, output_directory_tif),
+             full.names = T, pattern = ifelse( isNC, "\\.nc$", "\\.tif$")
+  )
+
+  if( isNC){
+    message_log(q, ": Creating VRT for soil moisture!")
+    mosaic <- sf::gdal_utils("buildvrt",
+                             files,
+                             destination = vrtPath,
+                             options =  c("-sd", "1", "-separate" )
+    )
+    vrtPath <- sprintf("%s/%s_Conf.vrt",output_directory, q)
+    mosaic <- sf::gdal_utils("buildvrt",
+                             files,
+                             destination = vrtPath,
+                             options =  c("-sd", "2", "-separate" )
+    )
+    vrtPath <- sprintf("%s/%s.vrt",output_directory, q)
+  } else {
+    mosaic <- sf::gdal_utils("buildvrt",
+                             files,
+                             destination = vrtPath
+    )
+  }
   if(!mosaic){
     warning_log(q, ": VRT not successful while creating ", vrtPath)
   } else {
@@ -96,21 +114,22 @@ message_log("==============finish  STEP 3 UNZIP ==============")
 ## step 4  create TIF and overviews  ----
 message_log("============== STEP 4 tif and overviews ==============")
 cores = min(names(matches), 10)
-# for(q in names(matches)){}
+
+for(q in names(matches)){
 
 forceTifCreation <- FALSE
-  outmc <- mclapply(names(matches),
-         mc.cores = cores,
-          FUN=function(q){
+  # outmc <- mclapply(names(matches),
+  #        mc.cores = cores,
+  #         FUN=function(q){
 
 
       output_directory <- sprintf("%s/%s", output_base_dir, q)
       output_directory_tif <- file.path(output_directory, "TIFFs")
       vrtPath <- sprintf("%s/%s.vrt",output_directory, q)
 
-     message_log(q, " STEP 4 tif and overviews ==============")
+      message_log(q, " STEP 4 tif and overviews ==============")
 
-     if(forceTifCreation || !file.exists(sprintf("%s/%s.tif",output_directory, q))){
+      if(forceTifCreation || !file.exists(sprintf("%s/%s.tif",output_directory, q))){
 
        opts <- c("-ot", "Byte",
                  "-co", "TILED=YES",
@@ -119,16 +138,42 @@ forceTifCreation <- FALSE
 
        # if(forceTifCreation) opts <- c(opts, "-overwrite")
 
-       if(grepl("CropTypes", q)){
+       if(grepl("CropTypes", q) || grepl("SurfaceSoil", q) ){
          opts <- c(opts, "-scale", "1000" ,"3300")
+         next
        }
 
 
+      # if(isNC){
+      #
+      #   rr <- terra::rast(vrtPath)
+      #
+      #   rr <- stars::read_stars(vrtPath)
+      #   # new_crs = st_crs('EPSG:3035')
+      #   # nrr <- stars::st_warp(rr[,,,1], crs = new_crs  )
+      #   # plot(nrr)
+      #   names(rr)<- as.Date(substr( basename(files), 14, 21), "%Y%m%d" )
+      #   terra::time(rr) <- as.POSIXct(as.Date(substr( basename(files), 14, 21), "%Y%m%d" ) )
+      #   rr.mean <- terra::app(rr, fun=function(x) mean(x, na.rm = TRUE),
+      #                         filename= sprintf("%s/%s_Mean2024.tif",output_directory, q),
+      #                         cores=50)
+      #   message_log(q, ": START writing final file TIF - compressed  deflate and tiled=yes for ", q)
+      #   # writeRaster(rr / 10 -100, sprintf("%s/%s.tif",output_directory, q), datatype="INT1U")
+      #   writeRaster(rr , sprintf("%s/%s.tif",output_directory, q), datatype="INT1U")
+      #   message_log(q, ": STOP writing final file TIF - compressed  deflate and tiled=yes for ", q)
+      #
+      #
+      #   vrtPath <- sprintf("%s/%s_Conf.vrt",output_directory, q)
+      #   rr <- terra::rast(vrtPath)
+      #   names(rr)<- as.Date(substr( basename(files), 14, 21), "%Y%m%d" )
+      #   terra::time(rr) <- as.POSIXct(as.Date(substr( basename(files), 14, 21), "%Y%m%d" ) )
+      #   message_log(q, ": START writing final file TIF - compressed  deflate and tiled=yes for ", q)
+      #   # writeRaster(rr / 10 -100, sprintf("%s/%s.tif",output_directory, q), datatype="INT1U")
+      #   writeRaster(rr , sprintf("%s/%s_Conf.tif",output_directory, q), datatype="INT1U")
+      #   message_log(q, ": STOP writing final file TIF - compressed  deflate and tiled=yes for ", q)
+      #
+      # }
 
-       # rr <- terra::rast(vrtPath)
-       # message_log(q, ": START writing final file TIF - compressed  deflate and tiled=yes for ", q)
-       # writeRaster(rr / 10 -100, sprintf("%s/%s.tif",output_directory, q), datatype="INT1U")
-       # message_log(q, ": STOP writing final file TIF - compressed  deflate and tiled=yes for ", q)
 
        ret <- tryCatch( {
          rr <- sf:: gdal_utils(util = "translate",
@@ -159,7 +204,8 @@ forceTifCreation <- FALSE
     )
   }
 
- })
+ }
+#)
 # }
 
 

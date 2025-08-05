@@ -117,3 +117,36 @@ query <- list(
     "enddate"= "2025-01-01T23:59:59.999Z"
   )
 )
+
+
+
+makeGridStars <- function(){
+  if(!require("stars")){install.packages("stars")}
+  # Define the extent in EPSG:3035 (in meters)
+  # Rough bounding box covering most of Europe
+  bbox_3035 <- st_bbox(c(
+    xmin = 2500000,  # western Portugal
+    xmax = 7500000,  # eastern edge of Europe
+    ymin = 1300000,  # southern edge (Greece)
+    ymax = 5500000   # northern edge (Norway)
+  ), crs = st_crs(3035))
+
+  # Define dimensions (1 km = 1000 meters)
+  res <- 1000
+  nx <- (bbox_3035$xmax - bbox_3035$xmin) / res
+  ny <- (bbox_3035$ymax - bbox_3035$ymin) / res
+
+  # Create stars object with NA values (or 0s, or any dummy data)
+  grid <- st_as_stars(
+    st_dimensions(
+      x = seq(bbox_3035$xmin + res/2, bbox_3035$xmax - res/2, by = res),
+      y = seq(bbox_3035$ymax - res/2, bbox_3035$ymin + res/2, by = -res),  # note decreasing y
+      raster = st_raster_dimension(x = "x", y = "y", dimensions = "raster")
+    ),
+    values = NA_real_
+  )
+
+  # Assign CRS
+  st_crs(grid) <- 3035
+  grid
+}

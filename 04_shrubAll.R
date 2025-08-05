@@ -1,46 +1,89 @@
+# src <- 'NETCDF:"/archivio/shared/geodati/raster/Biomass/ESACCI-BIOMASS-L4-AGB-MERGED-100m-2022-fv6.0.nc":agb'
+# mosaic <- sf::gdal_utils("warp",
+#                          src,
+#                          destination =  "/archivio/shared/geodati/raster/Biomass/ESACCI-BIOMASS-L4-AGB-MERGED-100m-2022-fv6.0_3035.tif",
+#                          options =  c(  "-t_srs", "EPSG:3035"  )
+# )
+glob.biom <- terra::rast('/archivio/shared/geodati/raster/Biomass/Biomass10m3035_CLCmask.tif')
+glob.clc <- terra::rast('/archivio/shared/geodati/raster/CLMS_CLCplus_RASTER_2023/CLMS_CLCplus_RASTER_2023.tif')
+
+glob.bmCount <- terra::zonal(bm3035, clcr, fun=sum)
+
+
+clcplusClasses <- c( "0"="No Data", "1"= "Sealed",
+                     "2"= "Woody – needle leaved trees",
+                     "3"= "Woody – Broadleaved deciduous trees",
+                     "4"= "Woody – Broadleaved evergreen trees",
+                     "5"= "Low-growing woody plants - bushes shrubs",
+                     "6"= "Permanent herbaceous",
+                     "7"= "Periodically herbaceous","8"= "Lichens and mosses",
+                     "9"= "Non- and sparsely-vegetated","10" = "Water ",
+                     "11" = "Snow and ice",
+                     "253"="None",
+                     "254"="Empty")
+
+BiomCalc<-function(path, Val=5, pathBiom, plotIt=F){
+  out <- jsonlite::fromJSON(sf::gdal_utils("translate", path,
+                                           "tmp.csv",
+                                           options = c("-of", "xyz"  )))
+  values <- out$stac$`raster:bands`$histogram$buckets[[1]][1:12]
+  names(values) <- clcplusClasses
+  as.list( values / 100)
+  # plot(terra::rast(path))
+}
+
+AreaCalc<-function(path, plotIt=F){
+  out <- jsonlite::fromJSON(sf::gdal_utils("info", path,
+                 options = c("-hist",
+                             "-json",
+                             "-norat",
+                             "-noct")))
+  values <- out$stac$`raster:bands`$histogram$buckets[[1]][1:12]
+  names(values) <- clcplusClasses
+  as.list( values / 100)
+  # plot(terra::rast(path))
+}
+
+library(tibble)
+library(tableHTML)
 library(terra)
-library(parallel)
-source("00_globals.R")
+message("Starting")
+# path <-  "CataloniaRasterCLC2023.tif"
+# clcAll <- function2apply("/archivio/shared/geodati/raster/CLMS_CLCplus_RASTER_2023/CLMS_CLCplus_RASTER_2023.tif")
+# clc <- function2apply("CataloniaRasterCLC2023.tif")
+clcr <-   terra::rast("CataloniaRasterCLC2023.tif")
+# bm <- terra::rast("CataloniaRasterESACCIbiomass.tif")
+bm3035 <-   terra::rast("CataloniaRasterESACCIbiomass3035.tif")
 
-clc <- terra::rast("/archivio/shared/geodati/raster/CLMS_CLCplus_RASTER_2023/CLMS_CLCplus_RASTER_2023.tif")
-clcv <- terra::cells(clc)
-shrubs <- clc[clcv] == 5
-message_log("tot pixels with shrub in EU: ", length(shrubs) )
-message_log("tot pixels with shrub in EU in ha: ", length(shrubs)*100/10000 )
-message_log("tot pixels with shrub in EU in km2: ", length(shrubs)*100/1000000 )
-#
-#
-# tmpFolder <- "tmps/"
-# tileFolder <- "/archivio/shared/geodati/raster/CLMS_CLCplus_RASTER_2023/TIFFs"
-#
-# tifsInFullPath <- list.files(tileFolder, pattern = "\\.tif$",full.names = T)
-# tifsIn<-tools::file_path_sans_ext(filename(tifsInFullPath))
-# names(tifsInFullPath) <- tifsIn
-# tifsOut<-tools::file_path_sans_ext(list.files(tmpFolder, pattern = "\\.tif$"))
-#
-# tifs2calculate <- setdiff(tifsIn, tifsOut)
-#
-# noret <- mclapply(tifsInFullPath[tifs2calculate] ,
-#                   mc.cores = 30,
-#                   FUN = function(x) {
-#                     ret <- tryCatch( {
-#                       r <- terra::rast(x)
-#                       ## prod is kg*C/m^2/year 0.0001 so must be multiplied by 10e4 * 100 m2 in 10 m pixel
-#                       prod <- terra::resample(terra::crop(terra::rast("/archivio/shared/geodati/raster/productivityYearlyModis500mEPSG3035.tif"),
-#                                         r), r)
-#                       bm <- terra::resample(terra::crop(terra::rast("/archivio/shared/geodati/raster/Biomass/biomass100mEPSG3035.tif"),
-#                                         r), r)
-#                       r[r[]!=5] = NA
-#                       r2  <- r/r
-#                       r2*prod
-#                       terra::writeRaster(r, tmpFolder%+%"/"%+%filename(x),
-#                                          datatype="INT4U")
-#                       TRUE
-#                     },
-#                     error = function(e) {
-#                       FALSE
-#                     })
-#                     ret
-#                 })
-#
+bmcatal.count <- terra::zonal( bm3035,  clcr, fun="notNA" )
+names(bmcatal.count)<- c("ClassV",   "AGBn")
+bmcatal.avg <- terra::zonal( bm3035,  clcr, fun="mean")
+names(bmcatal.avg)<- c("ClassV", "AGBmean" )
+# bmcatal.sum <- terra::zonal( bm3035,  clcr, fun="sum")
+# names(bmcatal.sum)<- c("ClassV", "AGBsum" )
+bmcatal <- merge(bmcatal.count,bmcatal.avg)
+bmcatalt<-tibble(.rows = nrow(bmcatal))
 
+bmcatalt$`CLCn`  <- bmcatal$ClassV
+bmcatalt$`Corine Land Cover Plus 2023 Class` <- clcplusClasses[ as.character(bmcatal$ClassV) ]
+bmcatalt$`Catalonia Tot. Area sum (ha)` <-  format(bmcatal$AGBn / 100, big.mark = "'")
+bmcatalt$`Catalonia Tot. Biomass  (Mg)` <- format( round(bmcatal$AGBmean * bmcatal$AGBn / 100), big.mark = "'")
+load(file="AllAreas.rda")
+tot <- merge(bmcatalt,
+             tibble( CLCn= 1:length(clcAll[-1]),
+                       "All EU 2023 Tot. Area sum (ha)"=
+                       format(as.numeric(unlist(clcAll[-1])),
+                              big.mark= "'")
+                    )
+             )
+
+writexl::write_xlsx(tot, "tot.xlsx")
+save(tot, file="tot.rda")
+# bmcatalt$`All EU 2023 Tot. Area sum (ha)`<- format( tot$AGBmeanTotEU , big.mark = "'")
+
+
+
+ tableHTML(tot,rownames = F )
+
+
+# save(bmcatalWithNames, file="AllAreasBiomass.rda")
