@@ -16,6 +16,19 @@ set_parallel_strategy(sequential())
 # step 1 - create a decent CHM -----------
 f <- "~/Downloads/lignano.laz"
 ofile = paste0("dataset_merged.laz")
+
+### check ground points ---------
+hasGround <- function(f){
+  pipe <- reader(filter=keep_class(33))  + write_las(ofile = "tmp.laz")
+  ans = exec(pipe, on = f)
+  suppressWarnings(file.remove("tmp.laz"))
+}
+### create ground points ---------
+if(!hasGround){
+
+}
+### FINISH check  ground class has points
+
 del = triangulate(filter = keep_ground())
 dtm = rasterize(1, del)
 pipeline = del + dtm
