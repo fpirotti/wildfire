@@ -108,14 +108,14 @@ query <- list(
     "product_type"= "Grassland Confidence Layer",
     "resolution"=  "10m",
     "year"=  "2021"
-  ),
-  "CLMS_SurfaceSoilMoisture_2024"=list(
-    "dataset_id"= "EO:CLMS:DAT:CLMS_GLOBAL_SSM_1KM_V1_DAILY_NETCDF",
-    "productType"= "SSM1km",
-    "resolution"= "1000",
-    "startdate"= "2023-01-01T00:00:00.000Z",
-    "enddate"= "2025-01-01T23:59:59.999Z"
-  )
+  ) #,
+  # "CLMS_SurfaceSoilMoisture_2024"=list(
+  #   "dataset_id"= "EO:CLMS:DAT:CLMS_GLOBAL_SSM_1KM_V1_DAILY_NETCDF",
+  #   "productType"= "SSM1km",
+  #   "resolution"= "1000",
+  #   "startdate"= "2023-01-01T00:00:00.000Z",
+  #   "enddate"= "2025-01-01T23:59:59.999Z"
+  # )
 )
 
 

@@ -8,7 +8,7 @@ source("00_globals.R")
 ## bounding box with
 ## West-most (lower) X, South-most Y,
 ## East-most (higher) X, North-most Y
-bbox=c(-10,20,50,83)
+bbox=c(-10,20,80,83)
 startIndex=0
 itemsPerPage=100
 forceQuery <- FALSE
@@ -21,6 +21,7 @@ client$get_token()
 
 ## step 1 query tiles ----
 matches <- list()
+forceQuery <- T
 if(file.exists("matches.rda")) load("matches.rda")
 for(q in names(query)){
   if(!forceQuery  && !is.null(matches[[q]])){
