@@ -15,9 +15,22 @@ plotShade <- function(dtm){
 set_parallel_strategy(sequential())
 # step 1 - create a decent CHM -----------
 f <- "~/Downloads/lignano.laz"
+
+d <- file.path(dirname(f), "outdir")
+if(dir.exists(d)){
+  answer <- readline(prompt = "Do you want to overwrite contents of ? (Y/N): ")
+  if (tolower(answer) == "Y") {
+    message("Continuing...")
+  }
+} else {
+  suppressWarnings(dir.create(d))
+}
+
+outdir <- tools::file_path_sans_ext(f)
 ofile = paste0("dataset_merged.laz")
 
 ### check ground points ---------
+fg <- f
 hasGround <- function(f){
   pipe <- reader(filter=keep_class(33))  + write_las(ofile = "tmp.laz")
   ans = exec(pipe, on = f)
@@ -25,12 +38,13 @@ hasGround <- function(f){
 }
 ### create ground points ---------
 if(!hasGround){
-
+  pipeline = classify_with_csf(TRUE, 1 ,1, time_step = 1) + write_las()
+  fg = exec(pipeline, on = f, progress = TRUE)
 }
 ### FINISH check  ground class has points
 
 del = triangulate(filter = keep_ground())
-dtm = rasterize(1, del)
+dtm = rasterize(1, del, ofile = f)
 pipeline = del + dtm
-ans = exec(pipeline, on = f)
+ans = exec(pipeline, on = fg)
 plotShade(ans)
