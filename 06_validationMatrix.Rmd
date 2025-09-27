@@ -11,11 +11,75 @@ classoption: landscape
 library(knitr) 
 
 library(kableExtra)
-
+library(terra)
 library(Metrics)
 library(gt)
 library(tidyverse)
 library(yardstick)
+
+todos <- list(
+CZ_AT = list(  pred = terra::rast("input/CZ-AT_ScottBurganFuelMapClassV2.tif") ,
+                obs = terra::rast("data/validation/WildfireCE_Fuel_map_validation_AT-CZ_CzechGlobe_model.tif") 
+            ),
+
+DE_CZ = list(pred = terra::rast("input/DE-CZ_ScottBurganFuelMapClassV2.tif"),
+               obs = terra::rast("data/validation/WildfireCE_Fuel_map_validation_DE-CZ_CzechGlobe_model.tif")
+ )
+)
+
+risultati <- list()
+for(area in names(todos) ){
+  pred <- todos[[area]][["pred"]]
+  ref <- todos[[area]][["obs"]]
+  cls<-terra::resample( terra::project(pred, ref, method="near"), ref, method="near" )
+  terra::writeRaster(cls,
+                     sprintf("input/%s_ScottBurganFuelMapClassV2_32633.tif",
+                             area), overwrite=T )
+  cls[cls==0] <- NA
+  s <- c(ref, cls)
+  plot(s)
+  # Extract values as a data.frame
+  vals <- na.omit(as.data.frame(s, xy=FALSE))
+  colnames(vals) <- c("CzechGlobe", "WildFire")
+  conf_mat <- table(vals$CzechGlobe, vals$WildFire)
+  # Overall accuracy
+  overall_acc <- sum(diag(conf_mat)) / sum(conf_mat) 
+  # Producer's accuracy (per class)
+  prod_acc <- diag(conf_mat) / rowSums(conf_mat) 
+  # User's accuracy (per class)
+  user_acc <- diag(conf_mat) / colSums(conf_mat) 
+  # Kappa
+  pe <- sum(rowSums(conf_mat) * colSums(conf_mat)) / (sum(conf_mat)^2)
+  kappa <- (overall_acc - pe) / (1 - pe)
+  
+  vals$WildFire2 <- trunc(vals$WildFire/10)
+  vals$CzechGlobe2 <-  trunc(vals$CzechGlobe/10)   
+  
+  conf_mat2 <- table(vals$CzechGlobe2, vals$WildFire2)
+  # Overall accuracy
+  overall_acc2 <- sum(diag(conf_mat2)) / sum(conf_mat2) 
+  # Producer's accuracy (per class)
+  prod_acc2 <- diag(conf_mat2) / rowSums(conf_mat2) 
+  # User's accuracy (per class)
+  user_acc2 <- diag(conf_mat2) / colSums(conf_mat2) 
+  # Kappa
+  pe2 <- sum(rowSums(conf_mat2) * colSums(conf_mat2)) / (sum(conf_mat2)^2)
+  kappa2 <- (overall_acc2 - pe2) / (1 - pe2)
+
+  risultati[[area]] <-  list(
+    ConfusionMatrix = conf_mat,
+    OverallAccuracy = overall_acc,
+    ProducersAccuracy = prod_acc,
+    UsersAccuracy = user_acc,
+    Kappa = kappa,
+    ConfusionMatrix2 = conf_mat2,
+    OverallAccuracy2 = overall_acc2,
+    ProducersAccuracy2 = prod_acc2,
+    UsersAccuracy2 = user_acc2,
+    Kappa2 = kappa2
+  )
+}
+
 m1 <- read.csv("data/validation/WildfireCE_Fuel_map_validation_DE-CZ_CzechGlobe_model.csv")
 levs <- levels(as.factor( c(m1$WildfireCE_class, m1$CzechGlobe_class) ))
 df_tbl <- tibble(

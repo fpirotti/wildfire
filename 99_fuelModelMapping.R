@@ -1,6 +1,8 @@
 library(sf)
 library(terra)
 
+
+source("00_globals.R")
 ### this script assumes that there are available rasters in the same
 ### aligned coordinate system. It will clip them.
 
