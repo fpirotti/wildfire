@@ -2,11 +2,14 @@
 title: "Untitled"
 author: "CIRGEO - Francesco Pirotti"
 date: "`r Sys.Date()`"
-output: pdf_document
+output:
+  html_document:
+    df_print: paged
+  pdf_document: default
 classoption: landscape
 ---
 
-```{r  setup, echo=FALSE, message=FALSE, warning=FALSE, paged.print=FALSE  } 
+```{r echo=FALSE, message=FALSE, warning=FALSE,results='asis'}
 
 library(knitr) 
 
@@ -32,15 +35,26 @@ for(area in names(todos) ){
   pred <- todos[[area]][["pred"]]
   ref <- todos[[area]][["obs"]]
   cls<-terra::resample( terra::project(pred, ref, method="near"), ref, method="near" )
-  terra::writeRaster(cls,
-                     sprintf("input/%s_ScottBurganFuelMapClassV2_32633.tif",
-                             area), overwrite=T )
+
   cls[cls==0] <- NA
+  ref[ref==0] <- NA
+  
   s <- c(ref, cls)
-  plot(s)
+  
+    # terra::writeRaster(s,
+    #                  sprintf("input/%s_ScottBurganFuelMapClassV2_32633.tif",
+    #                          area), overwrite=T )
+    
+  # plot(s)
   # Extract values as a data.frame
   vals <- na.omit(as.data.frame(s, xy=FALSE))
   colnames(vals) <- c("CzechGlobe", "WildFire")
+  
+  lvs <- sort(unique(c(vals$WildFire, vals$CzechGlobe)))
+  
+  vals$WildFire <- factor(vals$WildFire, levels = lvs)
+  vals$CzechGlobe <-  factor(vals$CzechGlobe, levels = lvs) 
+  
   conf_mat <- table(vals$CzechGlobe, vals$WildFire)
   # Overall accuracy
   overall_acc <- sum(diag(conf_mat)) / sum(conf_mat) 
@@ -52,10 +66,14 @@ for(area in names(todos) ){
   pe <- sum(rowSums(conf_mat) * colSums(conf_mat)) / (sum(conf_mat)^2)
   kappa <- (overall_acc - pe) / (1 - pe)
   
-  vals$WildFire2 <- trunc(vals$WildFire/10)
-  vals$CzechGlobe2 <-  trunc(vals$CzechGlobe/10)   
+  vals$CzechGlobe2 <-  trunc(as.integer(as.character(vals$CzechGlobe))/10) 
+  vals$WildFire2 <- trunc(as.integer(as.character(vals$WildFire))/10)  
+  lvs <- sort(unique(c(vals$WildFire2, vals$CzechGlobe2)))
   
-  conf_mat2 <- table(vals$CzechGlobe2, vals$WildFire2)
+  vals$WildFire2 <- factor(vals$WildFire2, levels = lvs)
+  vals$CzechGlobe2 <-  factor(vals$CzechGlobe2, levels = lvs) 
+  
+  conf_mat2 <- table(Reference = vals$CzechGlobe2, Classified=vals$WildFire2)
   # Overall accuracy
   overall_acc2 <- sum(diag(conf_mat2)) / sum(conf_mat2) 
   # Producer's accuracy (per class)
@@ -66,63 +84,21 @@ for(area in names(todos) ){
   pe2 <- sum(rowSums(conf_mat2) * colSums(conf_mat2)) / (sum(conf_mat2)^2)
   kappa2 <- (overall_acc2 - pe2) / (1 - pe2)
 
-  risultati[[area]] <-  list(
-    ConfusionMatrix = conf_mat,
-    OverallAccuracy = overall_acc,
-    ProducersAccuracy = prod_acc,
-    UsersAccuracy = user_acc,
-    Kappa = kappa,
-    ConfusionMatrix2 = conf_mat2,
-    OverallAccuracy2 = overall_acc2,
-    ProducersAccuracy2 = prod_acc2,
-    UsersAccuracy2 = user_acc2,
-    Kappa2 = kappa2
-  )
+  cm_ext <-  as.matrix(conf_mat2)
+  cm_ext <- cbind(cm_ext, "Prod.Acc" = sprintf("%.1f%%", prod_acc2*100)) 
+  # Add User’s Accuracy as extra row
+  cm_ext <- rbind(cm_ext, "User.Acc" = c(sprintf("%.1f%%", user_acc2*100), 
+                                         sprintf("%.1f%%", overall_acc2*100)))
+
+  
+k <- kable(cm_ext, align = "r", caption = paste0("Confusion Matrix rows=CzechGlobe (reference)   colums=Wildfire (Classified)   kappa=", round(kappa2,3)) ) %>%
+  kable_styling(full_width = FALSE, latex_options = c("hold_position", "striped", "scale_down")) %>%
+  column_spec(1, bold = TRUE) 
+
+
+print(k)
+  
 }
-
-m1 <- read.csv("data/validation/WildfireCE_Fuel_map_validation_DE-CZ_CzechGlobe_model.csv")
-levs <- levels(as.factor( c(m1$WildfireCE_class, m1$CzechGlobe_class) ))
-df_tbl <- tibble(
-  predicted =  factor(m1$WildfireCE_class,levels = levs),
-  observed  =  factor(m1$CzechGlobe_class,levels = levs)
-)
-
-conf_mat <- df_tbl %>%
-  conf_mat(truth = observed, estimate = predicted) 
-
-kable(conf_mat$table, caption = "Confusion Matrix") %>%
-  kable_styling(latex_options = c("hold_position", "striped", "scale_down"))
-
-
-levs <- levels(as.factor( c(m1$WildfireCE_class, m1$CzechGlobe_class) ))
-df_tbl <- tibble(
-  predicted =  factor(m1$WildfireCE_class,levels = levs),
-  observed  =  factor(m1$CzechGlobe_class,levels = levs)
-)
-
+  
 ```
 
-
-
-```{r  conf2, echo=FALSE, message=FALSE, warning=FALSE, paged.print=FALSE  } 
- 
-levs <- levels(as.factor( c( trunc(m1$WildfireCE_class/10), trunc(m1$CzechGlobe_class/10) ) ))
-df_tbl <- tibble(
-  predicted =  factor(trunc(m1$WildfireCE_class/10),levels = levs),
-  observed  =  factor(trunc(m1$CzechGlobe_class/10),levels = levs)
-)
-
-conf_mat <- df_tbl %>%
-  conf_mat(truth = observed, estimate = predicted) 
-
-kable(conf_mat$table, caption = "Confusion Matrix MacroClasses") %>%
-  kable_styling(latex_options = c("hold_position", "striped", "scale_down"))
-
-
-levs <- levels(as.factor( c(m1$WildfireCE_class, m1$CzechGlobe_class) ))
-df_tbl <- tibble(
-  predicted =  factor(m1$WildfireCE_class,levels = levs),
-  observed  =  factor(m1$CzechGlobe_class,levels = levs)
-)
-
-```
