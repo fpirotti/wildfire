@@ -14,20 +14,21 @@ cat(as.character(date()), "\n", file = "processing_01_GEE_data.log" )
 # ee_install_upgrade()
 version = 3
 # ee_Initialize(quiet = T)
-ee_Initialize(user = 'cirgeo' )
+ee_Initialize(user = 'cirgeo', project = "progetto-eu-h2020-cirgeo" )
 
 
 proj3035_30m = ee$Projection('EPSG:3035')$atScale(30);
 
 
 ## Tree Canopy Density from Copernicus  10 m 2018
-tcd = ee$Image("projects/progetto-eu-h2020-cirgeo/assets/copernicus/TCD_2018_010m_eu_03035_V2_4326")$select("b1")
-## very high threshold to consider all arid ?
-aridityThreshold = 3;
+## NEW! Tree Canopy Density from Copernicus  10 m 2021
+tcd = ee$Image("projects/progetto-eu-h2020-cirgeo/assets/copernicus/CLMS_TCF_TreeDensity_RASTER_2021_1_0")$select("b1")
+## very high threshold to consider all arid ? low values = arid, high values = humid
+aridityThreshold = 10;
 
 # Time range for NDVI stack
-startDate = '2022-01-01';
-endDate = '2024-09-30';
+startDate = '2023-01-01';
+endDate = '2025-09-30';
 
 # Function to mask clouds and shadows using the SCL band
 maskS2clouds <- function(image) {
@@ -59,7 +60,7 @@ aridityIndex = ee$ImageCollection('projects/progetto-eu-h2020-cirgeo/assets/glob
 ## Canopy height LANG -----
 canopy_height = ee$Image('users/nlang/ETH_GlobalCanopyHeight_2020_10m_v1')$unmask()
 ## Canopy COVER -----
-canopy_cover = ee$Image("UMD/hansen/global_forest_change_2023_v1_11")
+canopy_cover = ee$Image("UMD/hansen/global_forest_change_2024_v1_12")
 
 ## Copernicus Global Land Cover 100 m 2019 -----
 proba = ee$Image('COPERNICUS/Landcover/100m/Proba-V-C3/Global/2019')
@@ -118,7 +119,7 @@ figure1_1_scottBurgan$a101=grassSparse
 grassLowLoad=grassCLCplus$Or(grassProba)$And(ndviMax$lt(0.2))$multiply(99)
 ## 102 dry ----
 figure1_1_scottBurgan$a102=grassLowLoad$multiply(aridityIndex$lte(aridityThreshold))
-## 105 wet ----
+## 105 wet ---- should not exist
 figure1_1_scottBurgan$a105=grassLowLoad$multiply(aridityIndex$gt(aridityThreshold))
 
 # grass MOD load ----
@@ -239,6 +240,7 @@ figure1_1_scottBurgan$a204 = sb$eq(4L)$multiply(100)
 
 for( k in names(figure1_1_scottBurgan) ){
    bv = as.integer(substr(k, 2,6))
+   message(bv)
    if(is.na(bv)){
      browser()
    }

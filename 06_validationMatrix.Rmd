@@ -3,9 +3,9 @@ title: "Untitled"
 author: "CIRGEO - Francesco Pirotti"
 date: "`r Sys.Date()`"
 output:
+  pdf_document: default
   html_document:
     df_print: paged
-  pdf_document: default
 classoption: landscape
 ---
 
@@ -21,11 +21,11 @@ library(tidyverse)
 library(yardstick)
 
 todos <- list(
-CZ_AT = list(  pred = terra::rast("input/CZ-AT_ScottBurganFuelMapClassV2.tif") ,
+"CZ-AT" = list(  pred = terra::rast("input/CZ-AT_ScottBurganFuelMapClassV2.tif") ,
                 obs = terra::rast("data/validation/WildfireCE_Fuel_map_validation_AT-CZ_CzechGlobe_model.tif") 
             ),
 
-DE_CZ = list(pred = terra::rast("input/DE-CZ_ScottBurganFuelMapClassV2.tif"),
+"DE-CZ" = list(pred = terra::rast("input/DE-CZ_ScottBurganFuelMapClassV2.tif"),
                obs = terra::rast("data/validation/WildfireCE_Fuel_map_validation_DE-CZ_CzechGlobe_model.tif")
  )
 )
@@ -73,6 +73,12 @@ for(area in names(todos) ){
   vals$WildFire2 <- factor(vals$WildFire2, levels = lvs)
   vals$CzechGlobe2 <-  factor(vals$CzechGlobe2, levels = lvs) 
   
+  ids <- rownames(vals)[ vals$WildFire2==vals$CzechGlobe2 ]
+  errors <- s
+  errors[ as.integer(ids) ]<- NA
+  # plot(errors)
+  discrepancies <- na.omit(as.points(errors))
+  writeVector(discrepancies, sprintf("%s_discrepancies.gpkg", area), overwrite=TRUE)
   conf_mat2 <- table(Reference = vals$CzechGlobe2, Classified=vals$WildFire2)
   # Overall accuracy
   overall_acc2 <- sum(diag(conf_mat2)) / sum(conf_mat2) 
@@ -91,13 +97,13 @@ for(area in names(todos) ){
                                          sprintf("%.1f%%", overall_acc2*100)))
 
   
-k <- kable(cm_ext, align = "r", caption = paste0("Confusion Matrix rows=CzechGlobe (reference)   colums=Wildfire (Classified)   kappa=", round(kappa2,3)) ) %>%
+k <- kable(cm_ext, align = "r", caption = paste0("--", area, " - Confusion Matrix rows=CzechGlobe (reference)   colums=Wildfire-V2 (Classified)   kappa=", round(kappa2,3)) ) %>%
   kable_styling(full_width = FALSE, latex_options = c("hold_position", "striped", "scale_down")) %>%
   column_spec(1, bold = TRUE) 
 
 
 print(k)
-  
+cat("\\newpage\n")  
 }
   
 ```

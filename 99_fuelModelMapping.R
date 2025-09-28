@@ -9,7 +9,7 @@ source("00_globals.R")
 tempDir <- "intermediateRastersForFuelMap"
 areaPolygon <- sf::read_sf("data/nutsProvincesPilotRegions.gpkg")
 ## for testing small area
-areaPolygon <- areaPolygon |> sf::st_union()  |> sf::st_buffer(-53000)# |> sf::st_boundary()
+areaPolygon <- areaPolygon |> sf::st_union()  #|> sf::st_buffer(-53000)# |> sf::st_boundary()
 sf::st_area(areaPolygon)/10000
 
 inputData <- list()
