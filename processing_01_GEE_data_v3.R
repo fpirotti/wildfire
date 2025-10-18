@@ -14,17 +14,12 @@ cat(as.character(date()), "\n", file = "processing_01_GEE_data.log" )
 # ee_install_upgrade()
 version = 3
 # ee_Initialize(quiet = T)
-ee_Initialize(user = 'cirgeo', project = "progetto-eu-h2020-cirgeo" )
+ee_Initialize(user = 'cirgeo'  )
 
 
 proj3035_30m = ee$Projection('EPSG:3035')$atScale(30);
 
 
-## Tree Canopy Density from Copernicus  10 m 2018
-## NEW! Tree Canopy Density from Copernicus  10 m 2021
-tcd = ee$Image("projects/progetto-eu-h2020-cirgeo/assets/copernicus/CLMS_TCF_TreeDensity_RASTER_2021_1_0")$select("b1")
-## very high threshold to consider all arid ? low values = arid, high values = humid
-aridityThreshold = 10;
 
 # Time range for NDVI stack
 startDate = '2023-01-01';
@@ -57,15 +52,22 @@ s2 = ee$ImageCollection("COPERNICUS/S2_SR_HARMONIZED")$filterDate(startDate, end
 ndviMax = s2$qualityMosaic('NDVI');#$clip(pilotSites);
 ## Aridity -----
 aridityIndex = ee$ImageCollection('projects/progetto-eu-h2020-cirgeo/assets/global/AridityIndex')$mosaic()$divide(10000);
+
 ## Canopy height LANG -----
 canopy_height = ee$Image('users/nlang/ETH_GlobalCanopyHeight_2020_10m_v1')$unmask()
 ## Canopy COVER -----
 canopy_cover = ee$Image("UMD/hansen/global_forest_change_2024_v1_12")
 
+## NEW! Tree Canopy Density from Copernicus  10 m 2021
+tcd = ee$Image("projects/progetto-eu-h2020-cirgeo/assets/copernicus/CLMS_TCF_TreeDensity_RASTER_2021_1_0")$select("b1")
+## NEW! CLC+ backbone 10 m 2023 ----
+clcplus = ee$Image('projects/progetto-eu-h2020-cirgeo/assets/copernicus/CLMS_CLCplus_RASTER_2023')$select('b1')
+
+## very high threshold to consider all arid ? low values = arid, high values = humid
+aridityThreshold = 10;
+
 ## Copernicus Global Land Cover 100 m 2019 -----
 proba = ee$Image('COPERNICUS/Landcover/100m/Proba-V-C3/Global/2019')
-## CLC+ backbone 10 m 2018 ----
-clcplus = ee$Image('projects/progetto-eu-h2020-cirgeo/assets/copernicus/CLMS_CLCplus_2021')$select('b1')
 
 figure1_1 = { };
 figure1_1_scottBurgan = { };
@@ -94,29 +96,38 @@ figure1_1_scottBurgan$a99 = clcplus$gt(253)$Or(clcplus$gt(7)$And(clcplus$lt(10) 
 figure1_1_scottBurgan$a92 = clcplus$eq(11)$multiply(100)
 
 
-# 93 agriculture ----
-# we use eurocrop map from JRC
-eucropmap = ee$ImageCollection('JRC/D5/EUCROPMAP/V1')$filterDate(
-  '2018-01-01', '2019-01-01')$first();
+# 93 agriculture ---- NOT ANY MORE, WE FOLLOW CZECHGLOBE AND USE 102 OR 104
+# # we use eurocrop map from JRC
+# eucropmap = ee$ImageCollection('JRC/D5/EUCROPMAP/V1')$filterDate(
+#   '2018-01-01', '2019-01-01')$first();
+#
+# eucropmapAgric = eucropmap$gt(100)$And(eucropmap$lt(300))
+#
+# figure1_1_scottBurgan$a93=eucropmapAgric$
+#   multiply(100)
 
-eucropmapAgric = eucropmap$gt(100)$And(eucropmap$lt(300))
+## I need to know the percentiles of the NDVI that cover the vegetation, in order to divide
 
-figure1_1_scottBurgan$a93=eucropmapAgric$
-  multiply(100)
-
+# percentilesGRASS = ndviMax$mask( clcplus$eq(6)$Or(clcplus$eq(7)) )$reduceRegions(
+#   reducer= ee$Reducer$percentile( c(5, 10, 25, 50, 75, 90, 95) ),
+#   collection= pilotSites,
+#   scale= 100
+# )$getInfo()
+#
+# load( file="percentilesGRASS.rda")
+# save(percentilesGRASS, file="percentilesGRASS.rda")
 
 ## GRASS  ----
-grassProba=proba$select('discrete_classification')$eq(30)
-grassCLCplus=clcplus$eq(6)$Or(tcd$lt(1))
+grassCLCplus=clcplus$eq(6)$Or(clcplus$eq(7))
 
 # 101 grasssparse ----
-grassSparse= grassCLCplus$And(proba$select('discrete_classification')$eq(60))$multiply(99)
+#grass= grassCLCplus$eq(6)$Or(grassCLCplus$eq(7))$multiply(100)
 
-figure1_1_scottBurgan$a101=grassSparse
+figure1_1_scottBurgan$a101=grassCLCplus
 
 
 # GRASS LOW load ----
-grassLowLoad=grassCLCplus$Or(grassProba)$And(ndviMax$lt(0.2))$multiply(99)
+grassLowLoad=grassCLCplus$Or(grassProba)$And(ndviMax$lt(0.5))$multiply(100)
 ## 102 dry ----
 figure1_1_scottBurgan$a102=grassLowLoad$multiply(aridityIndex$lte(aridityThreshold))
 ## 105 wet ---- should not exist
