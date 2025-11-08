@@ -12,14 +12,17 @@ drive_auth(email = "cirgeo@unipd.it")
 
 cat(as.character(date()), "\n", file = "processing_01_GEE_data.log" )
 # ee_install_upgrade()
-version = 3
+### setting version ----
+versionFuelModel  = 3
 # ee_Initialize(quiet = T)
 ee_Initialize(user = 'cirgeo'  )
+scale = 30
+### setting scale ----
+proj3035_30m = ee$Projection('EPSG:3035')$atScale(scale);
 
-
-proj3035_30m = ee$Projection('EPSG:3035')$atScale(30);
-
-
+### setting tasks containers ----
+task_img_container <- list()
+task_img_containerAsset <- list()
 
 # Time range for NDVI stack
 startDate = '2023-01-01';
@@ -43,34 +46,94 @@ addNDVI <-function(image) {
 }
 # LAYERS ------
 ## pilot sites ----
-pilotSites = ee$FeatureCollection("projects/progetto-eu-h2020-cirgeo/assets/wildfire/wildfire_pilot_sites_v3") ;
+inputVars <- list()
+inputVars$pilotSites = ee$FeatureCollection("projects/progetto-eu-h2020-cirgeo/assets/wildfire/wildfire_pilot_sites_v3") ;
+nPilots = inputVars$pilotSites$size()$getInfo()
 
 # Load and process S2 collection
 s2 = ee$ImageCollection("COPERNICUS/S2_SR_HARMONIZED")$filterDate(startDate, endDate)$filter(ee$Filter$lt('CLOUDY_PIXEL_PERCENTAGE', 50))$map(maskS2clouds)$map(addNDVI);
 
 ##  NDVI -----
-ndviMax = s2$qualityMosaic('NDVI');#$clip(pilotSites);
+inputVars$ndviMax = s2$qualityMosaic('NDVI');#$clip(pilotSites);
 ## Aridity -----
-aridityIndex = ee$ImageCollection('projects/progetto-eu-h2020-cirgeo/assets/global/AridityIndex')$mosaic()$divide(10000);
-
-## Canopy height LANG -----
-canopy_height = ee$Image('users/nlang/ETH_GlobalCanopyHeight_2020_10m_v1')$unmask()
+inputVars$aridityIndex = ee$ImageCollection('projects/progetto-eu-h2020-cirgeo/assets/global/AridityIndex')$mosaic()$divide(10000);
 ## Canopy COVER -----
+inputVars$canopy_cover = ee$ImageCollection("projects/progetto-eu-h2020-cirgeo/assets/copernicus/CLMS_TCF_TreeDensity_RASTER_2021")$mosaic();
+
+## NEW!!  Canopy height META -----
+# inputVars$canopy_height = ee$Image('users/nlang/ETH_GlobalCanopyHeight_2020_10m_v1')$unmask()
+canopy_height =  ee$ImageCollection("projects/sat-io/open-datasets/facebook/meta-canopy-height")$mosaic();
+## aggregate at X meters
+inputVars$canopy_height =   canopy_height$reproject(
+  crs=proj3035_30m,
+  scale=1L
+  )$reduceResolution(
+    reducer=  ee$Reducer$mean()$combine(
+      reducer2=ee$Reducer$stdDev(),
+      sharedInputs=TRUE
+      ),
+  maxPixels=1024L
+)$reproject(crs=ee$Projection('EPSG:3035'), scale = scale)
+
+
+
+for( i in 1:nPilots){
+  feature =ee$Feature( inputVars$pilotSites$toList(12)$get(i-1))
+  gg = feature$geometry();
+  idf = feature$get("pilot_id")$getInfo() ;
+  id = paste0(idf,'_treeHeightV', versionFuelModel)
+  # task_img_containerAsset[[id ]] <-"s"
+  # next
+  idp = paste0(idf,'_ScottBurganFuelClassProbV', versionFuelModel)
+  folder <- sprintf("wildfireOutProgettoEUv3/%s",idf)
+    # 2. Get the folder
+  # folder2rm <- drive_get(folder)
+  # if(nrow(folder2rm)!=0){
+  #   # 3. List files
+  #   files_in_folder <- drive_ls(path = folder2rm)
+  #   # 4. Remove all files
+  #   drive_rm(files_in_folder)
+  # }
+
+    task_img_container[[  id ]] <- ee_image_to_drive(
+      image= inputVars$canopy_height$toFloat()$clip(gg),
+      description= id,
+      timePrefix = F,
+      folder=NULL,
+      region= gg ,
+      scale= 30,
+      crs= 'EPSG:3035',
+      maxPixels= 1e13
+    )
+    task_img_container[[id ]]$start()
+  }
+
+
+
+
+
+
+
+
+
+
+
 canopy_cover = ee$Image("UMD/hansen/global_forest_change_2024_v1_12")
-
 ## NEW! Tree Canopy Density from Copernicus  10 m 2021
-tcd = ee$Image("projects/progetto-eu-h2020-cirgeo/assets/copernicus/CLMS_TCF_TreeDensity_RASTER_2021_1_0")$select("b1")
+# tcd = ee$Image("projects/progetto-eu-h2020-cirgeo/assets/copernicus/CLMS_TCF_TreeDensity_RASTER_2021_1_0")$select("b1")
 ## NEW! CLC+ backbone 10 m 2023 ----
-clcplus = ee$Image('projects/progetto-eu-h2020-cirgeo/assets/copernicus/CLMS_CLCplus_RASTER_2023')$select('b1')
-
+inputVars$clcplus = ee$Image('projects/progetto-eu-h2020-cirgeo/assets/copernicus/CLMS_CLCplus_RASTER_2023')$select('b1')
+## NEW! crop map 10 m 2021 - we assume orchards and vineyards are not changed ----
+inputVars$cropmap = ee$Image('projects/progetto-eu-h2020-cirgeo/assets/copernicus/CLMS_CropTypes_RASTER_2021')$select('b1')
+inputVars$cropmapHighVeg = inputVars$cropmap$gt(100)$And(inputVars$cropmap$lt(200))
 ## very high threshold to consider all arid ? low values = arid, high values = humid
-aridityThreshold = 10;
+inputVars$aridityThreshold = 100;
 
 ## Copernicus Global Land Cover 100 m 2019 -----
-proba = ee$Image('COPERNICUS/Landcover/100m/Proba-V-C3/Global/2019')
+# proba = ee$Image('COPERNICUS/Landcover/100m/Proba-V-C3/Global/2019')
 
-figure1_1 = { };
-figure1_1_scottBurgan = { };
+outputStack = { };
+outputStack_scottBurgan = { };
 
 ## CANOPY LOSS MAP ----
 onlyNonDisturbedPixels =  canopy_cover$select("lossyear")$unmask()$eq(0);
@@ -80,191 +143,231 @@ hansenLossPost2010upTo2019 = hansenLossPost2010$And( canopy_cover$select("lossye
 hansenLossPost2000   =  canopy_cover$select("lossyear")$unmask()$gt(0)
 hansenLossPost2000upTo2009   =  hansenLossPost2000$And( canopy_cover$select("lossyear")$unmask()$lt(11) ) ;
 
-figure1_1$updatedHansen = canopy_cover$select(0)$unmask()$mask(onlyNonDisturbedPixels)
+# outputStack$updatedHansen = canopy_cover$select(0)$unmask()$mask(onlyNonDisturbedPixels)
 
 
 # 91 Urban or suburban development; insufficient wildland fuel ----
-figure1_1_scottBurgan$a91 = clcplus$eq(1)$multiply(100)
+outputStack_scottBurgan$a91 = clcplus$eq(1)
 
 # 98 water ----
-figure1_1_scottBurgan$a98 = clcplus$gt(253)$Or(clcplus$eq(10))$multiply(100)
+outputStack_scottBurgan$a98 = clcplus$gt(253)$Or(clcplus$eq(10))
 
 # 99 barren ----
-figure1_1_scottBurgan$a99 = clcplus$gt(253)$Or(clcplus$gt(7)$And(clcplus$lt(10) ))$multiply(100)
+outputStack_scottBurgan$a99 = clcplus$gt(253)$Or(clcplus$gt(7)$And(clcplus$lt(10) ))
 
 # 92 snow ice ----
-figure1_1_scottBurgan$a92 = clcplus$eq(11)$multiply(100)
+outputStack_scottBurgan$a92 = clcplus$eq(11)
 
 
-# 93 agriculture ---- NOT ANY MORE, WE FOLLOW CZECHGLOBE AND USE 102 OR 104
-# # we use eurocrop map from JRC
-# eucropmap = ee$ImageCollection('JRC/D5/EUCROPMAP/V1')$filterDate(
-#   '2018-01-01', '2019-01-01')$first();
+## I need to know the percentiles of the NDVI that cover the grass/shrub/tree vegetation,
+## in order to estimate a first idea for fuel load (more for grass/shrub as trees are
+## saturated )
 #
-# eucropmapAgric = eucropmap$gt(100)$And(eucropmap$lt(300))
-#
-# figure1_1_scottBurgan$a93=eucropmapAgric$
-#   multiply(100)
-
-## I need to know the percentiles of the NDVI that cover the vegetation, in order to divide
-
-# percentilesGRASS = ndviMax$mask( clcplus$eq(6)$Or(clcplus$eq(7)) )$reduceRegions(
+# percentilesGRASS10 = ndviMax$mask( clcplus$eq(6)$Or(clcplus$eq(7)) )$reduceRegions(
 #   reducer= ee$Reducer$percentile( c(5, 10, 25, 50, 75, 90, 95) ),
 #   collection= pilotSites,
-#   scale= 100
+#   scale= 10
+# )$getInfo()
+# percentilesShrub10 = ndviMax$mask( clcplus$eq(5) )$reduceRegions(
+#   reducer= ee$Reducer$percentile( c(5, 10, 25, 50, 75, 90, 95) ),
+#   collection= pilotSites,
+#   scale= 10
 # )$getInfo()
 #
 # load( file="percentilesGRASS.rda")
-# save(percentilesGRASS, file="percentilesGRASS.rda")
+# aa <- lapply( names(percentiles) , function(ppn){
+#   pp <- percentiles[[ppn]]
+#   res<- sapply(pp$features, function(x){
+#     gg<-unlist(x$properties[c(4,2,3,5,6,7,8)])
+#   })
+#   rr<-as.data.frame( t(apply(res, 1, function(s){
+#     c(mean(s), sd(s) )
+#   })) )
+#   names(rr) <- c("Mean", "stdDev")
+#   rr$Quantile <- rownames(res)
+#   rr$Type <-ppn
+#   rr
+# })
+# ndviStats <- do.call(rbind, aa)
+# ndviStats$Quantile <- factor(ndviStats$Quantile,
+#                              levels = (sprintf("p%d", c(5,10,25,50,75,90, 95) ) ) )
+# library(ggplot2)
+# ggplot2::ggplot(ndviStats, aes(fill=Type,  color=Type, y=Mean,x=Quantile,
+#                                group=Type)) +
+#   geom_errorbar(aes( ymin = Mean-stdDev, ymax=Mean+stdDev )) +
+#   facet_wrap(vars( Type)) +
+#   geom_line()
+# percentiles <- list(grass10m=percentilesGRASS10, shurb100m=percentilesShrub100,
+#                     shrub10m=percentilesShrub10)
+# save(percentiles,
+#      file="percentiles.rda")
 
 ## GRASS  ----
 grassCLCplus=clcplus$eq(6)$Or(clcplus$eq(7))
+## MacroClasses
+## Grass
+outputStack_scottBurgan$a10=clcplus$eq(6)$Or(clcplus$eq(7))
+## to make sure it is grass, we remove pixels that have any crop type canopy cover
+## grass shrub
+outputStack_scottBurgan$a12=clcplus$eq(6)$Or(clcplus$eq(7))
 
+##  shrub
+outputStack_scottBurgan$a14=clcplus$eq(5)
+##  tree
+outputStack_scottBurgan$a16=clcplus$eq(5)
+##  tree1
+outputStack_scottBurgan$a18=clcplus$eq(5)
+##  blowdown
+outputStack_scottBurgan$a20=clcplus$eq(5)
+
+
+onlyMacroClass <- T
+## Grass
 # 101 grasssparse ----
-#grass= grassCLCplus$eq(6)$Or(grassCLCplus$eq(7))$multiply(100)
+#grass= grassCLCplus$eq(6)$Or(grassCLCplus$eq(7))
+if(!onlyMacroClass){
+  outputStack_scottBurgan$a101=grassCLCplus
+  # GRASS LOW load ----
+  grassLowLoad=grassCLCplus$Or(grassProba)$And(ndviMax$lt(0.5))
+  ## 102 dry ----
+  outputStack_scottBurgan$a102=grassLowLoad$multiply(aridityIndex$lte(aridityThreshold))
+  ## 105 wet ---- should not exist
+  outputStack_scottBurgan$a105=grassLowLoad$multiply(aridityIndex$gt(aridityThreshold))
 
-figure1_1_scottBurgan$a101=grassCLCplus
+  # grass MOD load ----
+  grassModerateLoad=grassCLCplus$Or(grassProba)$And(ndviMax$gte(0.2)$And(ndviMax$lt(0.4)))$multiply(99)
+  ## 104 dry ----
+  outputStack_scottBurgan$a104=grassModerateLoad$multiply(aridityIndex$lte(aridityThreshold))
+  ## 106 wet ----
+  outputStack_scottBurgan$a106=grassModerateLoad$multiply(aridityIndex$gt(aridityThreshold))
 
+  # grass HIGH load ----
+  grassHighLoad=grassCLCplus$Or(grassProba)$And(ndviMax$gte(0.4))$multiply(99)
+  ## 107 dry ----
+  outputStack_scottBurgan$a107=grassHighLoad$multiply(aridityIndex$lte(aridityThreshold))
+  ## 108 wet ----
+  outputStack_scottBurgan$a108=grassHighLoad$multiply(aridityIndex$gt(aridityThreshold))
 
-# GRASS LOW load ----
-grassLowLoad=grassCLCplus$Or(grassProba)$And(ndviMax$lt(0.5))$multiply(100)
-## 102 dry ----
-figure1_1_scottBurgan$a102=grassLowLoad$multiply(aridityIndex$lte(aridityThreshold))
-## 105 wet ---- should not exist
-figure1_1_scottBurgan$a105=grassLowLoad$multiply(aridityIndex$gt(aridityThreshold))
+  #SHRUB  ----
+  shrubProba=proba$select('discrete_classification')$eq(20)
+  shrubCLCplus=clcplus$eq(5)
 
-# grass MOD load ----
-grassModerateLoad=grassCLCplus$Or(grassProba)$And(ndviMax$gte(0.2)$And(ndviMax$lt(0.4)))$multiply(99)
-## 104 dry ----
-figure1_1_scottBurgan$a104=grassModerateLoad$multiply(aridityIndex$lte(aridityThreshold))
-## 106 wet ----
-figure1_1_scottBurgan$a106=grassModerateLoad$multiply(aridityIndex$gt(aridityThreshold))
-
-# grass HIGH load ----
-grassHighLoad=grassCLCplus$Or(grassProba)$And(ndviMax$gte(0.4))$multiply(99)
-## 107 dry ----
-figure1_1_scottBurgan$a107=grassHighLoad$multiply(aridityIndex$lte(aridityThreshold))
-## 108 wet ----
-figure1_1_scottBurgan$a108=grassHighLoad$multiply(aridityIndex$gt(aridityThreshold))
-
-#SHRUB  ----
-shrubProba=proba$select('discrete_classification')$eq(20)
-shrubCLCplus=clcplus$eq(5)
-
-#SHRUB low load ----
-shrubLowLoad=shrubCLCplus$Or(shrubProba)$And(ndviMax$lt(0.2))$multiply(99)
-## 141 dry ----
-figure1_1_scottBurgan$a141=shrubLowLoad$multiply(aridityIndex$lte(aridityThreshold))
-## 146 wet ----
-figure1_1_scottBurgan$a146=shrubLowLoad$multiply(aridityIndex$gt(aridityThreshold))
+  #SHRUB low load ----
+  shrubLowLoad=shrubCLCplus$Or(shrubProba)$And(ndviMax$lt(0.2))$multiply(99)
+  ## 141 dry ----
+  outputStack_scottBurgan$a141=shrubLowLoad$multiply(aridityIndex$lte(aridityThreshold))
+  ## 146 wet ----
+  outputStack_scottBurgan$a146=shrubLowLoad$multiply(aridityIndex$gt(aridityThreshold))
 
 
-#SHRUB MODERATE load ----
-shrubModerateLoad=shrubCLCplus$Or(shrubProba)$And(ndviMax$gte(0.2)$And(ndviMax$lt(0.4)))$multiply(99)
-## 142 dry ----
-figure1_1_scottBurgan$a142=shrubModerateLoad$multiply(aridityIndex$lte(aridityThreshold))
-## 143 wet ----
-figure1_1_scottBurgan$a143=shrubModerateLoad$multiply(aridityIndex$gt(aridityThreshold))
+  #SHRUB MODERATE load ----
+  shrubModerateLoad=shrubCLCplus$Or(shrubProba)$And(ndviMax$gte(0.2)$And(ndviMax$lt(0.4)))$multiply(99)
+  ## 142 dry ----
+  outputStack_scottBurgan$a142=shrubModerateLoad$multiply(aridityIndex$lte(aridityThreshold))
+  ## 143 wet ----
+  outputStack_scottBurgan$a143=shrubModerateLoad$multiply(aridityIndex$gt(aridityThreshold))
 
 
-#SHRUB high load ----
-shrubHighLoad=shrubCLCplus$Or(shrubProba)$And(ndviMax$gte(0.4)$And(ndviMax$lt(0.6)))$multiply(99)
-## 145 dry ----
-figure1_1_scottBurgan$a145=shrubHighLoad$multiply(aridityIndex$lte(aridityThreshold))
-## 148 wet ----
-figure1_1_scottBurgan$a148=shrubHighLoad$multiply(aridityIndex$gt(aridityThreshold))
+  #SHRUB high load ----
+  shrubHighLoad=shrubCLCplus$Or(shrubProba)$And(ndviMax$gte(0.4)$And(ndviMax$lt(0.6)))$multiply(99)
+  ## 145 dry ----
+  outputStack_scottBurgan$a145=shrubHighLoad$multiply(aridityIndex$lte(aridityThreshold))
+  ## 148 wet ----
+  outputStack_scottBurgan$a148=shrubHighLoad$multiply(aridityIndex$gt(aridityThreshold))
 
-#############
-# SHRUB VERY high load ----
-shrubVeryHighLoad=shrubCLCplus$And(shrubProba)$And(ndviMax$gte(0.6))$multiply(99)
-## 147 dry ----
-figure1_1_scottBurgan$a147=shrubVeryHighLoad$multiply(aridityIndex$lte(aridityThreshold))
-## 149 wet ----
-figure1_1_scottBurgan$a149=shrubVeryHighLoad$multiply(aridityIndex$gt(aridityThreshold))
+  #############
+  # SHRUB VERY high load ----
+  shrubVeryHighLoad=shrubCLCplus$And(shrubProba)$And(ndviMax$gte(0.6))$multiply(99)
+  ## 147 dry ----
+  outputStack_scottBurgan$a147=shrubVeryHighLoad$multiply(aridityIndex$lte(aridityThreshold))
+  ## 149 wet ----
+  outputStack_scottBurgan$a149=shrubVeryHighLoad$multiply(aridityIndex$gt(aridityThreshold))
 
 
-#############
-# TIMBER UNDERSTOREY  ----
-proba12x=proba$select('discrete_classification')$divide(10)$floor()$toByte()$eq(12)
+  #############
+  # TIMBER UNDERSTOREY  ----
+  proba12x=proba$select('discrete_classification')$divide(10)$floor()$toByte()$eq(12)
 
-# TIMBER UNDERSTOREY LOW+MEDIUM MODERATE load  ----
-timberUnderstoreyLowMediumLoad=clcplus$gt(1)$And(clcplus$ lt(6))$And(proba12x)$And(ndviMax$lte(0.6))$multiply(99)
-## 161 dry  ----
-figure1_1_scottBurgan$a161=timberUnderstoreyLowMediumLoad$multiply(aridityIndex$lte(aridityThreshold))
-## 162 wet  ----
-figure1_1_scottBurgan$a162=timberUnderstoreyLowMediumLoad$multiply(aridityIndex$gt(aridityThreshold))
+  # TIMBER UNDERSTOREY LOW+MEDIUM MODERATE load  ----
+  timberUnderstoreyLowMediumLoad=clcplus$gt(1)$And(clcplus$ lt(6))$And(proba12x)$And(ndviMax$lte(0.6))$multiply(99)
+  ## 161 dry  ----
+  outputStack_scottBurgan$a161=timberUnderstoreyLowMediumLoad$multiply(aridityIndex$lte(aridityThreshold))
+  ## 162 wet  ----
+  outputStack_scottBurgan$a162=timberUnderstoreyLowMediumLoad$multiply(aridityIndex$gt(aridityThreshold))
 
-#############
-#TIMBER UNDERSTOREY high load  ----
-timberUnderstoreyHighLoad=clcplus$gt(1)$Or(clcplus$ lt(6))$And(proba12x)$And(ndviMax$gt(0.6))$multiply(99)
-## 165 dry ----
-figure1_1_scottBurgan$a165=timberUnderstoreyHighLoad$multiply(aridityIndex$lte(aridityThreshold))
-## 163 wet ----
-figure1_1_scottBurgan$a163=timberUnderstoreyHighLoad$multiply(aridityIndex$gt(aridityThreshold))
+  #############
+  #TIMBER UNDERSTOREY high load  ----
+  timberUnderstoreyHighLoad=clcplus$gt(1)$Or(clcplus$ lt(6))$And(proba12x)$And(ndviMax$gt(0.6))$multiply(99)
+  ## 165 dry ----
+  outputStack_scottBurgan$a165=timberUnderstoreyHighLoad$multiply(aridityIndex$lte(aridityThreshold))
+  ## 163 wet ----
+  outputStack_scottBurgan$a163=timberUnderstoreyHighLoad$multiply(aridityIndex$gt(aridityThreshold))
 
-#############
-#TIMBER LITTER CONIFER  -----
-probaClass = proba$select('discrete_classification')
-proba11x=probaClass$divide(10)$floor()$toByte()$eq(11)
+  #############
+  #TIMBER LITTER CONIFER  -----
+  probaClass = proba$select('discrete_classification')
+  proba11x=probaClass$divide(10)$floor()$toByte()$eq(11)
 
-fuelLoadEstimation = tcd$divide(100)$multiply(ndviMax)$multiply(canopy_height$divide(30))
-clcplusTimber = clcplus$gt(1)$And(clcplus$ lt(6))$And(proba12x$Or(proba11x))$And(fuelLoadEstimation$gt(0.1))
+  fuelLoadEstimation = tcd$divide(100)$multiply(ndviMax)$multiply(canopy_height$divide(30))
+  clcplusTimber = clcplus$gt(1)$And(clcplus$ lt(6))$And(proba12x$Or(proba11x))$And(fuelLoadEstimation$gt(0.1))
 
-clcplusTimberConifer = clcplusTimber$And( probaClass$eq(111)$Or(probaClass$eq(113))$Or(probaClass$eq(115))$Or(probaClass$eq(121))$Or(probaClass$eq(123))$Or(probaClass$eq(125))  )
-clcplusTimberBroadleaf = clcplusTimber$And( probaClass$eq(112)$Or(probaClass$eq(114))$Or(probaClass$eq(116))$Or(probaClass$eq(122))$Or(probaClass$eq(124))$Or(probaClass$eq(126))  )
+  clcplusTimberConifer = clcplusTimber$And( probaClass$eq(111)$Or(probaClass$eq(113))$Or(probaClass$eq(115))$Or(probaClass$eq(121))$Or(probaClass$eq(123))$Or(probaClass$eq(125))  )
+  clcplusTimberBroadleaf = clcplusTimber$And( probaClass$eq(112)$Or(probaClass$eq(114))$Or(probaClass$eq(116))$Or(probaClass$eq(122))$Or(probaClass$eq(124))$Or(probaClass$eq(126))  )
 
-lowLoad = fuelLoadEstimation$gt(0)$And(fuelLoadEstimation$lt(0.33));
-medLoad = fuelLoadEstimation$gte(0.33)$And(fuelLoadEstimation$lt(0.66));
-highLoad = fuelLoadEstimation$gte(0.66);
+  lowLoad = fuelLoadEstimation$gt(0)$And(fuelLoadEstimation$lt(0.33));
+  medLoad = fuelLoadEstimation$gte(0.33)$And(fuelLoadEstimation$lt(0.66));
+  highLoad = fuelLoadEstimation$gte(0.66);
 
 
 
-##  181 Low Load Compact Conifer Litter -----
-  figure1_1_scottBurgan$a181=clcplusTimberConifer$add(lowLoad)$multiply(50)
-##  182 Low Load Compact Broadleaves Litter -----
-  figure1_1_scottBurgan$a182=clcplusTimberBroadleaf$add(lowLoad)$multiply(50)
+  ##  181 Low Load Compact Conifer Litter -----
+  outputStack_scottBurgan$a181=clcplusTimberConifer$add(lowLoad)$multiply(50)
+  ##  182 Low Load Compact Broadleaves Litter -----
+  outputStack_scottBurgan$a182=clcplusTimberBroadleaf$add(lowLoad)$multiply(50)
 
-##  183 Moderate Load Conifer Litter -----
-  figure1_1_scottBurgan$a183=clcplusTimberConifer$add(medLoad)$multiply(50)
+  ##  183 Moderate Load Conifer Litter -----
+  outputStack_scottBurgan$a183=clcplusTimberConifer$add(medLoad)$multiply(50)
 
-##  186 Moderate Load Broadleaf Litter -----
-  figure1_1_scottBurgan$a186= clcplusTimberBroadleaf$add(medLoad)$multiply(50)
+  ##  186 Moderate Load Broadleaf Litter -----
+  outputStack_scottBurgan$a186= clcplusTimberBroadleaf$add(medLoad)$multiply(50)
 
-##  185 High Load Conifer Litter -----
-  figure1_1_scottBurgan$a185=clcplusTimberConifer$And(highLoad)$multiply(50)
+  ##  185 High Load Conifer Litter -----
+  outputStack_scottBurgan$a185=clcplusTimberConifer$And(highLoad)$multiply(50)
 
-##  189 very High Load broadleaf Compact Litter -----
-  figure1_1_scottBurgan$a189= clcplusTimberBroadleaf$add(highLoad)$multiply(50)
+  ##  189 very High Load broadleaf Compact Litter -----
+  outputStack_scottBurgan$a189= clcplusTimberBroadleaf$add(highLoad)$multiply(50)
 
 
 
-########## SLASH BLOWDOWN USING HANSEN LOSS -------
-## areas with 100% canopy cover and trees 25 meters or above
-## will have class 204 high load.
-## load is lowered depending on density and tree height
-sb = clcplusTimber$multiply(tcd)$multiply(canopy_height)$divide(2500)$multiply(4L)$multiply(hansenLossPost2018)$unmask()$toByte()
+  ########## SLASH BLOWDOWN USING HANSEN LOSS -------
+  ## areas with 100% canopy cover and trees 25 meters or above
+  ## will have class 204 high load.
+  ## load is lowered depending on density and tree height
+  sb = clcplusTimber$multiply(tcd)$multiply(canopy_height)$divide(2500)$multiply(4L)$multiply(hansenLossPost2018)$unmask()$toByte()
 
-figure1_1_scottBurgan$a201 = sb$eq(1L)$multiply(100)
-figure1_1_scottBurgan$a202 = sb$eq(2L)$multiply(100)
-figure1_1_scottBurgan$a203 = sb$eq(3L)$multiply(100)
-figure1_1_scottBurgan$a204 = sb$eq(4L)$multiply(100)
+  outputStack_scottBurgan$a201 = sb$eq(1L)
+  outputStack_scottBurgan$a202 = sb$eq(2L)
+  outputStack_scottBurgan$a203 = sb$eq(3L)
+  outputStack_scottBurgan$a204 = sb$eq(4L)
 
-for( k in names(figure1_1_scottBurgan) ){
+}
+
+for( k in names(outputStack_scottBurgan) ){
    bv = as.integer(substr(k, 2,6))
    message(bv)
    if(is.na(bv)){
      browser()
    }
-   nouse =  figure1_1_scottBurgan[[k]]$select(0)$projection()
+   nouse =  outputStack_scottBurgan[[k]]$select(0)$projection()
    newBand = ee$Image$constant( bv )$
                 rename('new_band')$
                 setDefaultProjection(nouse)$toByte();
 
-   figure1_1_scottBurgan[[k]] = figure1_1_scottBurgan[[k]]$unmask()$toFloat()$addBands(newBand)$rename(c("prob","class") );
+   outputStack_scottBurgan[[k]] = outputStack_scottBurgan[[k]]$unmask()$toFloat()$addBands(newBand)$rename(c("prob","class") );
 
 }
 
-ScottBurganProbs=ee$ImageCollection( unname(figure1_1_scottBurgan) )
+ScottBurganProbs=ee$ImageCollection( unname(outputStack_scottBurgan) )
 nouse = ScottBurganProbs$first()$projection()
 
 ScottBurgan=ScottBurganProbs$qualityMosaic('prob')$
@@ -274,12 +377,9 @@ ScottBurgan=ScottBurganProbs$qualityMosaic('prob')$
 
 
 
-n = pilotSites$size()$getInfo()
 
-task_img_container <- list()
-task_img_containerAsset <- list()
-
-for( i in 1:n){
+## process Pilot areas -----------
+for( i in 1:nPilots){
 
   feature =ee$Feature(pilotSites$toList(12)$get(i-1))
   gg = feature$geometry();
@@ -287,11 +387,11 @@ for( i in 1:n){
 
 
   ScottBurganFiltered = ScottBurgan$select('scottburgan_class')
-  id = paste0(idf,'_ScottBurganFuelMapClassV', version)
+  id = paste0(idf,'_ScottBurganFuelMapClassV', versionFuelModel)
   # task_img_containerAsset[[id ]] <-"s"
   # next
   ScottBurganProbFiltered = ScottBurgan$select('scottburgan_cprob')
-  idp = paste0(idf,'_ScottBurganFuelClassProbV', version)
+  idp = paste0(idf,'_ScottBurganFuelClassProbV', versionFuelModel)
 
   if(0==0 && is.null(task_img_container[[id ]])){
 
@@ -457,7 +557,7 @@ for( i in 1:n){
 amk_fc <-ee$FeatureCollection( unname(featuresHist)  )
 
 ## HISTOGRAM -----
-assetIdh= sprintf('projects/progetto-eu-h2020-cirgeo/assets/wildfire/fuelModelV%dHFD', version)
+assetIdh= sprintf('projects/progetto-eu-h2020-cirgeo/assets/wildfire/fuelModelV%dHFD', versionFuelModel)
 task <- ee_table_to_asset(
   collection= amk_fc ,
   description="Histogram",
