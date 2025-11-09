@@ -28,6 +28,14 @@ task_img_containerAsset <- list()
 startDate = '2023-01-01';
 endDate = '2025-09-30';
 
+europeBounds = ee$Geometry$Rectangle(
+  coords = c(-31.266, 27.636, 39.869, 81.008),
+  proj= 'EPSG:4326',
+  geodesic=F
+);
+
+# europeBounds$area(1)$getInfo() / 1000000
+
 # Function to mask clouds and shadows using the SCL band
 maskS2clouds <- function(image) {
   scl = image$select('SCL');
@@ -41,98 +49,84 @@ maskS2clouds <- function(image) {
 
 # Function to compute NDVI and add it as a band
 addNDVI <-function(image) {
-  ndvi = image$normalizedDifference(c('B8', 'B4'))$rename('NDVI');
+  ndvi = image$normalizedDifference(c('B8', 'B4'))$rename('b1');
   return(ndvi);
 }
 # LAYERS ------
 ## pilot sites ----
 inputVars <- list()
-inputVars$pilotSites = ee$FeatureCollection("projects/progetto-eu-h2020-cirgeo/assets/wildfire/wildfire_pilot_sites_v3") ;
-nPilots = inputVars$pilotSites$size()$getInfo()
-
+pilotSites = ee$FeatureCollection("projects/progetto-eu-h2020-cirgeo/assets/wildfire/wildfire_pilot_sites_v3") ;
+nPilots =  pilotSites$size()$getInfo()
+bounds = pilotSites$geometry()$bounds()
 # Load and process S2 collection
-s2 = ee$ImageCollection("COPERNICUS/S2_SR_HARMONIZED")$filterDate(startDate, endDate)$filter(ee$Filter$lt('CLOUDY_PIXEL_PERCENTAGE', 50))$map(maskS2clouds)$map(addNDVI);
+s2 = ee$ImageCollection("COPERNICUS/S2_SR_HARMONIZED")$filterDate(startDate, endDate)$filterBounds(bounds)$filter(ee$Filter$lt('CLOUDY_PIXEL_PERCENTAGE', 50))$map(maskS2clouds)$map(addNDVI);
 
 ##  NDVI -----
-inputVars$ndviMax = s2$qualityMosaic('NDVI');#$clip(pilotSites);
+inputVars$ndviMax = s2$qualityMosaic('b1')$clip(bounds)
+
+
 ## Aridity -----
-inputVars$aridityIndex = ee$ImageCollection('projects/progetto-eu-h2020-cirgeo/assets/global/AridityIndex')$mosaic()$divide(10000);
-## Canopy COVER -----
-inputVars$canopy_cover = ee$ImageCollection("projects/progetto-eu-h2020-cirgeo/assets/copernicus/CLMS_TCF_TreeDensity_RASTER_2021")$mosaic();
-
-## NEW!!  Canopy height META -----
-# inputVars$canopy_height = ee$Image('users/nlang/ETH_GlobalCanopyHeight_2020_10m_v1')$unmask()
-canopy_height =  ee$ImageCollection("projects/sat-io/open-datasets/facebook/meta-canopy-height")$mosaic();
-## aggregate at X meters
-inputVars$canopy_height =   canopy_height$reproject(
-  crs=proj3035_30m,
-  scale=1L
-  )$reduceResolution(
-    reducer=  ee$Reducer$mean()$combine(
-      reducer2=ee$Reducer$stdDev(),
-      sharedInputs=TRUE
-      ),
-  maxPixels=1024L
-)$reproject(crs=ee$Projection('EPSG:3035'), scale = scale)
-
-
-
-for( i in 1:nPilots){
-  feature =ee$Feature( inputVars$pilotSites$toList(12)$get(i-1))
-  gg = feature$geometry();
-  idf = feature$get("pilot_id")$getInfo() ;
-  id = paste0(idf,'_treeHeightV', versionFuelModel)
-  # task_img_containerAsset[[id ]] <-"s"
-  # next
-  idp = paste0(idf,'_ScottBurganFuelClassProbV', versionFuelModel)
-  folder <- sprintf("wildfireOutProgettoEUv3/%s",idf)
-    # 2. Get the folder
-  # folder2rm <- drive_get(folder)
-  # if(nrow(folder2rm)!=0){
-  #   # 3. List files
-  #   files_in_folder <- drive_ls(path = folder2rm)
-  #   # 4. Remove all files
-  #   drive_rm(files_in_folder)
-  # }
-
-    task_img_container[[  id ]] <- ee_image_to_drive(
-      image= inputVars$canopy_height$toFloat()$clip(gg),
-      description= id,
-      timePrefix = F,
-      folder=NULL,
-      region= gg ,
-      scale= 30,
-      crs= 'EPSG:3035',
-      maxPixels= 1e13
-    )
-    task_img_container[[id ]]$start()
-  }
-
-
-
-
-
-
-
-
-
-
-
-canopy_cover = ee$Image("UMD/hansen/global_forest_change_2024_v1_12")
-## NEW! Tree Canopy Density from Copernicus  10 m 2021
-# tcd = ee$Image("projects/progetto-eu-h2020-cirgeo/assets/copernicus/CLMS_TCF_TreeDensity_RASTER_2021_1_0")$select("b1")
+aridityIndex =  ee$ImageCollection('projects/progetto-eu-h2020-cirgeo/assets/global/AridityIndex')$mosaic()$divide(10000);
+## NEW! Tree Canopy Density from Copernicus  10 m 2021 -----
+inputVars$canopy_cover = ee$ImageCollection("projects/progetto-eu-h2020-cirgeo/assets/copernicus/CLMS_TCF_TreeDensity_RASTER_2021")$mosaic()
 ## NEW! CLC+ backbone 10 m 2023 ----
 inputVars$clcplus = ee$Image('projects/progetto-eu-h2020-cirgeo/assets/copernicus/CLMS_CLCplus_RASTER_2023')$select('b1')
 ## NEW! crop map 10 m 2021 - we assume orchards and vineyards are not changed ----
 inputVars$cropmap = ee$Image('projects/progetto-eu-h2020-cirgeo/assets/copernicus/CLMS_CropTypes_RASTER_2021')$select('b1')
 inputVars$cropmapHighVeg = inputVars$cropmap$gt(100)$And(inputVars$cropmap$lt(200))
 ## very high threshold to consider all arid ? low values = arid, high values = humid
-inputVars$aridityThreshold = 100;
+aridityThreshold = 100;
 
-## Copernicus Global Land Cover 100 m 2019 -----
-# proba = ee$Image('COPERNICUS/Landcover/100m/Proba-V-C3/Global/2019')
+## NEW!!  Canopy height META -----
+# inputVars$canopy_height = ee$Image('users/nlang/ETH_GlobalCanopyHeight_2020_10m_v1')$unmask()
+canopy_heightColl =  ee$ImageCollection("projects/sat-io/open-datasets/facebook/meta-canopy-height")$filterBounds(bounds);
+canopy_height =  canopy_heightColl$mosaic()
+canopy_height.proj <- canopy_heightColl$first()$projection()$getInfo()
+## aggregate at X meters catching statistics about canopy height
+combinedReducer = ee$Reducer$mean()$combine(
+  reducer2= ee$Reducer$stdDev(),
+  sharedInputs= T
+) $combine(
+  reducer2= ee$Reducer$min(),
+  sharedInputs= T
+) $combine(
+  reducer2= ee$Reducer$max(),
+  sharedInputs= T
+);
 
-outputStack = { };
+inputVars$canopy_height = canopy_height$rename("b1")$setDefaultProjection(canopy_heightColl$first()$projection())$reduceResolution(
+  reducer=  combinedReducer,
+  maxPixels=2048L
+)
+
+### TRY OUTPUT ----
+# for( i in 1:nPilots){
+#   feature =ee$Feature( inputVars$pilotSites$toList(12)$get(i-1))
+#   gg = feature$geometry();
+#   idf = feature$get("pilot_id")$getInfo() ;
+#   id = paste0(idf,'_CLCV', versionFuelModel)
+#   idp = paste0(idf,'_ScottBurganFuelClassProbV', versionFuelModel)
+#   folder <- sprintf("wildfireOutProgettoEUv3/%s",idf)
+#   task_img_container[[  id ]] <- ee_image_to_drive(
+#       # image= inputVars$canopy_height$toFloat()$clip(gg),
+#       image= inputVars$clcplus$clip(gg),
+#       description= id,
+#       timePrefix = F,
+#       folder=NULL,
+#       region= gg ,
+#       scale= 30,
+#       crs= 'EPSG:3035',
+#       maxPixels= 1e13
+#     )
+#     task_img_container[[id ]]$start()
+#   }
+
+
+
+canopy_cover = ee$Image("UMD/hansen/global_forest_change_2024_v1_12")
+
+
+outputStack_macroClass = { };
 outputStack_scottBurgan = { };
 
 ## CANOPY LOSS MAP ----
@@ -143,22 +137,101 @@ hansenLossPost2010upTo2019 = hansenLossPost2010$And( canopy_cover$select("lossye
 hansenLossPost2000   =  canopy_cover$select("lossyear")$unmask()$gt(0)
 hansenLossPost2000upTo2009   =  hansenLossPost2000$And( canopy_cover$select("lossyear")$unmask()$lt(11) ) ;
 
+
+### RANDOM FOREST -----
+## stack the predictors
+predictors <- inputVars$clcplus$rename("clc")$clip(points$geometry()$bounds())$toByte() #$reproject(crs=proj3035_30m, scale = scale)
+output <- list()
+for( k in names(inputVars) ){
+  message(k)
+  if(k=="clcplus") next
+  message(" go ")
+  img1 = inputVars[[k]]$clip(points$geometry()$bounds())
+  # train = img1$sampleRegions(
+  #   collection= points,
+  #   properties= list('class'),
+  #   scale= 30,
+  #   geometries=T
+  # );
+  # output[[k]] <- train$first()$getInfo()
+
+  newBnames <- gsub("b1", k, img1$bandNames()$getInfo() )
+  predictors <- predictors$addBands(img1$rename(newBnames)) # nouse =  inputVars[[k]]$select(0)$projection()
+}
+
+bands = predictors$bandNames()
+
+ train = predictors$sampleRegions(
+   collection= points,
+   properties= list('class'),
+   scale= 30,
+   geometries=T
+ );
+
+ train$first()$getInfo()
+
+
+ classifier = ee$Classifier$smileRandomForest(
+  numberOfTrees = 100
+)$train(
+  features = train,
+  classProperty = 'class',
+  inputProperties = bands
+);
+
+ ee$batch$Export$classifier$toAsset(
+   classifier = classifier,
+   description= 'RF_classifier_export',
+   assetId= 'users/cirgeo/RF_classifier'
+  )$start();
+
+ ## process Pilot areas -----------
+ for( i in 1:nPilots){
+
+   feature =ee$Feature(pilotSites$toList(12)$get(i-1))
+   gg = feature$geometry();
+   idf = feature$get("pilot_id")$getInfo() ;
+
+   id = paste0(idf,'_RF_ScottBurganFuelMapClassV', versionFuelModel)
+
+   classified = predictors$clip(gg)$classify(classifier);
+
+   task_img_container[[  id ]] <- ee_image_to_drive(
+       image=classified$toByte()$clip(gg),
+       description= id,
+       timePrefix = F,
+       folder=NULL,
+       region= gg ,
+       scale= 30,
+       crs= 'EPSG:3035',
+       maxPixels= 1e13
+     )
+     task_img_container[[id ]]$start()
+
+   }
+
+
+ # train$first()$geometry()$projection()$getInfo()
+### RANDOM FOREST FINISHED -----
 # outputStack$updatedHansen = canopy_cover$select(0)$unmask()$mask(onlyNonDisturbedPixels)
 
 
 # 91 Urban or suburban development; insufficient wildland fuel ----
-outputStack_scottBurgan$a91 = clcplus$eq(1)
-
+outputStack_scottBurgan$a91 = inputVars$clcplus$eq(1)
+outputStack_macroClass$a91 = inputVars$clcplus$eq(1)
 # 98 water ----
-outputStack_scottBurgan$a98 = clcplus$gt(253)$Or(clcplus$eq(10))
+outputStack_scottBurgan$a98 = inputVars$clcplus$gt(253)$Or(inputVars$clcplus$eq(10))
+outputStack_macroClass$a98 = inputVars$clcplus$gt(253)$Or(inputVars$clcplus$eq(10))
 
 # 99 barren ----
-outputStack_scottBurgan$a99 = clcplus$gt(253)$Or(clcplus$gt(7)$And(clcplus$lt(10) ))
+outputStack_scottBurgan$a99 = inputVars$clcplus$gt(253)$Or(inputVars$clcplus$gt(7)$And(inputVars$clcplus$lt(10) ))
+outputStack_macroClass$a99 = inputVars$clcplus$gt(253)$Or(inputVars$clcplus$gt(7)$And(inputVars$clcplus$lt(10) ))
 
 # 92 snow ice ----
-outputStack_scottBurgan$a92 = clcplus$eq(11)
+outputStack_scottBurgan$a92 = inputVars$clcplus$eq(11)
+outputStack_macroClass$a92 = inputVars$clcplus$eq(11)
 
-
+### PERCENTILES NDVI -----
 ## I need to know the percentiles of the NDVI that cover the grass/shrub/tree vegetation,
 ## in order to estimate a first idea for fuel load (more for grass/shrub as trees are
 ## saturated )
@@ -203,22 +276,26 @@ outputStack_scottBurgan$a92 = clcplus$eq(11)
 #      file="percentiles.rda")
 
 ## GRASS  ----
-grassCLCplus=clcplus$eq(6)$Or(clcplus$eq(7))
-## MacroClasses
-## Grass
-outputStack_scottBurgan$a10=clcplus$eq(6)$Or(clcplus$eq(7))
+grassCLCplus=inputVars$clcplus$eq(6)$Or(inputVars$clcplus$eq(7))
+## MACRO Classes -----
+## Grass only if < 10% has vegetation > 1 m
+outputStack_macroClass$a10=clcplus$eq(6)$Or(clcplus$eq(7))$And(
+  inputVars$canopy_height$select("b1_min")$eq(0L)$And(
+    inputVars$canopy_height$select("b1_mean")$lt(1L)
+  )
+  )
 ## to make sure it is grass, we remove pixels that have any crop type canopy cover
-## grass shrub
-outputStack_scottBurgan$a12=clcplus$eq(6)$Or(clcplus$eq(7))
+## grass shrub only if > 10% has vegetation > 1 m
+outputStack_macroClass$a12=clcplus$eq(6)$Or(clcplus$eq(7))
 
 ##  shrub
-outputStack_scottBurgan$a14=clcplus$eq(5)
+outputStack_macroClass$a14=clcplus$eq(5)
 ##  tree
-outputStack_scottBurgan$a16=clcplus$eq(5)
+outputStack_macroClass$a16=clcplus$eq(5)
 ##  tree1
-outputStack_scottBurgan$a18=clcplus$eq(5)
+outputStack_macroClass$a18=clcplus$eq(5)
 ##  blowdown
-outputStack_scottBurgan$a20=clcplus$eq(5)
+outputStack_macroClass$a20=clcplus$eq(5)
 
 
 onlyMacroClass <- T
