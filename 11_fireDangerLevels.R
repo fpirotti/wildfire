@@ -25,10 +25,11 @@ data$level.fwi <- factor(apply(data, 1,  function(x){
 # plot(table(data$level.fwi, data$MON, data$nome))
 
 
+
 si_at_it <- data |> filter(nome=="Alpi Giulie")
 si_it <- data |> filter(nome=="Carso")
 
-writexl::write_xlsx(list("ItaSlovBorder_Carso"= si_it,
+writexl::write_xlsx(list("TOT"=data, "ItaSlovBorder_Carso"= si_it,
                     "ItaAustriaSlovBorder_AlpGiulie"= si_at_it) ,
                     "fireDangerITA.xlsx"
 )
