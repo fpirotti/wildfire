@@ -8,8 +8,11 @@ library(googledrive)
 
 # 1. Authenticate
 drive_auth(email = "cirgeo@unipd.it")
-
-
+points <- ee$FeatureCollection("projects/progetto-eu-h2020-cirgeo/assets/wildfire/CzechGlobeDE_CZpts")
+withRand = points$randomColumn('rand');
+train = withRand$filter(ee$Filter$lt('rand', 0.05));
+valid = withRand$filter(ee$Filter$gt('rand', 0.05));
+print(train$size()$getInfo())
 cat(as.character(date()), "\n", file = "processing_01_GEE_data.log" )
 # ee_install_upgrade()
 ### setting version ----
@@ -28,11 +31,11 @@ task_img_containerAsset <- list()
 startDate = '2023-01-01';
 endDate = '2025-09-30';
 
-europeBounds = ee$Geometry$Rectangle(
-  coords = c(-31.266, 27.636, 39.869, 81.008),
-  proj= 'EPSG:4326',
-  geodesic=F
-);
+# europeBounds = ee$Geometry$Rectangle(
+#   coords = c(-31.266, 27.636, 39.869, 81.008),
+#   proj= 'EPSG:4326',
+#   geodesic=F
+# );
 
 # europeBounds$area(1)$getInfo() / 1000000
 
@@ -52,37 +55,6 @@ addNDVI <-function(image) {
   ndvi = image$normalizedDifference(c('B8', 'B4'))$rename('b1');
   return(ndvi);
 }
-# LAYERS ------
-## pilot sites ----
-inputVars <- list()
-pilotSites = ee$FeatureCollection("projects/progetto-eu-h2020-cirgeo/assets/wildfire/wildfire_pilot_sites_v3") ;
-nPilots =  pilotSites$size()$getInfo()
-bounds = pilotSites$geometry()$bounds()
-# Load and process S2 collection
-s2 = ee$ImageCollection("COPERNICUS/S2_SR_HARMONIZED")$filterDate(startDate, endDate)$filterBounds(bounds)$filter(ee$Filter$lt('CLOUDY_PIXEL_PERCENTAGE', 50))$map(maskS2clouds)$map(addNDVI);
-
-##  NDVI -----
-inputVars$ndviMax = s2$qualityMosaic('b1')$clip(bounds)
-
-
-## Aridity -----
-aridityIndex =  ee$ImageCollection('projects/progetto-eu-h2020-cirgeo/assets/global/AridityIndex')$mosaic()$divide(10000);
-## NEW! Tree Canopy Density from Copernicus  10 m 2021 -----
-inputVars$canopy_cover = ee$ImageCollection("projects/progetto-eu-h2020-cirgeo/assets/copernicus/CLMS_TCF_TreeDensity_RASTER_2021")$mosaic()
-## NEW! CLC+ backbone 10 m 2023 ----
-inputVars$clcplus = ee$Image('projects/progetto-eu-h2020-cirgeo/assets/copernicus/CLMS_CLCplus_RASTER_2023')$select('b1')
-## NEW! crop map 10 m 2021 - we assume orchards and vineyards are not changed ----
-inputVars$cropmap = ee$Image('projects/progetto-eu-h2020-cirgeo/assets/copernicus/CLMS_CropTypes_RASTER_2021')$select('b1')
-inputVars$cropmapHighVeg = inputVars$cropmap$gt(100)$And(inputVars$cropmap$lt(200))
-## very high threshold to consider all arid ? low values = arid, high values = humid
-aridityThreshold = 100;
-
-## NEW!!  Canopy height META -----
-# inputVars$canopy_height = ee$Image('users/nlang/ETH_GlobalCanopyHeight_2020_10m_v1')$unmask()
-canopy_heightColl =  ee$ImageCollection("projects/sat-io/open-datasets/facebook/meta-canopy-height")$filterBounds(bounds);
-canopy_height =  canopy_heightColl$mosaic()
-canopy_height.proj <- canopy_heightColl$first()$projection()$getInfo()
-## aggregate at X meters catching statistics about canopy height
 combinedReducer = ee$Reducer$mean()$combine(
   reducer2= ee$Reducer$stdDev(),
   sharedInputs= T
@@ -94,10 +66,52 @@ combinedReducer = ee$Reducer$mean()$combine(
   sharedInputs= T
 );
 
-inputVars$canopy_height = canopy_height$rename("b1")$setDefaultProjection(canopy_heightColl$first()$projection())$reduceResolution(
-  reducer=  combinedReducer,
-  maxPixels=2048L
-)
+statsAgg <-function(image) {
+  agg = image$rename("b1")$reduceResolution(
+      reducer   = combinedReducer,
+      maxPixels = 2048L  )#$reproject(crs=proj3035_30m, scale = scale)
+  return(agg);
+}
+
+# LAYERS ------
+## pilot sites ----
+inputVars <- list()
+pilotSites = ee$FeatureCollection("projects/progetto-eu-h2020-cirgeo/assets/wildfire/wildfire_pilot_sites_v3") ;
+nPilots =  pilotSites$size()$getInfo()
+bounds = pilotSites$geometry()$bounds()
+# Load and process S2 collection
+s2 = ee$ImageCollection("COPERNICUS/S2_SR_HARMONIZED")$filterDate(startDate, endDate)$filterBounds(bounds)$filter(ee$Filter$lt('CLOUDY_PIXEL_PERCENTAGE', 50))$map(maskS2clouds)$map(addNDVI);
+
+##  NDVI -----
+inputVars$ndviMax = s2$qualityMosaic('b1')
+
+
+## Aridity -----
+aridityIndex =  ee$ImageCollection('projects/progetto-eu-h2020-cirgeo/assets/global/AridityIndex')$mosaic()$divide(10000);
+## NEW! Tree Canopy Density from Copernicus  10 m 2021 -----
+inputVars$canopy_cover = ee$ImageCollection("projects/progetto-eu-h2020-cirgeo/assets/copernicus/CLMS_TCF_TreeDensity_RASTER_2021")$mosaic()
+## NEW! CLC+ backbone 10 m 2023 ----
+inputVars$clcplus = ee$Image('projects/progetto-eu-h2020-cirgeo/assets/copernicus/CLMS_CLCplus_RASTER_2023')$select('b1')
+## NEW! crop map 10 m 2021 - we assume orchards and vineyards are not changed ----
+inputVars$cropmap = ee$Image('projects/progetto-eu-h2020-cirgeo/assets/copernicus/CLMS_CropTypes_RASTER_2021')$select('b1')$unmask()
+inputVars$cropmapHighVeg = inputVars$cropmap$gt(100)$And(inputVars$cropmap$lt(200))
+## very high threshold to consider all arid ? low values = arid, high values = humid
+aridityThreshold = 100;
+
+## NEW!!  Canopy height META -----
+# inputVars$canopy_height = ee$Image('users/nlang/ETH_GlobalCanopyHeight_2020_10m_v1')$unmask()
+# canopy_heightColl =  ee$ImageCollection("projects/sat-io/open-datasets/facebook/meta-canopy-height")$filterBounds(bounds);
+
+
+
+canopy_height =  ee$ImageCollection("projects/progetto-eu-h2020-cirgeo/assets/wildfire/canopyHeightFromMeta30m")$mosaic() #$clip(bounds) #$map(statsAgg)
+canopy_height.proj <- canopy_heightColl$first()$projection()$getInfo()
+
+inputVars$canopy_height = canopy_height #$setDefaultProjection(canopy_heightColl$first()$projection())$reduceResolution(
+  # reducer   = combinedReducer,
+  # maxPixels = 2048L,
+  # bestEffort = T)
+
 
 ### TRY OUTPUT ----
 # for( i in 1:nPilots){
@@ -140,13 +154,13 @@ hansenLossPost2000upTo2009   =  hansenLossPost2000$And( canopy_cover$select("los
 
 ### RANDOM FOREST -----
 ## stack the predictors
-predictors <- inputVars$clcplus$rename("clc")$clip(points$geometry()$bounds())$toByte() #$reproject(crs=proj3035_30m, scale = scale)
+predictors <- inputVars$clcplus$rename("clc")$toByte() #$reproject(crs=proj3035_30m, scale = scale)
 output <- list()
 for( k in names(inputVars) ){
   message(k)
   if(k=="clcplus") next
   message(" go ")
-  img1 = inputVars[[k]]$clip(points$geometry()$bounds())
+  img1 = inputVars[[k]]
   # train = img1$sampleRegions(
   #   collection= points,
   #   properties= list('class'),
@@ -162,13 +176,12 @@ for( k in names(inputVars) ){
 bands = predictors$bandNames()
 
  train = predictors$sampleRegions(
-   collection= points,
+   collection= train,
    properties= list('class'),
-   scale= 30,
-   geometries=T
+   scale= 30
  );
 
- train$first()$getInfo()
+ # train$first()$getInfo()
 
 
  classifier = ee$Classifier$smileRandomForest(
@@ -182,7 +195,7 @@ bands = predictors$bandNames()
  ee$batch$Export$classifier$toAsset(
    classifier = classifier,
    description= 'RF_classifier_export',
-   assetId= 'users/cirgeo/RF_classifier'
+   assetId= 'projects/progetto-eu-h2020-cirgeo/assets/wildfire/RF_classifier_FuelModelV3'
   )$start();
 
  ## process Pilot areas -----------
@@ -194,14 +207,16 @@ bands = predictors$bandNames()
 
    id = paste0(idf,'_RF_ScottBurganFuelMapClassV', versionFuelModel)
 
-   classified = predictors$clip(gg)$classify(classifier);
+   # classified = predictors$clip(gg)$classify(classifier);
 
-   task_img_container[[  id ]] <- ee_image_to_drive(
-       image=classified$toByte()$clip(gg),
+   assetid <- paste0('projects/progetto-eu-h2020-cirgeo/assets/wildfire/canopyHeightMetaStats')
+   task_img_container[[  id ]] <- ee_image_to_asset(
+       image= inputVars$canopy_height$toFloat(), #predictors$toFloat()$clip(gg), ##
        description= id,
-       timePrefix = F,
-       folder=NULL,
-       region= gg ,
+       assetId= assetid,
+       # timePrefix = F,
+       # folder=NULL,
+       region= bounds, #gg ,
        scale= 30,
        crs= 'EPSG:3035',
        maxPixels= 1e13
