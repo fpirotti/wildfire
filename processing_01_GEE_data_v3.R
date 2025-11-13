@@ -10,9 +10,9 @@ library(googledrive)
 drive_auth(email = "cirgeo@unipd.it")
 points <- ee$FeatureCollection("projects/progetto-eu-h2020-cirgeo/assets/wildfire/CzechGlobeDE_CZpts")
 withRand = points$randomColumn('rand');
-train = withRand$filter(ee$Filter$lt('rand', 0.05));
-valid = withRand$filter(ee$Filter$gt('rand', 0.05));
-print(train$size()$getInfo())
+train = withRand$filter(ee$Filter$lt('rand', 0.1));
+valid = withRand$filter(ee$Filter$gt('rand', 0.1));
+#print(train$size()$getInfo())
 cat(as.character(date()), "\n", file = "processing_01_GEE_data.log" )
 # ee_install_upgrade()
 ### setting version ----
@@ -86,6 +86,14 @@ s2 = ee$ImageCollection("COPERNICUS/S2_SR_HARMONIZED")$filterDate(startDate, end
 inputVars$ndviMax = s2$qualityMosaic('b1')
 
 
+## DEM -----
+
+inputVars$dem = ee$ImageCollection('COPERNICUS/DEM/GLO30')$filterBounds(bounds)$mosaic()$select("DEM") ;
+
+terrain = ee$Terrain$products(inputVars$dem);
+inputVars$slope = terrain$select('slope');
+inputVars$aspect = terrain$select('aspect');
+
 ## Aridity -----
 aridityIndex =  ee$ImageCollection('projects/progetto-eu-h2020-cirgeo/assets/global/AridityIndex')$mosaic()$divide(10000);
 ## NEW! Tree Canopy Density from Copernicus  10 m 2021 -----
@@ -152,7 +160,7 @@ hansenLossPost2000   =  canopy_cover$select("lossyear")$unmask()$gt(0)
 hansenLossPost2000upTo2009   =  hansenLossPost2000$And( canopy_cover$select("lossyear")$unmask()$lt(11) ) ;
 
 
-### RANDOM FOREST -----
+### ==> RANDOM FOREST -----
 ## stack the predictors
 predictors <- inputVars$clcplus$rename("clc")$toByte() #$reproject(crs=proj3035_30m, scale = scale)
 output <- list()
@@ -198,25 +206,37 @@ bands = predictors$bandNames()
    assetId= 'projects/progetto-eu-h2020-cirgeo/assets/wildfire/RF_classifier_FuelModelV3'
   )$start();
 
+
  ## process Pilot areas -----------
+ assetRoot = 'projects/progetto-eu-h2020-cirgeo/assets/wildfire/fuelModelPredictors';
+ list = ee$data$listAssets(assetRoot);
+ tb <- tryCatch({
+   data.table::rbindlist(list$assets)
+ }, error = function(e){
+    as.data.frame(list$assets)
+ } )
+
  for( i in 1:nPilots){
 
    feature =ee$Feature(pilotSites$toList(12)$get(i-1))
    gg = feature$geometry();
    idf = feature$get("pilot_id")$getInfo() ;
 
-   id = paste0(idf,'_RF_ScottBurganFuelMapClassV', versionFuelModel)
-
+   id = paste0(idf,'_predictorsV', versionFuelModel)
+   idOut = paste0(idf,'_predictedV', versionFuelModel)
+   message(id)
+   # if( any(grepl(id, tb$name)) ) next
+   # exp <- ee$Classifier$explain(classifier)$getInfo()
    # classified = predictors$clip(gg)$classify(classifier);
 
-   assetid <- paste0('projects/progetto-eu-h2020-cirgeo/assets/wildfire/canopyHeightMetaStats')
+   assetid <- paste0('projects/progetto-eu-h2020-cirgeo/assets/wildfire/fuelModelPredictors/',id)
+   assetidOut <- paste0('projects/progetto-eu-h2020-cirgeo/assets/wildfire/fuelModel_RF_Predicted/',id)
+
    task_img_container[[  id ]] <- ee_image_to_asset(
-       image= inputVars$canopy_height$toFloat(), #predictors$toFloat()$clip(gg), ##
-       description= id,
-       assetId= assetid,
-       # timePrefix = F,
-       # folder=NULL,
-       region= bounds, #gg ,
+       image=  ee$Image(assetid)$classify(classifier )$select('classification'), ##predictors$clip(gg)$float()
+       description= idOut,
+       assetId= assetidOut,
+       region= bounds,
        scale= 30,
        crs= 'EPSG:3035',
        maxPixels= 1e13
