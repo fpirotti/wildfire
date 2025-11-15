@@ -30,20 +30,14 @@ combinedReducer = ee$Reducer$mean()$combine(
       sharedInputs= T
   );
 
-  ##  ========================
-    ##  3$ Aggregate to 30 m
-  ##  ========================
-    ##  Use mode for categorical data
+##  3$ Aggregate to 30 m  ----
 canopy30m = canopy$reduceResolution(
     reducer= combinedReducer,
     maxPixels= 2048,
     bestEffort= T
 );
 
-  ##  ========================
-    ##  4. Tile Europe in EPSG:3035 coordinates
-  ##  ========================
-    ## var europeProj = europe.transform(exportCrs, 1);  ##  reproject geometry for tiling
+##  4. Tile Europe in EPSG:3035 coordinates ----
 filteredGrid = grid$filter(ee$Filter$eq('wildfire', 1));
 filteredGridList = filteredGrid$toList(filteredGrid$size());
 ntiles = filteredGrid$size()$getInfo();
@@ -79,6 +73,6 @@ for( i in 1:ntiles){
 target = 'projects/progetto-eu-h2020-cirgeo/assets/wildfire/canopyHeightFromMeta30m/';
 
 for(ids in assetIds) {
-  ee$data$copyAsset(ids,  paste0(target, basename(ids)) )
+  ee$data$deleteAsset(ids )
   }
 

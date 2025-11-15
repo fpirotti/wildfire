@@ -1,12 +1,9 @@
 library(rgee)
 library(rgeeExtra)
-# library("inborutils")
-# library("parallel")
-# library("terra")
 library(stars)
 library(googledrive)
-
-# 1. Authenticate
+########### THIS REQUIRES FIRST THAT THE processing_01_GEE_tileMeta.R!
+# 1. Authenticate ----
 drive_auth(email = "cirgeo@unipd.it")
 points <- ee$FeatureCollection("projects/progetto-eu-h2020-cirgeo/assets/wildfire/CzechGlobeDE_CZpts")
 withRand = points$randomColumn('rand');
@@ -23,6 +20,7 @@ scale = 30
 ### setting scale ----
 proj3035_30m = ee$Projection('EPSG:3035')$atScale(scale);
 
+# 2. START ----
 ### setting tasks containers ----
 task_img_container <- list()
 task_img_containerAsset <- list()
@@ -30,14 +28,6 @@ task_img_containerAsset <- list()
 # Time range for NDVI stack
 startDate = '2023-01-01';
 endDate = '2025-09-30';
-
-# europeBounds = ee$Geometry$Rectangle(
-#   coords = c(-31.266, 27.636, 39.869, 81.008),
-#   proj= 'EPSG:4326',
-#   geodesic=F
-# );
-
-# europeBounds$area(1)$getInfo() / 1000000
 
 # Function to mask clouds and shadows using the SCL band
 maskS2clouds <- function(image) {
@@ -55,6 +45,8 @@ addNDVI <-function(image) {
   ndvi = image$normalizedDifference(c('B8', 'B4'))$rename('b1');
   return(ndvi);
 }
+
+## reducer for Meta 1 m tree height to 30 m grid
 combinedReducer = ee$Reducer$mean()$combine(
   reducer2= ee$Reducer$stdDev(),
   sharedInputs= T
@@ -68,8 +60,8 @@ combinedReducer = ee$Reducer$mean()$combine(
 
 statsAgg <-function(image) {
   agg = image$rename("b1")$reduceResolution(
-      reducer   = combinedReducer,
-      maxPixels = 2048L  )#$reproject(crs=proj3035_30m, scale = scale)
+    reducer   = combinedReducer,
+    maxPixels = 2048L  )#$reproject(crs=proj3035_30m, scale = scale)
   return(agg);
 }
 
@@ -87,7 +79,6 @@ inputVars$ndviMax = s2$qualityMosaic('b1')
 
 
 ## DEM -----
-
 inputVars$dem = ee$ImageCollection('COPERNICUS/DEM/GLO30')$filterBounds(bounds)$mosaic()$select("DEM") ;
 
 terrain = ee$Terrain$products(inputVars$dem);
@@ -109,16 +100,10 @@ aridityThreshold = 100;
 ## NEW!!  Canopy height META -----
 # inputVars$canopy_height = ee$Image('users/nlang/ETH_GlobalCanopyHeight_2020_10m_v1')$unmask()
 # canopy_heightColl =  ee$ImageCollection("projects/sat-io/open-datasets/facebook/meta-canopy-height")$filterBounds(bounds);
-
-
-
 canopy_height =  ee$ImageCollection("projects/progetto-eu-h2020-cirgeo/assets/wildfire/canopyHeightFromMeta30m")$mosaic() #$clip(bounds) #$map(statsAgg)
-canopy_height.proj <- canopy_heightColl$first()$projection()$getInfo()
+# canopy_height.proj <- canopy_heightColl$first()$projection()$getInfo()
 
-inputVars$canopy_height = canopy_height #$setDefaultProjection(canopy_heightColl$first()$projection())$reduceResolution(
-  # reducer   = combinedReducer,
-  # maxPixels = 2048L,
-  # bestEffort = T)
+inputVars$canopy_height = canopy_height$setDefaultProjection(canopy_heightColl$first()$projection())
 
 
 ### TRY OUTPUT ----
@@ -183,16 +168,15 @@ for( k in names(inputVars) ){
 
 bands = predictors$bandNames()
 
- train = predictors$sampleRegions(
-   collection= train,
-   properties= list('class'),
-   scale= 30
- );
+### collect training data from Cz -----
+train = predictors$sampleRegions(
+  collection= train,
+  properties= list('class'),
+  scale= 30
+);
 
- # train$first()$getInfo()
-
-
- classifier = ee$Classifier$smileRandomForest(
+### train -----
+classifier = ee$Classifier$smileRandomForest(
   numberOfTrees = 100
 )$train(
   features = train,
@@ -200,53 +184,82 @@ bands = predictors$bandNames()
   inputProperties = bands
 );
 
- ee$batch$Export$classifier$toAsset(
-   classifier = classifier,
-   description= 'RF_classifier_export',
-   assetId= 'projects/progetto-eu-h2020-cirgeo/assets/wildfire/RF_classifier_FuelModelV3'
-  )$start();
+### export to asset -----
+ee$batch$Export$classifier$toAsset(
+  classifier = classifier,
+  description= 'RF_classifier_export',
+  assetId= 'projects/progetto-eu-h2020-cirgeo/assets/wildfire/RF_classifier_FuelModelV3'
+)$start();
 
 
- ## process Pilot areas -----------
- assetRoot = 'projects/progetto-eu-h2020-cirgeo/assets/wildfire/fuelModelPredictors';
- list = ee$data$listAssets(assetRoot);
- tb <- tryCatch({
-   data.table::rbindlist(list$assets)
- }, error = function(e){
-    as.data.frame(list$assets)
- } )
+## CREATE PREDICTORS STACK  -----------
+assetRoot = 'projects/progetto-eu-h2020-cirgeo/assets/wildfire/fuelModelPredictors/';
+list = ee$data$listAssets(assetRoot);
+tb <- tryCatch({
+  data.frame(name=sapply(list$assets, function(x){x[["name"]]}))
+}, error = function(e){
+  as.data.frame(list$assets)
+} )
 
- for( i in 1:nPilots){
+for( i in 1:nPilots){
 
-   feature =ee$Feature(pilotSites$toList(12)$get(i-1))
-   gg = feature$geometry();
-   idf = feature$get("pilot_id")$getInfo() ;
+  feature =ee$Feature(pilotSites$toList(12)$get(i-1))
+  gg = feature$geometry();
+  idf = feature$get("pilot_id")$getInfo() ;
 
-   id = paste0(idf,'_predictorsV', versionFuelModel)
-   idOut = paste0(idf,'_predictedV', versionFuelModel)
-   message(id)
-   # if( any(grepl(id, tb$name)) ) next
-   # exp <- ee$Classifier$explain(classifier)$getInfo()
-   # classified = predictors$clip(gg)$classify(classifier);
+  id = paste0(idf,'_predictorsV', versionFuelModel)
+  message(id)
+  # if( any(grepl(id, tb$name)) ) next
+  # exp <- ee$Classifier$explain(classifier)$getInfo()
+  # classified = predictors$clip(gg)$classify(classifier);
 
-   assetid <- paste0('projects/progetto-eu-h2020-cirgeo/assets/wildfire/fuelModelPredictors/',id)
-   assetidOut <- paste0('projects/progetto-eu-h2020-cirgeo/assets/wildfire/fuelModel_RF_Predicted/',id)
+  assetid <- paste0('projects/progetto-eu-h2020-cirgeo/assets/wildfire/fuelModelPredictors/',id)
+  if( is.element(assetid, tb$name) ) ee$data$deleteAsset(assetid)
+  task_img_container[[  id ]] <- ee_image_to_asset(
+    image=  predictors,#$clip(gg),#$float(),
+    description= id,
+    assetId= assetid,
+    region= gg,
+    scale= 30,
+    crs= 'EPSG:3035',
+    maxPixels= 1e13
+  )
+  task_img_container[[id ]]$start()
 
-   task_img_container[[  id ]] <- ee_image_to_asset(
-       image=  ee$Image(assetid)$classify(classifier )$select('classification'), ##predictors$clip(gg)$float()
-       description= idOut,
-       assetId= assetidOut,
-       region= bounds,
-       scale= 30,
-       crs= 'EPSG:3035',
-       maxPixels= 1e13
-     )
-     task_img_container[[id ]]$start()
+}
 
-   }
+classifier <- ee$Classifier$load('projects/progetto-eu-h2020-cirgeo/assets/wildfire/RF_classifier_FuelModelV3');
+## CREATE CLASSIFIED IMAGES   -----------
+for( i in 1:nPilots){
 
+  feature =ee$Feature(pilotSites$toList(12)$get(i-1))
+  gg = feature$geometry();
+  idf = feature$get("pilot_id")$getInfo() ;
 
- # train$first()$geometry()$projection()$getInfo()
+  id = paste0(idf,'_predictorsV', versionFuelModel)
+  idOut = paste0(idf,'_predictedV', versionFuelModel)
+  message(id)
+  # if( any(grepl(id, tb$name)) ) next
+  # exp <- ee$Classifier$explain(classifier)$getInfo()
+  # classified = predictors$clip(gg)$classify(classifier);
+
+  assetid <- paste0('projects/progetto-eu-h2020-cirgeo/assets/wildfire/fuelModelPredictors/',id)
+  assetidOut <- paste0('projects/progetto-eu-h2020-cirgeo/assets/wildfire/fuelModelPredictedRF/',id)
+  if( is.element(assetid, tb$name) ) ee$data$deleteAsset(assetid)
+  task_img_container[[  id ]] <- ee_image_to_asset(
+    image=  predictors$clip(gg)$classify(classifier),
+    description= idOut,
+    assetId= assetidOut,
+    region= gg,
+    scale= 30,
+    crs= 'EPSG:3035',
+    maxPixels= 1e13
+  )
+  task_img_container[[id ]]$start()
+
+}
+
+# train$first()$geometry()$projection()$getInfo()
 ### RANDOM FOREST FINISHED -----
 # outputStack$updatedHansen = canopy_cover$select(0)$unmask()$mask(onlyNonDisturbedPixels)
 
@@ -318,7 +331,7 @@ outputStack_macroClass$a10=clcplus$eq(6)$Or(clcplus$eq(7))$And(
   inputVars$canopy_height$select("b1_min")$eq(0L)$And(
     inputVars$canopy_height$select("b1_mean")$lt(1L)
   )
-  )
+)
 ## to make sure it is grass, we remove pixels that have any crop type canopy cover
 ## grass shrub only if > 10% has vegetation > 1 m
 outputStack_macroClass$a12=clcplus$eq(6)$Or(clcplus$eq(7))
@@ -465,17 +478,17 @@ if(!onlyMacroClass){
 }
 
 for( k in names(outputStack_scottBurgan) ){
-   bv = as.integer(substr(k, 2,6))
-   message(bv)
-   if(is.na(bv)){
-     browser()
-   }
-   nouse =  outputStack_scottBurgan[[k]]$select(0)$projection()
-   newBand = ee$Image$constant( bv )$
-                rename('new_band')$
-                setDefaultProjection(nouse)$toByte();
+  bv = as.integer(substr(k, 2,6))
+  message(bv)
+  if(is.na(bv)){
+    browser()
+  }
+  nouse =  outputStack_scottBurgan[[k]]$select(0)$projection()
+  newBand = ee$Image$constant( bv )$
+    rename('new_band')$
+    setDefaultProjection(nouse)$toByte();
 
-   outputStack_scottBurgan[[k]] = outputStack_scottBurgan[[k]]$unmask()$toFloat()$addBands(newBand)$rename(c("prob","class") );
+  outputStack_scottBurgan[[k]] = outputStack_scottBurgan[[k]]$unmask()$toFloat()$addBands(newBand)$rename(c("prob","class") );
 
 }
 
@@ -528,18 +541,18 @@ for( i in 1:nPilots){
       maxPixels= 1e13
     )
     task_img_container[[id ]]$start()
-#
-#     task_img_container[[  idp ]] <- ee_image_to_drive(
-#       image= ScottBurganProbFiltered$toByte()$clip(gg),
-#       description= idp,
-#       folder="wildfireOutProgettoEU",
-#       timePrefix = F,
-#       region= gg ,
-#       scale= 30,
-#       crs= 'EPSG:3035',
-#       maxPixels= 1e13
-#     )
-#     task_img_container[[idp ]]$start()
+    #
+    #     task_img_container[[  idp ]] <- ee_image_to_drive(
+    #       image= ScottBurganProbFiltered$toByte()$clip(gg),
+    #       description= idp,
+    #       folder="wildfireOutProgettoEU",
+    #       timePrefix = F,
+    #       region= gg ,
+    #       scale= 30,
+    #       crs= 'EPSG:3035',
+    #       maxPixels= 1e13
+    #     )
+    #     task_img_container[[idp ]]$start()
 
   }
 
@@ -562,7 +575,7 @@ for( i in 1:nPilots){
       maxPixels= 1e13
     )
 
-   task_img_containerAsset[[id ]]$start()
+    task_img_containerAsset[[id ]]$start()
 
   }
   # task_img_container[[assetid ]]$status()
@@ -674,7 +687,7 @@ task <- ee_table_to_asset(
   collection= amk_fc ,
   description="Histogram",
   assetId= assetIdh
-  )
+)
 
 bb <- system( sprintf("earthengine rm %s", assetIdh), intern = T)
 if(length(bb)) cat(bb, "\n", file = "processing_01_GEE_data.log",append = T) else cat(bb, "SUCCESS\n", file = "processing_01_GEE_data.log",append = T)
