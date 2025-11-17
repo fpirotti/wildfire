@@ -145,46 +145,41 @@ hansenLossPost2000   =  canopy_cover$select("lossyear")$unmask()$gt(0)
 hansenLossPost2000upTo2009   =  hansenLossPost2000$And( canopy_cover$select("lossyear")$unmask()$lt(11) ) ;
 
 
-### ==> RANDOM FOREST -----
-## stack the predictors
-predictors <- inputVars$clcplus$rename("clc")$toByte() #$reproject(crs=proj3035_30m, scale = scale)
+# RANDOM FOREST #####
+## stack the predictors #####
+predictors <- inputVars$clcplus$rename("clc")$toByte()$reduceResolution(
+  reducer = ee$Reducer$mode(),
+  bestEffort= T,
+  maxPixels= 24
+);
 output <- list()
 for( k in names(inputVars) ){
   message(k)
   if(k=="clcplus") next
-  message(" go ")
   img1 = inputVars[[k]]
-  # train = img1$sampleRegions(
-  #   collection= points,
-  #   properties= list('class'),
-  #   scale= 30,
-  #   geometries=T
-  # );
-  # output[[k]] <- train$first()$getInfo()
-
   newBnames <- gsub("b1", k, img1$bandNames()$getInfo() )
   predictors <- predictors$addBands(img1$rename(newBnames)) # nouse =  inputVars[[k]]$select(0)$projection()
 }
 
 bands = predictors$bandNames()
 
-### collect training data from Cz -----
+## training data from Cz -----
 train = predictors$sampleRegions(
   collection= train,
   properties= list('class'),
   scale= 30
 );
 
-### train -----
+## train -----
 classifier = ee$Classifier$smileRandomForest(
-  numberOfTrees = 100
+  numberOfTrees = 250
 )$train(
   features = train,
   classProperty = 'class',
   inputProperties = bands
 );
 
-### export to asset -----
+## export to asset -----
 ee$batch$Export$classifier$toAsset(
   classifier = classifier,
   description= 'RF_classifier_export',
@@ -193,13 +188,13 @@ ee$batch$Export$classifier$toAsset(
 
 
 ## CREATE PREDICTORS STACK  -----------
-assetRoot = 'projects/progetto-eu-h2020-cirgeo/assets/wildfire/fuelModelPredictors/';
-list = ee$data$listAssets(assetRoot);
-tb <- tryCatch({
-  data.frame(name=sapply(list$assets, function(x){x[["name"]]}))
-}, error = function(e){
-  as.data.frame(list$assets)
-} )
+assetRootPred = 'projects/progetto-eu-h2020-cirgeo/assets/wildfire/fuelModelPredictors/';
+assetRootClassified = 'projects/progetto-eu-h2020-cirgeo/assets/wildfire/fuelModelPredictedRF/';
+
+
+list = ee$data$listAssets(assetRootPred);
+tb <-   data.frame(name=sapply(list$assets, function(x){x[["name"]]}))
+
 
 for( i in 1:nPilots){
 
@@ -209,12 +204,10 @@ for( i in 1:nPilots){
 
   id = paste0(idf,'_predictorsV', versionFuelModel)
   message(id)
-  # if( any(grepl(id, tb$name)) ) next
-  # exp <- ee$Classifier$explain(classifier)$getInfo()
-  # classified = predictors$clip(gg)$classify(classifier);
+  assetid <- paste0(assetRootPred,id)
 
-  assetid <- paste0('projects/progetto-eu-h2020-cirgeo/assets/wildfire/fuelModelPredictors/',id)
   if( is.element(assetid, tb$name) ) ee$data$deleteAsset(assetid)
+
   task_img_container[[  id ]] <- ee_image_to_asset(
     image=  predictors,#$clip(gg),#$float(),
     description= id,
@@ -228,24 +221,27 @@ for( i in 1:nPilots){
 
 }
 
-classifier <- ee$Classifier$load('projects/progetto-eu-h2020-cirgeo/assets/wildfire/RF_classifier_FuelModelV3');
 ## CREATE CLASSIFIED IMAGES   -----------
+classifier <- ee$Classifier$load('projects/progetto-eu-h2020-cirgeo/assets/wildfire/RF_classifier_FuelModelV3');
+
+list = ee$data$listAssets(assetRootClassified);
+tb <- tryCatch({
+  data.frame(name=sapply(list$assets, function(x){x[["name"]]}))
+}, error = function(e){
+  as.data.frame(list$assets)
+} )
+
 for( i in 1:nPilots){
 
   feature =ee$Feature(pilotSites$toList(12)$get(i-1))
   gg = feature$geometry();
   idf = feature$get("pilot_id")$getInfo() ;
-
   id = paste0(idf,'_predictorsV', versionFuelModel)
   idOut = paste0(idf,'_predictedV', versionFuelModel)
   message(id)
-  # if( any(grepl(id, tb$name)) ) next
-  # exp <- ee$Classifier$explain(classifier)$getInfo()
-  # classified = predictors$clip(gg)$classify(classifier);
-
-  assetid <- paste0('projects/progetto-eu-h2020-cirgeo/assets/wildfire/fuelModelPredictors/',id)
-  assetidOut <- paste0('projects/progetto-eu-h2020-cirgeo/assets/wildfire/fuelModelPredictedRF/',id)
-  if( is.element(assetid, tb$name) ) ee$data$deleteAsset(assetid)
+  assetid <- paste0(assetRootPred,id)
+  assetidOut <- paste0(assetRootClassified,idOut)
+  if( is.element(assetidOut, tb$name) ) ee$data$deleteAsset(assetidOut)
   task_img_container[[  id ]] <- ee_image_to_asset(
     image=  predictors$clip(gg)$classify(classifier),
     description= idOut,
@@ -261,6 +257,62 @@ for( i in 1:nPilots){
 
 # train$first()$geometry()$projection()$getInfo()
 ### RANDOM FOREST FINISHED -----
+### DOWNLOAD FOR VALIDATION N1 ----
+imgcol <- ee$ImageCollection(file.path(dirname(assetRootClassified), basename(assetRootClassified)))
+
+for( i in 1:imgcol$size()$getInfo()){
+
+  feature =ee$Feature(pilotSites$toList(12)$get(i-1))
+  gg = feature$geometry();
+  idf = feature$get("pilot_id")$getInfo() ;
+  id = paste0(idf,'_predictorsV', versionFuelModel)
+  idOut = paste0(idf,'_predictedV', versionFuelModel)
+
+  assetid <- paste0('projects/progetto-eu-h2020-cirgeo/assets/wildfire/fuelModelPredictors/',id)
+
+  assetid <- paste0(assetRootPred,id)
+  assetidOut <- paste0(assetRootClassified,idOut)
+  img <-  ee$Image( assetidOut ) ## ee$Image(imgcol$toList(imgcol$size())$get(i-1))
+  message(id)
+  # task_img_container[[  id ]] <- ee_image_to_drive(
+  #   image=  ee$Image(assetid)$toFloat()$clip(gg),
+  #   description= id,
+  #   region= gg,
+  #   folder = NULL,
+  #   fileNamePrefix = NULL,
+  #   timePrefix = F,
+  #   scale= 30,
+  #   crs= 'EPSG:3035',
+  #   maxPixels= 1e13
+  # )
+  # task_img_container[[id ]]$start()
+  message(idOut)
+  task_img_container[[  idOut ]] <- ee_image_to_drive(
+    image=  img$clip(gg),
+    description= idOut,
+    folder = "rGEEout",
+    fileNamePrefix = NULL,
+    timePrefix = F,
+    #assetId= assetidOut,
+    region= gg,
+    scale= 30,
+    crs= 'EPSG:3035',
+    maxPixels= 1e13
+  )
+  task_img_container[[idOut ]]$start()
+
+}
+
+
+for( i in 1:imgcol$size()$getInfo()){
+  feature =ee$Feature(pilotSites$toList(12)$get(i-1))
+
+  idf = feature$get("pilot_id")$getInfo() ;
+  idOut = paste0(idf,'_predictedV', versionFuelModel)
+
+  f <-   drive_find(q = sprintf("name contains '%s'", idOut) )
+  googledrive::drive_download(f)
+}
 # outputStack$updatedHansen = canopy_cover$select(0)$unmask()$mask(onlyNonDisturbedPixels)
 
 
