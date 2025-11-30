@@ -306,12 +306,11 @@ for( i in 1:imgcol$size()$getInfo()){
 
 for( i in 1:imgcol$size()$getInfo()){
   feature =ee$Feature(pilotSites$toList(12)$get(i-1))
-
   idf = feature$get("pilot_id")$getInfo() ;
   idOut = paste0(idf,'_predictedV', versionFuelModel)
-
   f <-   drive_find(q = sprintf("name contains '%s'", idOut) )
-  googledrive::drive_download(f)
+  googledrive::drive_download(f,overwrite = T, path =
+                                file.path("data/validation/version3/v3b", f$name))
 }
 # outputStack$updatedHansen = canopy_cover$select(0)$unmask()$mask(onlyNonDisturbedPixels)
 
