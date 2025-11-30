@@ -6,7 +6,9 @@ library(googledrive)
 ee_Initialize(user = 'cirgeo'  )
 
 assetRoot = 'projects/progetto-eu-h2020-cirgeo/assets/wildfire';
-list = ee$data$listAssets(assetRoot);
+target = 'projects/progetto-eu-h2020-cirgeo/assets/wildfire/canopyHeightFromMeta30m/';
+
+list = ee$data$listAssets(target);
 tb <- as.data.frame(do.call(rbind, list$assets))
 
 grid = ee$FeatureCollection("projects/progetto-eu-h2020-cirgeo/assets/copernicus/EEA_50km_grid_land")
@@ -53,24 +55,27 @@ for( i in 1:ntiles){
     nm = paste0('canopyMeta30m_tile_E',
                  as.numeric(tileDict$eoforigin)/10000, '_N',
                  as.numeric(tileDict$noforigin)/10000);
-    assetIds[[nm]] <- paste0('projects/progetto-eu-h2020-cirgeo/assets/wildfire/',nm)
-    next
-    if( any(grepl(nm, tb$name)) ) next
-
+    assetIds[[nm]] <- paste0(target,nm)
+    # next
+    if( any(grepl(nm, tb$name)) ) {
+      message(nm, " exists")
+      next
+      # ee$data$deleteAsset(assetIds[[nm]] )
+    }
+    # next
     ee_image_to_asset(
         image= canopy30m$clip(tile) ,
         description= nm,
-        assetId= paste0('projects/progetto-eu-h2020-cirgeo/assets/wildfire/',nm),
+        assetId= assetIds[[nm]],
         region= tile$geometry(),
         scale= 30,
-        ## crs= 'EPSG:3035',
+        crs= 'EPSG:3035',
         maxPixels= 1e13
       )$start();
       ##  }
   }
 
 
-target = 'projects/progetto-eu-h2020-cirgeo/assets/wildfire/canopyHeightFromMeta30m/';
 
 for(ids in assetIds) {
   ee$data$deleteAsset(ids )

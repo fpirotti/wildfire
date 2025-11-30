@@ -21,7 +21,7 @@ client$get_token()
 
 ## step 1 query tiles ----
 matches <- list()
-forceQuery <- T
+forceQuery <- F
 if(file.exists("matches.rda")) load("matches.rda")
 for(q in names(query)){
   if(!forceQuery  && !is.null(matches[[q]])){

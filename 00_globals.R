@@ -49,6 +49,13 @@ query <- list(
     "year"=  "2023",
     "type"="Byte"
   ),
+  "CLMS_TCF_TreeDensity_RASTER_2023" = list(
+    "dataset_id"= "EO:EEA:DAT:HRL:TCF",
+    "product_type"="Tree Cover Density",
+    "resolution"= "10m",
+    "year"= "2023",
+    "type"="Byte"
+  ),
   "CLMS_TCF_TreeDensity_RASTER_2021" = list(
     "dataset_id"= "EO:EEA:DAT:HRL:TCF",
     "product_type"="Tree Cover Density",

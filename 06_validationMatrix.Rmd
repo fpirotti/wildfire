@@ -1,18 +1,18 @@
 ---
-title: "Untitled"
-author: "CIRGEO - Francesco Pirotti"
+title: "D1.2.2 Fuel Mapping and Validation (Pilot Regions)"
+author: "UNIPD - Francesco Pirotti"
 date: "`r Sys.Date()`"
 output:
+  pdf_document: default
   html_document:
     df_print: paged
-  pdf_document: default
 classoption: landscape
 ---
 
 ```{r echo=FALSE, message=FALSE, warning=FALSE,results='asis'}
 
 library(knitr) 
-
+source("06_validationMatrix.R")
 library(kableExtra)
 library(terra)
 library(Metrics)
@@ -21,104 +21,31 @@ library(tidyverse)
 library(yardstick)
 
 todos <- list(
-"CZ-AT" = list(  pred = terra::rast("input/CZ-AT_ScottBurganFuelMapClassV2.tif") ,
+"CZ-AT" = list( pred = terra::rast("input/CZ-AT_ScottBurganFuelMapClassV2.tif") ,
+                predV3 = terra::rast("data/validation/version3/v3b/CZ-AT_predictedV3.tif") ,
                 obs = terra::rast("data/validation/WildfireCE_Fuel_map_validation_AT-CZ_CzechGlobe_model.tif") 
             ),
 
 "DE-CZ" = list(pred = terra::rast("input/DE-CZ_ScottBurganFuelMapClassV2.tif"),
+                predV3 = terra::rast("data/validation/version3/v3b/DE-CZ_predictedV3.tif") ,
                obs = terra::rast("data/validation/WildfireCE_Fuel_map_validation_DE-CZ_CzechGlobe_model.tif")
  )
 )
 
 risultati <- list()
 for(area in names(todos) ){
-  pred <- todos[[area]][["pred"]]
+  pred <- todos[[area]][["predV3"]]
   ref <- todos[[area]][["obs"]]
-  cls<-terra::resample( terra::project(pred, ref, method="near"), ref, method="near" )
-
-  cls[cls==0] <- NA
-  ref[ref==0] <- NA
-  
-  s <- c(ref, cls)
-  
-    # terra::writeRaster(s,
-    #                  sprintf("input/%s_ScottBurganFuelMapClassV2_32633.tif",
-    #                          area), overwrite=T )
-    
-  # plot(s)
-  # Extract values as a data.frame
-  vals <- na.omit(as.data.frame(s, xy=FALSE))
-  colnames(vals) <- c("CzechGlobe", "WildFire")
-  
-  lvs <- sort(unique(c(vals$WildFire, vals$CzechGlobe)))
-  
-  vals$WildFire <- factor(vals$WildFire, levels = lvs)
-  vals$CzechGlobe <-  factor(vals$CzechGlobe, levels = lvs) 
-  
-  conf_mat <- table(vals$CzechGlobe, vals$WildFire)
-  # Overall accuracy
-  overall_acc <- sum(diag(conf_mat)) / sum(conf_mat) 
-  # Producer's accuracy (per class)
-  prod_acc <- diag(conf_mat) / rowSums(conf_mat) 
-  # User's accuracy (per class)
-  user_acc <- diag(conf_mat) / colSums(conf_mat) 
-  # Kappa
-  pe <- sum(rowSums(conf_mat) * colSums(conf_mat)) / (sum(conf_mat)^2)
-  kappa <- (overall_acc - pe) / (1 - pe)
-  
-  cm_ext <-  as.matrix(conf_mat)
-  cm_ext <- cbind(cm_ext, "Prod.Acc" = sprintf("%.1f%%", prod_acc*100)) 
-  # Add User’s Accuracy as extra row
-  cm_ext <- rbind(cm_ext, "User.Acc" = c(sprintf("%.1f%%", user_acc*100), 
-                                         sprintf("%.1f%%", overall_acc*100)))
-  
-  
-  k <- kable(cm_ext, caption = paste0("--", area, " - Confusion Matrix ALL rows=CzechGlobe (reference)   colums=Wildfire-V2 (Classified)   kappa=", round(kappa,3)) ) %>%
-  kable_styling(latex_options = c("scale_down", "hold_position"),full_width = FALSE, font_size =9) %>%
-  scroll_box(width = "100%", height = "300px")  
+  cls<- terra::project(as.points(pred), ref)
 
 
-print(k)
-cat("\\newpage\n")   
-
-  vals$CzechGlobe2 <-  trunc(as.integer(as.character(vals$CzechGlobe))/10) 
-  vals$WildFire2 <- trunc(as.integer(as.character(vals$WildFire))/10)  
-  lvs <- sort(unique(c(vals$WildFire2, vals$CzechGlobe2)))
   
-  vals$WildFire2 <- factor(vals$WildFire2, levels = lvs)
-  vals$CzechGlobe2 <-  factor(vals$CzechGlobe2, levels = lvs) 
-  
-  # ids <- rownames(vals)[ vals$WildFire2==vals$CzechGlobe2 ]
-  # errors <- s
-  # errors[ as.integer(ids) ]<- NA
-  # plot(errors)
-  # discrepancies <- na.omit(as.points(errors))
-  # writeVector(discrepancies, sprintf("%s_discrepancies.gpkg", area), overwrite=TRUE)
-  conf_mat2 <- table(Reference = vals$CzechGlobe2, Classified=vals$WildFire2)
-  # Overall accuracy
-  overall_acc2 <- sum(diag(conf_mat2)) / sum(conf_mat2) 
-  # Producer's accuracy (per class)
-  prod_acc2 <- diag(conf_mat2) / rowSums(conf_mat2) 
-  # User's accuracy (per class)
-  user_acc2 <- diag(conf_mat2) / colSums(conf_mat2) 
-  # Kappa
-  pe2 <- sum(rowSums(conf_mat2) * colSums(conf_mat2)) / (sum(conf_mat2)^2)
-  kappa2 <- (overall_acc2 - pe2) / (1 - pe2)
+  k <- errorTables(ref, cls)
+  for(t in k){ 
+    print(t)
+    cat("\\newpage\n")  
+  }
 
-  cm_ext <-  as.matrix(conf_mat2)
-  cm_ext <- cbind(cm_ext, "Prod.Acc" = sprintf("%.1f%%", prod_acc2*100)) 
-  # Add User’s Accuracy as extra row
-  cm_ext <- rbind(cm_ext, "User.Acc" = c(sprintf("%.1f%%", user_acc2*100), 
-                                         sprintf("%.1f%%", overall_acc2*100)))
-
-  
-k <- kable(cm_ext, align = "r", caption = paste0("--", area, " - Confusion Matrix rows=CzechGlobe (reference)   colums=Wildfire-V2 (Classified)   kappa=", round(kappa2,3)) ) %>%
-  kable_styling(full_width = FALSE, latex_options = c("hold_position", "striped", "scale_down")) %>%
-  column_spec(1, bold = TRUE) 
-
-
-print(k)
-cat("\\newpage\n")  
 }
   
 ```
