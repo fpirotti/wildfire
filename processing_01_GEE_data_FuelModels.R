@@ -5,6 +5,8 @@ library(googledrive)
 ########### THIS REQUIRES FIRST THAT THE processing_01_GEE_tileMeta.R!
 # 1. Authenticate ----
 drive_auth(email = "cirgeo@unipd.it")
+ee_Initialize(user = 'cirgeo'  )
+
 points <- ee$FeatureCollection("projects/progetto-eu-h2020-cirgeo/assets/wildfire/CzechGlobeDE_CZpts")
 withRand = points$randomColumn('rand');
 train = withRand$filter(ee$Filter$lt('rand', 0.1));
