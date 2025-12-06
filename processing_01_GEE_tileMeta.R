@@ -20,7 +20,7 @@ exportCrs = 'EPSG:3035';  ##  target projection
 canopyColl = ee$ImageCollection("projects/sat-io/open-datasets/facebook/meta-canopy-height")$filterBounds(pilotSites$bounds());
 
   ##  Create mosaic using the 'cover_code' band
-canopy = canopyColl$mosaic()$select('cover_code')$rename("b1")$setDefaultProjection(canopyColl$first()$projection());  ##  keep native CRS
+canopy = ee$Image(canopyColl$mosaic())$select('cover_code')$rename("b1")$setDefaultProjection(canopyColl$first()$projection());  ##  keep native CRS
 combinedReducer = ee$Reducer$mean()$combine(
   reducer2= ee$Reducer$stdDev(),
   sharedInputs= T
@@ -35,7 +35,7 @@ combinedReducer = ee$Reducer$mean()$combine(
 ##  3$ Aggregate to 30 m  ----
 canopy10m = canopy$reduceResolution(
     reducer= combinedReducer,
-    maxPixels= 2048,
+    maxPixels= 300,
     bestEffort= T
 );
 
@@ -47,13 +47,12 @@ canopy10m = canopy$reduceResolution(
 ntiles = pilotSites$size()$getInfo();
 nImagesInTolanCollection <- canopyColl$size()$getInfo()
 assetIds <- list()
-for( i in 1:ntiles){
-  # for( i in 1:nImagesInTolanCollection){
-  # img <- ee$Image(canopyColl$toList(nImagesInTolanCollection)$get((i-1)))
-  tile = ee$Feature(pilotSites$toList(ntiles)$get(i-1))## $buffer(-10000);
-  tileDict = tile$toDictionary()$getInfo();
+# for( i in 1:ntiles){
+ for( i in 1:nImagesInTolanCollection){
+  img <- ee$Image(canopyColl$toList(nImagesInTolanCollection)$get((i-1)))
+  tileDict = img$getInfo();
 
-  nm<-tileDict$pilot_id
+  nm<-tileDict$properties$`system:index`
   if( any(grepl(nm, tb$name)) ) {
     message(nm, " exists")
     next
@@ -63,44 +62,15 @@ for( i in 1:ntiles){
   assetIds[[nm]] <- paste0(target,nm )
 
   ee_image_to_asset(
-    image= ee$Image(canopy)$clip(tile)$toByte(),
+    image= ee$Image(canopy10m)$toByte(),
     description= nm,
     assetId= assetIds[[nm]],
-    region= tile$geometry(),
+     region= img$geometry(),
     scale= 10,
     # crs= 'EPSG:3035',
     maxPixels= 1e13
   )$start();
 }
-    ## for(var j=42; j< 52; ++j){
-      ## var x1 = i+1;
-      ## var y1 = j+1;
-    tile = ee$Feature(filteredGridList$get(i-1))## $buffer(-10000);
-    tileDict = tile$toDictionary()$getInfo();
-
-    nm = paste0('canopyMeta30m_tile_E',
-                 as.numeric(tileDict$eoforigin)/10000, '_N',
-                 as.numeric(tileDict$noforigin)/10000);
-    assetIds[[nm]] <- paste0(target,nm)
-    # next
-    if( any(grepl(nm, tb$name)) ) {
-      message(nm, " exists")
-      next
-      # ee$data$deleteAsset(assetIds[[nm]] )
-    }
-    # next
-    # ee_image_to_asset(
-    #     image= canopy30m$clip(tile) ,
-    #     description= nm,
-    #     assetId= assetIds[[nm]],
-    #     region= tile$geometry(),
-    #     scale= 10,
-    #    # crs= 'EPSG:3035',
-    #     maxPixels= 1e13
-    #   )$start();
-      ##  }
-  }
-
 
 
 for(ids in assetIds) {
