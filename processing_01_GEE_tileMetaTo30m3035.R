@@ -78,6 +78,9 @@ assetIds <- list()
       })
     )
   )$toBands()$rename(bandNames)
+
+  out <- out$addBands(out$select("b1_stdDev")$sqrt(), {}, T)
+
   # ff<-(out$getInfo())
   # ff2<-(out$toBands()$getInfo())
   ee_image_to_asset(
