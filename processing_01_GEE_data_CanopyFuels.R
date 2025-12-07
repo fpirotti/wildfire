@@ -67,7 +67,8 @@ pilotRegions <- nuts2use$map(
   ee_utils_pyfunc(function(f) f$geometry()$buffer(1000)$dissolve())
 )$geometry()$dissolve()
 
-# ---- parametersCanopyBaseHeight dictionary ----
+# EQUATION PARAMTERS -----
+## treeH2treeCBH -----
 parametersCanopyBaseHeight <- ee$Dictionary(list(
   veg_abies_alba_anv_v3 = c(0.0, 0.253, 2.039462437),
   veg_castanea_sativa_anv_v3 = c(0.0, 0.550, 2.944425115),
@@ -86,7 +87,7 @@ parametersCanopyBaseHeight <- ee$Dictionary(list(
   veg_quercus_suber_anv_v3 = c(0.0, 0.369, 1.653155781),
   veg_salix_caprea_anv_v3 = c(0.0, 0.389, 2.26567518)
 ))
-
+## treeDBH2thinBiomassFraction -----
 dbh2canopyBiomassFraction2 <- list(
   veg_abies_alba_anv_v3 =
     '(exp(-2.3958  + 2.4497  *log(DBH)) - exp(-3.2683 + 2.5768 * log(DBH))) /
@@ -220,3 +221,159 @@ dbh2canopyBiomassFraction_errorPropagation2 <- list(
   # …and so on for the other species, following the same structure
 )
 
+## treeH2treeDBH -----
+# careful,
+## parameters height to dbh for polynomial quadratic function -
+## b0(X)**2 + b1(X) + b2 + E ;  each parameter is c(b2, b1, b0, E)
+## E = Error (RMSE) of linear model
+parametersPolynomialQuadratic_treeH2treeDBH <- list(
+  veg_abies_alba_anv_v3       = c( 1.343649043,  0.687352953,  0.037239577,   4.91),
+  veg_castanea_sativa_anv_v3  = c( 4.09797249,  -0.239361253,  0.0868789,     7.12),
+  veg_corylus_avellana_anv_v3 = c( 0.904585844,  0.533727752,  0.036534637,   0.48),
+  veg_fagus_sylvatica_anv_v3  = c( 0.864821818,  0.380177125,  0.04702699,    4.48),
+  veg_olea_europaea_anv_v3    = c(-4.310682232,  3.19918107,  -0.052826581,   4.87),
+  veg_picea_abies_anv_v3      = c( 1.380584301,  0.678991739,  0.035128331,   3.87),
+  veg_pinus_halepensis_anv_v3 = c(-9.290716186,  3.357434352, -0.046325054,   6.83),
+  veg_pinus_nigra_anv_v3      = c( 5.45609197,   1.105017037,  0.011863807,   5.94),
+  veg_pinus_pinea_anv_v3      = c(-2.363414601,  2.979136129, -0.029655175,   8.74),
+  veg_pinus_sylvestris_anv_v3 = c( 5.129869306, -0.055376739,  0.039545636,   4.02),
+  veg_prunus_avium_anv_v3     = c(-1.074143494,  0.517291151,  0.057392221,   5.97),
+  veg_quercus_cerris_anv_v3   = c( 0.673365032,  0.995395474,  0.019629626,   5.48),
+  veg_quercus_ilex_anv_v3     = c( 4.782623276,  0.449189731,  0.067941183,   4.64),
+  veg_quercus_robur_anv_v3    = c( 3.561031278,  0.167072658,  0.046124222,   5.68),
+  veg_quercus_suber_anv_v3    = c(-2.508958732,  3.617397079,  0.012845111,   7.83),
+  veg_salix_caprea_anv_v3     = c(-7.855460266,  1.451894959,  0.031738413,   6.24)
+)
+## Output rasters -----
+namesAndDesc <- list(
+  canopyHeight               = "Average tree canopy heights from ground in pixel, (m)",
+  # canopyHeightSD           = "Estimation of error (SD) (m)",  # commented out like in JS
+  materassoHeight            = "Average height of canopy-only in pixel, (m)",
+  materassoVolume            = "Average volume of canopy from the forest stand's canopy bottom to tree tops. In cubic meters (m3)",
+  materassoVolumeRMSE        = "Average volume of canopy from the forest stand's canopy bottom to tree tops. In cubic meters (m3)",
+  canopyBaseHeight           = "The forest Canopy Base Height (CBH) describes the average height from the ground to a forest stand's canopy bottom. Specifically, it is the lowest height in a stand at which there is a sufficient amount of forest canopy fuel to propagate fire vertically into the canopy.",
+  canopyBaseHeightRMSE       = "Estimation of error (RMSE) from propagation of canopy height model errors and CBH model error",
+  averageDbh                 = "Average Diameter at Base Height",
+  averageDbhRMSE             = "Estimation of error (RMSE) from propagation of canopy height model errors and H=>DBH model error",
+  biomassOfCanopy            = "Biomas (Mg/ha) of the canopy part of AGB",
+  biomassOfCanopyRMSE        = "Estimation of error (RMSE) from propagation of canopy height model errors and H=>DBH model error",
+  canopyBulkDensity          = "Canopy Bulk Density (CBD) is the amount of canopy biomass over canopy volume (kg/m3)",
+  canopyBulkDensityRMSE      = "Estimation of error (RMSE) from propagation of errors coming from the models and input variables (i.e. canopy heights, canopy base height, diameter and canopy biomass).",
+  canopyBiomassFraction      = "Fraction (from 0 to 1) of canopy i.e. leaves with respect to total AGB (leaves+branches+stem). It was calculated with a species-specific model over 16 species.",
+  canopyBiomassFractionRMSE  = "Propagated error to the canopy biomass fraction value from the model used for estimation."
+)
+
+
+## R code start -------
+# List assets
+assets <- ee$data$listAssets("users/cirgeo/FIRE-RES/open")
+
+# Extract asset IDs
+filt <- lapply(assets$assets, function(el) el$id)
+# Filter asset IDs containing "veg"
+filt2 <- Filter(function(el) grepl("veg", el), filt)
+
+# Sum of all probability layers
+sumProbs <- ee$ImageCollection(filt2)$sum()
+
+# The function translated
+canopyBulkDensfunction <- function(element) {
+
+  element <- ee$Image(element)
+
+  spname <- ee$String(element$get("system:id"))$slice(27, 73)
+
+  # ------- CBH parameters ----------
+  paramsCBH <- ee$List(parametersCanopyBaseHeight$get(spname))
+  slopev    <- ee$Number(paramsCBH$get(1))
+  intercept <- ee$Number(paramsCBH$get(0))
+  err       <- ee$Number(paramsCBH$get(2))
+
+  cbh <- canopy_height$select(0)$multiply(slopev)$add(intercept)
+  cbh <- cbh$multiply(cbh$gt(0))
+
+  cbhsd_chain <- slopev$multiply(4.25)
+  cbhsd_chain <- cbhsd_chain$pow(2)$add(err$pow(2))$sqrt()
+
+  area30mPixel3035 <- 900
+
+  # --------- DBH parameters ----------
+  paramsH2treeDBH <- ee$List(parametersPolynomialQuadratic_treeH2treeDBH$get(spname))
+
+  expressionFF <- ee$String(dbh2canopyBiomassFraction2$get(spname))
+  expressionFFerrPropag <- ee$String(dbh2canopyBiomassFraction_errorPropagation2$get(spname))
+
+  # ---------- Canopy layer thickness ----------
+  materassoZ <- canopy_height$select(0)$subtract(cbh)
+  materassoZ <- materassoZ$subtract(materassoZ$multiply(materassoZ$lt(0)))$float()
+
+  materasso3d <- materassoZ$multiply(area30mPixel3035)
+  materasso3d_sd <- ee$Number(area30mPixel3035)$multiply(cbhsd_chain)
+
+  # ---------- Average DBH ----------
+  averageDBH <- canopy_height$select(0)$pow(2)$multiply(
+    ee$Image(ee$Number(paramsH2treeDBH$get(2)))
+  )$add(
+    canopy_height$select(0)$multiply(
+      ee$Image(ee$Number(paramsH2treeDBH$get(1)))
+    )
+  )
+
+  averageDBH <- averageDBH$multiply(averageDBH$gt(1))
+
+  averageDBH_sd <- canopy_height$select(0)$
+    multiply(ee$Image(ee$Number(paramsH2treeDBH$get(2))$multiply(2)))$
+    add(ee$Image(ee$Number(paramsH2treeDBH$get(1))))
+
+  averageDBH_sd <- averageDBH_sd$pow(2)$add(
+    ee$Number(paramsH2treeDBH$get(3))$pow(2)
+  )$sqrt()
+
+  averageDBH <- averageDBH$addBands(averageDBH_sd)$rename("DBH", "DBHsd")
+
+  # Fraction functions
+  ff <- averageDBH$expression(expressionFF, list(DBH = averageDBH$select("DBH")))
+
+  ff_sd <- averageDBH$expression(
+    expressionFFerrPropag,
+    list(
+      DBH = averageDBH$select("DBH"),
+      sigma_DBH = averageDBH$select("DBHsd")
+    )
+  )
+
+  # Biomass fractions
+  biomassOfCanopyFraction <- biomass$multiply(ff)
+  biomassOfCanopyFraction_sd <- biomass$multiply(ff_sd)
+
+  # Canopy bulk density
+  canopyBulkDensity <- biomassOfCanopyFraction$multiply(1000)$divide(materasso3d)
+
+  canopyBulkDensity_sd <- (
+    biomassOfCanopyFraction_sd$multiply(1000)$pow(2)$multiply(materasso3d$pow(2))
+    $add(
+      biomassOfCanopyFraction$multiply(1000)$pow(2)$multiply(materasso3d_sd$pow(2))
+    )
+  )$divide(materasso3d$pow(4))$sqrt()
+
+  # Final band stack
+  final <- canopy_height$
+    addBands(list(
+      materassoZ$float(),
+      materasso3d$float(),
+      ee$Image(materasso3d_sd$float()),
+      cbh$float(),
+      ee$Image(cbhsd_chain)$float(),
+      averageDBH$float(),
+      biomassOfCanopyFraction$float(),
+      biomassOfCanopyFraction_sd$float(),
+      canopyBulkDensity$float(),
+      canopyBulkDensity_sd$float(),
+      ff$float(),
+      ff_sd$float()
+    ))$
+    rename(namesAndDesc)
+
+  # Return weighted final image
+  element$unmask()$divide(sumProbs)$multiply(final)
+}
