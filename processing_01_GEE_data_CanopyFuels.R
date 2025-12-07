@@ -45,10 +45,10 @@ tcd <- ee$ImageCollection(
   "projects/progetto-eu-h2020-cirgeo/assets/copernicus/CLMS_TCF_TreeDensity_RASTER_2021"
 )
 
-canopy_height <- ee$ImageCollection(
+canopy_height_coll <- ee$ImageCollection(
   "projects/progetto-eu-h2020-cirgeo/assets/wildfire/canopyHeightFromMeta10m"
-)$mosaic()
-
+);
+canopy_height <- canopy_height_coll$mosaic()$setDefaultProjection(canopy_height_coll$first()$projection());
 nuts <- ee$FeatureCollection(
   "projects/progetto-eu-h2020-cirgeo/assets/NUTS_RG_01M_2024_4326"
 )
@@ -88,7 +88,7 @@ parametersCanopyBaseHeight <- ee$Dictionary(list(
   veg_salix_caprea_anv_v3 = c(0.0, 0.389, 2.26567518)
 ))
 ## treeDBH2thinBiomassFraction -----
-dbh2canopyBiomassFraction2 <- list(
+dbh2canopyBiomassFraction2 <-  ee$Dictionary(list(
   veg_abies_alba_anv_v3 =
     '(exp(-2.3958  + 2.4497  *log(DBH)) - exp(-3.2683 + 2.5768 * log(DBH))) /
      exp(-2.3958 + 2.4497 * log(DBH))',
@@ -181,9 +181,9 @@ dbh2canopyBiomassFraction2 <- list(
      (exp(1.4718 + 2.3117 * log(DBH)) +
       exp(4.4721 + 2.4987 * log(DBH)) +
       exp(4.5086 + 1.9234 * log(DBH)))'
-)
+))
 
-dbh2canopyBiomassFraction_errorPropagation2 <- list(
+dbh2canopyBiomassFraction_errorPropagation2 <-  ee$Dictionary(list(
   veg_abies_alba_anv_v3 =
     '(2.4497 * exp(2.4497 * log(DBH) - 2.3958) -
       (2.4497 * (exp(2.4497 * log(DBH) - 2.3958) - exp(2.5768 * log(DBH) - 3.2683)) +
@@ -219,14 +219,14 @@ dbh2canopyBiomassFraction_errorPropagation2 <- list(
      (DBH * (exp(1.53326 * log(DBH) - 3.52781) + exp(1.60779 * log(DBH) - 1.0421) + exp(2.68734 * log(DBH) - 4.65302)))'
 
   # …and so on for the other species, following the same structure
-)
+) )
 
 ## treeH2treeDBH -----
 # careful,
 ## parameters height to dbh for polynomial quadratic function -
 ## b0(X)**2 + b1(X) + b2 + E ;  each parameter is c(b2, b1, b0, E)
 ## E = Error (RMSE) of linear model
-parametersPolynomialQuadratic_treeH2treeDBH <- list(
+parametersPolynomialQuadratic_treeH2treeDBH <-  ee$Dictionary( list(
   veg_abies_alba_anv_v3       = c( 1.343649043,  0.687352953,  0.037239577,   4.91),
   veg_castanea_sativa_anv_v3  = c( 4.09797249,  -0.239361253,  0.0868789,     7.12),
   veg_corylus_avellana_anv_v3 = c( 0.904585844,  0.533727752,  0.036534637,   0.48),
@@ -243,8 +243,9 @@ parametersPolynomialQuadratic_treeH2treeDBH <- list(
   veg_quercus_robur_anv_v3    = c( 3.561031278,  0.167072658,  0.046124222,   5.68),
   veg_quercus_suber_anv_v3    = c(-2.508958732,  3.617397079,  0.012845111,   7.83),
   veg_salix_caprea_anv_v3     = c(-7.855460266,  1.451894959,  0.031738413,   6.24)
-)
-## Output rasters -----
+))
+
+## namesAndDesc: Output rasters -----
 namesAndDesc <- list(
   canopyHeight               = "Average tree canopy heights from ground in pixel, (m)",
   # canopyHeightSD           = "Estimation of error (SD) (m)",  # commented out like in JS
@@ -280,18 +281,22 @@ sumProbs <- ee$ImageCollection(filt2)$sum()
 canopyBulkDensfunction <- function(element) {
 
   element <- ee$Image(element)
+  # element <- ee$Image(filt2[[1]])
 
   spname <- ee$String(element$get("system:id"))$slice(27, 73)
-
+  # spname$getInfo()
   # ------- CBH parameters ----------
   paramsCBH <- ee$List(parametersCanopyBaseHeight$get(spname))
   slopev    <- ee$Number(paramsCBH$get(1))
   intercept <- ee$Number(paramsCBH$get(0))
   err       <- ee$Number(paramsCBH$get(2))
 
+  # canopy_height$getInfo()
+
   cbh <- canopy_height$select(0)$multiply(slopev)$add(intercept)
   cbh <- cbh$multiply(cbh$gt(0))
-
+  ## 4.25 m is the uncertainty of the META canopy heights!
+  ## it thus propagates linearly
   cbhsd_chain <- slopev$multiply(4.25)
   cbhsd_chain <- cbhsd_chain$pow(2)$add(err$pow(2))$sqrt()
 
@@ -299,7 +304,7 @@ canopyBulkDensfunction <- function(element) {
 
   # --------- DBH parameters ----------
   paramsH2treeDBH <- ee$List(parametersPolynomialQuadratic_treeH2treeDBH$get(spname))
-
+  # paramsH2treeDBH$getInfo()
   expressionFF <- ee$String(dbh2canopyBiomassFraction2$get(spname))
   expressionFFerrPropag <- ee$String(dbh2canopyBiomassFraction_errorPropagation2$get(spname))
 
@@ -376,4 +381,59 @@ canopyBulkDensfunction <- function(element) {
 
   # Return weighted final image
   element$unmask()$divide(sumProbs)$multiply(final)
+}
+
+
+## process ----
+# Map function over collection ----
+# namesAndDesc()
+mapped <- ee$ImageCollection(filt2)$map(canopyBulkDensfunction)
+
+proj <- clc$projection()
+projection <- proj$getInfo()
+
+# Build CBD image
+CBD <- mapped$
+  sum()$
+  setDefaultProjection(proj)$
+  reduceResolution(
+    reducer   = ee$Reducer$mean(),
+    maxPixels = 256
+  )
+
+### Pilot sites list -----------
+ps_list <- pilotSites$toList(pilotSites$size())
+n <- pilotSites$size()$getInfo()
+
+# Band names
+bbands <- names(namesAndDesc)
+
+# --- Loop over sites & bands ---
+for (i2 in seq_len(n) - 1) {
+
+  feat <- ee$Feature(ps_list$get(i2))
+  nm <- feat$get("pilot_id")$getInfo()
+  geom <- feat$geometry()
+
+  for (b in bbands) {
+
+    img_export <- CBD$
+      unmask()$
+      clip(geom)$
+      select(b)$
+      toFloat()
+
+    task <- ee_image_to_drive(
+      image       = img_export,
+      description = paste0(nm, "_", b),
+      folder      = "GEE_export",
+      region      = geom,
+      scale       = 30,
+      crs         = "EPSG:3035",
+      maxPixels   = 1e13
+    )
+
+    task$start()
+
+  }
 }
