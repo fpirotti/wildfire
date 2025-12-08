@@ -6,7 +6,7 @@ library(googledrive)
 ee_Initialize(user = 'cirgeo'  )
 pilotSites <- ee$FeatureCollection("projects/progetto-eu-h2020-cirgeo/assets/wildfire/wildfire_pilot_sites_v3")
 assetRoot = 'projects/progetto-eu-h2020-cirgeo/assets/wildfire';
-target = 'projects/progetto-eu-h2020-cirgeo/assets/wildfire/canopyHeightFromMeta10m/';
+target = 'users/cirgeo/wildfire/canopyHeightFromMeta10m';
 
 list = ee$data$listAssets(target);
 tb <- as.data.frame(do.call(rbind, list$assets))

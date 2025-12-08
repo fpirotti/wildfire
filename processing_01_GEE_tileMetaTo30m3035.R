@@ -2,6 +2,7 @@ library(rgee)
 library(rgeeExtra)
 library(googledrive)
 
+## first requires that "___GEE_tileMeta.R" be run to produce the 10 m resampled height metrics
 # ee_Initialize(quiet = T)
 ee_Initialize(user = 'cirgeo'  )
 pilotSites <- ee$FeatureCollection("projects/progetto-eu-h2020-cirgeo/assets/wildfire/wildfire_pilot_sites_v3")
@@ -73,7 +74,11 @@ assetIds <- list()
         band <- ee$String(pair$get(0))
         reducer <- ee$Reducer(pair$get(1))
         # band$getInfo()
-        ee$Image(img$select(band)$reduce(reducer))$rename(band)
+        ee$Image(img$select(band)$reduceResolution(
+          reducer= reducer,
+          maxPixels= 300,
+          bestEffort= T
+        ))
 
       })
     )
@@ -81,7 +86,7 @@ assetIds <- list()
 
   out <- out$addBands(out$select("b1_stdDev")$sqrt(), {}, T)
 
-  # ff<-(out$getInfo())
+   # ff<-(out$getInfo())
   # ff2<-(out$toBands()$getInfo())
   ee_image_to_asset(
     image= ee$Image(out)$toByte(),

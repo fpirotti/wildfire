@@ -22,10 +22,13 @@ pilotSites <- ee$FeatureCollection(
 )
 
 agbcoll <- ee$ImageCollection("projects/sat-io/open-datasets/ESA/ESA_CCI_AGB")
-agb <- agbcoll$
-  filterDate("2021-01-01", "2023-01-01")$
-  first()$
-  select("AGB")
+heightWeightscoll <- ee$ImageCollection("users/cirgeo/wildfire/biomassCanopyHeightsUpsampleWeights10m")
+heightWeights <- ee$Image(heightWeightscoll$mosaic()$setDefaultProjection(heightWeightscoll$first()$projection()))
+agb <- heightWeights$multiply( agbcoll$
+    filterDate("2021-01-01", "2023-01-01")$
+    first()$
+    select("AGB")
+  )
 
 agb_sd <- agbcoll$
   filterDate("2021-01-01", "2023-01-01")$
@@ -46,9 +49,9 @@ tcd <- ee$ImageCollection(
 )
 
 canopy_height_coll <- ee$ImageCollection(
-  "projects/progetto-eu-h2020-cirgeo/assets/wildfire/canopyHeightFromMeta10m"
+  'users/cirgeo/wildfire/canopyHeightFromMeta10m'
 );
-canopy_height <- canopy_height_coll$mosaic()$setDefaultProjection(canopy_height_coll$first()$projection());
+canopy_height <- canopy_height_coll$select(0)$mosaic()$setDefaultProjection(canopy_height_coll$first()$projection());
 nuts <- ee$FeatureCollection(
   "projects/progetto-eu-h2020-cirgeo/assets/NUTS_RG_01M_2024_4326"
 )
@@ -216,9 +219,22 @@ dbh2canopyBiomassFraction_errorPropagation2 <-  ee$Dictionary(list(
       (0.111 * exp(2.68734 * log(DBH) - 4.65302) + exp(1.53326 * log(DBH) - 3.52781)) *
       (1.53326 * exp(1.53326 * log(DBH) - 3.52781) + 1.60779 * exp(1.60779 * log(DBH) - 1.0421) + 2.68734 * exp(2.68734 * log(DBH) - 4.65302)) /
       (exp(1.53326 * log(DBH) - 3.52781) + exp(1.60779 * log(DBH) - 1.0421) + exp(2.68734 * log(DBH) - 4.65302))) /
-     (DBH * (exp(1.53326 * log(DBH) - 3.52781) + exp(1.60779 * log(DBH) - 1.0421) + exp(2.68734 * log(DBH) - 4.65302)))'
+     (DBH * (exp(1.53326 * log(DBH) - 3.52781) + exp(1.60779 * log(DBH) - 1.0421) + exp(2.68734 * log(DBH) - 4.65302)))',
 
-  # …and so on for the other species, following the same structure
+ veg_picea_abies_anv_v3 = "(0.2440113 * exp(2.1983 * log(DBH) - 3.3163) + 1.8688 * exp(1.8688 * log(DBH) - 2.7957) - (0.111 * exp(2.1983 * log(DBH) - 3.3163) + exp(1.8688 * log(DBH) - 2.7957)) * (1.8688 * exp(1.8688 * log(DBH) - 2.7957) + 2.1983 *          exp(2.1983 * log(DBH) - 3.3163) + 2.3404 * exp(2.3404 * log(DBH) - 2.5027))/exp(1.8688 * log(DBH) - 2.7957) + exp(2.1983 * log(DBH) - 3.3163) + exp(2.3404 * log(DBH) - 2.5027))/(DBH * exp(1.8688 * log(DBH) - 2.7957) + exp(2.1983 * log(DBH) - 3.3163) + exp(2.3404 * log(DBH) - 2.5027))",
+ veg_pinus_halepensis_anv_v3 = "(2.289 - (2.13609 * exp(2.13609 * log(DBH) - 2.51839) + 2.289 * exp(2.289 * log(DBH) - 3.709))/exp(2.13609 * log(DBH) - 2.51839) + exp(2.289 * log(DBH) - 3.709)) * exp(2.289 * log(DBH) - 3.709)/(DBH *          exp(2.13609 * log(DBH) - 2.51839) + exp(2.289 * log(DBH) - 3.709))",
+ veg_pinus_nigra_anv_v3 = "(0.162948 * exp(1.468 * log(DBH) - 1.1351) + 0.8705 * exp(0.8705 * log(DBH) - 0.6105) - (0.111 * exp(1.468 * log(DBH) - 1.1351) + exp(0.8705 * log(DBH) - 0.6105)) * (0.8705 * exp(0.8705 * log(DBH) - 0.6105) + 1.468 *          exp(1.468 * log(DBH) - 1.1351) + 2.3691 * exp(2.3691 * log(DBH) - 2.5551))/exp(0.8705 * log(DBH) - 0.6105) + exp(1.468 * log(DBH) - 1.1351) + exp(2.3691 * log(DBH) - 2.5551))/(DBH * exp(0.8705 * log(DBH) - 0.6105) + exp(1.468 * log(DBH) - 1.1351) + exp(2.3691 * log(DBH) - 2.5551))",
+ veg_pinus_pinea_anv_v3 = "(1.03816992 * DBH**0.6788 + 87.58527287796 * DBH/100**3.248054 - (0.6184 * DBH**1.6788 + 2061.774 * DBH/100**4.248054) * (87.58527287796 * DBH/100**3.248054 +          DBH**0.6788 * (0.00779256 * DBH**1.5681 + 1.03816992))/2061.774 * DBH/100**4.248054 + DBH**1.6788 * (0.0024 * DBH**1.5681 + 0.6184))/2061.774 * DBH/100**4.248054 + DBH**1.6788 * (0.0024 * DBH**1.5681 + 0.6184)",
+ veg_pinus_sylvestris_anv_v3 = "(0.2397711 * exp(2.1601 * log(DBH) - 3.6641) + 1.7471 * exp(1.7471 * log(DBH) - 3.5276) - (0.111 * exp(2.1601 * log(DBH) - 3.6641) + exp(1.7471 * log(DBH) - 3.5276)) * (1.7471 * exp(1.7471 * log(DBH) - 3.5276) + 2.1601 *          exp(2.1601 * log(DBH) - 3.6641) + 2.308 * exp(2.308 * log(DBH) - 2.3583))/exp(1.7471 * log(DBH) - 3.5276) + exp(2.1601 * log(DBH) - 3.6641) + exp(2.308 * log(DBH) - 2.3583))/(DBH * exp(1.7471 * log(DBH) - 3.5276) + exp(2.1601 * log(DBH) - 3.6641) + exp(2.308 * log(DBH) - 2.3583))",
+ veg_prunus_avium_anv_v3 = "(0.2448771 * exp(2.2061 * log(DBH) - 2.6762) + 1.3212 * exp(1.3212 * log(DBH) - 4.1058) - (0.111 * exp(2.2061 * log(DBH) - 2.6762) + exp(1.3212 * log(DBH) - 4.1058)) * (1.3212 * exp(1.3212 * log(DBH) - 4.1058) + 1.9656 *          exp(1.9656 * log(DBH) - 1.0948) + 2.2061 * exp(2.2061 * log(DBH) - 2.6762))/exp(1.3212 * log(DBH) - 4.1058) + exp(1.9656 * log(DBH) - 1.0948) + exp(2.2061 * log(DBH) - 2.6762))/(DBH * exp(1.3212 * log(DBH) - 4.1058) + exp(1.9656 * log(DBH) - 1.0948) + exp(2.2061 * log(DBH) - 2.6762))",
+ veg_quercus_cerris_anv_v3 = "(0.212898 * exp(1.918 * log(DBH) - 0.599) + 1.895 * exp(1.895 * log(DBH) - 0.959) - (0.111 * exp(1.918 * log(DBH) - 0.599) + exp(1.895 * log(DBH) - 0.959)) * (1.895 * exp(1.895 * log(DBH) - 0.959) + 1.901 *          exp(1.901 * log(DBH) - 0.303) + 1.918 * exp(1.918 * log(DBH) - 0.599))/exp(1.895 * log(DBH) - 0.959) + exp(1.901 * log(DBH) - 0.303) + exp(1.918 * log(DBH) - 0.599))/(DBH * exp(1.895 * log(DBH) - 0.959) + exp(1.901 * log(DBH) - 0.303) + exp(1.918 * log(DBH) - 0.599))",
+ veg_quercus_ilex_anv_v3 = "(0.2563323 * exp(2.3093 * log(DBH) - 2.985) + 2.1018 * exp(2.1018 * log(DBH) - 4.4998) - (0.111 * exp(2.3093 * log(DBH) - 2.985) + exp(2.1018 * log(DBH) - 4.4998)) * (2.1018 * exp(2.1018 * log(DBH) - 4.4998) + 2.2686 *          exp(2.2686 * log(DBH) - 2.1809) + 2.3093 * exp(2.3093 * log(DBH) - 2.985))/exp(2.1018 * log(DBH) - 4.4998) + exp(2.2686 * log(DBH) - 2.1809) + exp(2.3093 * log(DBH) - 2.985))/(DBH * exp(2.1018 * log(DBH) - 4.4998) + exp(2.2686 * log(DBH) - 2.1809) + exp(2.3093 * log(DBH) - 2.985))",
+ veg_quercus_robur_anv_v3 = "(0.3277386 * exp(2.9526 * log(DBH) - 4.4339) + 2.1375 * exp(2.1375 * log(DBH) - 4.4663) - (0.111 * exp(2.9526 * log(DBH) - 4.4339) + exp(2.1375 * log(DBH) - 4.4663)) * (2.1375 * exp(2.1375 * log(DBH) - 4.4663) + 2.5279 *          exp(2.5279 * log(DBH) - 2.7054) + 2.9526 * exp(2.9526 * log(DBH) - 4.4339))/exp(2.1375 * log(DBH) - 4.4663) + exp(2.5279 * log(DBH) - 2.7054) + exp(2.9526 * log(DBH) - 4.4339))/(DBH * exp(2.1375 * log(DBH) - 4.4663) + exp(2.5279 * log(DBH) - 2.7054) + exp(2.9526 * log(DBH) - 4.4339))",
+ veg_quercus_suber_anv_v3 = "(0.3830372238 + 1.355957 * (exp(0.600169 + 1.355957 * log(DBH))/DBH**0.5831) - ((1.355957 * exp(0.600169 + 1.355957 * log(DBH)) +          2.011002 * exp(0.164185 + 2.011002 * log(DBH)))/DBH**0.5831 + 3.4507858) * (0.656898 * DBH**0.5831 +          exp(0.600169 + 1.355957 * log(DBH)))/5.918 * DBH**0.5831 + exp(0.164185 + 2.011002 * log(DBH)) + exp(0.600169 + 1.355957 * log(DBH)))/(DBH**0.4169 * 5.918 * DBH**0.5831 + exp(0.164185 + 2.011002 * log(DBH)) + exp(0.600169 + 1.355957 * log(DBH)))",
+ veg_salix_caprea_anv_v3 = "(0.2134974 * exp(1.9234 * log(DBH) + 4.5086) + 2.3117 * exp(1.4718 + 2.3117 * log(DBH)) - (0.111 * exp(1.9234 * log(DBH) + 4.5086) + exp(1.4718 + 2.3117 * log(DBH))) * (1.9234 *          exp(1.9234 * log(DBH) + 4.5086) + 2.3117 * exp(1.4718 + 2.3117 * log(DBH)) + 2.4987 * exp(2.4987 * log(DBH) + 4.4721))/exp(1.4718 + 2.3117 * log(DBH)) + exp(1.9234 * log(DBH) + 4.5086) + exp(2.4987 * log(DBH) + 4.4721))/(DBH * exp(1.4718 + 2.3117 * log(DBH)) + exp(1.9234 * log(DBH) + 4.5086) + exp(2.4987 * log(DBH) + 4.4721))"
+
+
+
 ) )
 
 ## treeH2treeDBH -----
@@ -291,7 +307,7 @@ canopyBulkDensfunction <- function(element) {
   intercept <- ee$Number(paramsCBH$get(0))
   err       <- ee$Number(paramsCBH$get(2))
 
-  # canopy_height$getInfo()
+  # spname$getInfo()
 
   cbh <- canopy_height$select(0)$multiply(slopev)$add(intercept)
   cbh <- cbh$multiply(cbh$gt(0))
@@ -300,7 +316,7 @@ canopyBulkDensfunction <- function(element) {
   cbhsd_chain <- slopev$multiply(4.25)
   cbhsd_chain <- cbhsd_chain$pow(2)$add(err$pow(2))$sqrt()
 
-  area30mPixel3035 <- 900
+  area30mPixel3035 <- canopy_height$pixelArea()
 
   # --------- DBH parameters ----------
   paramsH2treeDBH <- ee$List(parametersPolynomialQuadratic_treeH2treeDBH$get(spname))
@@ -313,7 +329,7 @@ canopyBulkDensfunction <- function(element) {
   materassoZ <- materassoZ$subtract(materassoZ$multiply(materassoZ$lt(0)))$float()
 
   materasso3d <- materassoZ$multiply(area30mPixel3035)
-  materasso3d_sd <- ee$Number(area30mPixel3035)$multiply(cbhsd_chain)
+  materasso3d_sd <-  area30mPixel3035$multiply(cbhsd_chain)
 
   # ---------- Average DBH ----------
   averageDBH <- canopy_height$select(0)$pow(2)$multiply(
@@ -377,7 +393,7 @@ canopyBulkDensfunction <- function(element) {
       ff$float(),
       ff_sd$float()
     ))$
-    rename(namesAndDesc)
+    rename(names(namesAndDesc))
 
   # Return weighted final image
   element$unmask()$divide(sumProbs)$multiply(final)
@@ -386,6 +402,7 @@ canopyBulkDensfunction <- function(element) {
 
 ## process ----
 # Map function over collection ----
+
 # namesAndDesc()
 mapped <- ee$ImageCollection(filt2)$map(canopyBulkDensfunction)
 
