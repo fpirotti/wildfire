@@ -1,0 +1,1 @@
+{"frames":[{"func":"cbind(cm_ext, Prod.Acc = sprintf(\"%.1f%%\", prod_acc2 * 100))","file":"","line_number":0,"end_line_number":0,"character_number":0,"end_character_number":0},{"func":"sprintf(\"%.1f%%\", prod_acc2 * 100)","file":"","line_number":0,"end_line_number":0,"character_number":0,"end_character_number":0}],"message":"Error: object 'prod_acc2' not found\n"}

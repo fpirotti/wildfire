@@ -1,0 +1,32 @@
+2025-08-03 07:31:14 - CLMS_CLCplus_RASTER_2023 : QUERY - Exists, skipping    
+2025-08-03 07:31:14 - CLMS_CLCplus_RASTER_2023confidence : QUERY - Exists, skipping    
+2025-08-03 07:31:14 - CLMS_TCF_TreeDensity_RASTER_2021 : QUERY - Exists, skipping    
+2025-08-03 07:31:14 - CLMS_TCF_TreeDensity_RASTER_2021_Conf : QUERY - Exists, skipping    
+2025-08-03 07:31:14 - CLMS_TCF_DominantLeafType_RASTER_2021 : QUERY - Exists, skipping    
+2025-08-03 07:31:14 - CLMS_TCF_DominantLeafType_RASTER_2021_Conf : QUERY - Exists, skipping    
+2025-08-03 07:31:14 - CLMS_CropTypes_RASTER_2021 : QUERY - Exists, skipping    
+2025-08-03 07:31:14 - CLMS_CropTypes_RASTER_2021_Conf : QUERY - Exists, skipping    
+2025-08-03 07:31:14 - CLMS_GrassLand_RASTER_2021 : QUERY - Querying starting    
+2025-08-03 07:31:16 - CLMS_GrassLand_RASTER_2021 : QUERY - too few matches   
+2025-08-03 07:31:16 - CLMS_GrassLand_RASTER_2021_Conf : QUERY - Querying starting    
+2025-08-03 07:31:17 - CLMS_GrassLand_RASTER_2021_Conf : QUERY - too few matches   
+2025-08-03 07:31:17 - CLMS_SurfaceSoilMoisture_2024 : QUERY - Exists, skipping    
+2025-08-03 07:31:17 - CLMS_CLCplus_RASTER_2023 :  DOWNLOAD -  799  already done out of  799   
+2025-08-03 07:31:17 - CLMS_CLCplus_RASTER_2023 : DOWNLOAD - All Done !=======   
+2025-08-03 07:31:17 - CLMS_CLCplus_RASTER_2023confidence :  DOWNLOAD -  799  already done out of  799   
+2025-08-03 07:31:17 - CLMS_CLCplus_RASTER_2023confidence : DOWNLOAD - All Done !=======   
+2025-08-03 07:31:17 - CLMS_TCF_TreeDensity_RASTER_2021 :  DOWNLOAD -  799  already done out of  799   
+2025-08-03 07:31:17 - CLMS_TCF_TreeDensity_RASTER_2021 : DOWNLOAD - All Done !=======   
+2025-08-03 07:31:17 - CLMS_TCF_TreeDensity_RASTER_2021_Conf :  DOWNLOAD -  799  already done out of  799   
+2025-08-03 07:31:17 - CLMS_TCF_TreeDensity_RASTER_2021_Conf : DOWNLOAD - All Done !=======   
+2025-08-03 07:31:17 - CLMS_TCF_DominantLeafType_RASTER_2021 :  DOWNLOAD -  799  already done out of  799   
+2025-08-03 07:31:17 - CLMS_TCF_DominantLeafType_RASTER_2021 : DOWNLOAD - All Done !=======   
+2025-08-03 07:31:17 - CLMS_TCF_DominantLeafType_RASTER_2021_Conf :  DOWNLOAD -  799  already done out of  799   
+2025-08-03 07:31:17 - CLMS_TCF_DominantLeafType_RASTER_2021_Conf : DOWNLOAD - All Done !=======   
+2025-08-03 07:31:17 - CLMS_CropTypes_RASTER_2021 :  DOWNLOAD -  799  already done out of  799   
+2025-08-03 07:31:17 - CLMS_CropTypes_RASTER_2021 : DOWNLOAD - All Done !=======   
+2025-08-03 07:31:17 - CLMS_CropTypes_RASTER_2021_Conf :  DOWNLOAD -  850  already done out of  850   
+2025-08-03 07:31:17 - CLMS_CropTypes_RASTER_2021_Conf : DOWNLOAD - All Done !=======   
+2025-08-03 07:31:17 - CLMS_SurfaceSoilMoisture_2024 :  DOWNLOAD -  0  already done out of  732   
+2025-08-03 07:31:17 - CLMS_SurfaceSoilMoisture_2024 : DOWNLOAD -  0  already done out of  732   
+2025-08-03 07:31:17 - CLMS_SurfaceSoilMoisture_2024 : DOWNLOAD -  732  to do be done out of  732   

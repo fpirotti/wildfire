@@ -1,0 +1,52 @@
+---
+title: "D1.2.2 Fuel Mapping and Validation (Pilot Regions)"
+author: "UNIPD - Francesco Pirotti"
+date: "`r Sys.Date()`"
+output:
+  pdf_document: default
+  html_document:
+    df_print: paged
+classoption: landscape
+---
+
+```{r echo=FALSE, message=FALSE, warning=FALSE,results='asis'}
+
+library(knitr) 
+source("06_validationMatrix.R")
+library(kableExtra)
+library(terra)
+library(Metrics)
+library(gt)
+library(tidyverse)
+library(yardstick)
+
+todos <- list(
+"CZ-AT" = list( pred = terra::rast("input/CZ-AT_ScottBurganFuelMapClassV2.tif") ,
+                predV3 = terra::rast("data/validation/version3/v3b/CZ-AT_predictedV3.tif") ,
+                obs = terra::rast("data/validation/WildfireCE_Fuel_map_validation_AT-CZ_CzechGlobe_model.tif") 
+            ),
+
+"DE-CZ" = list(pred = terra::rast("input/DE-CZ_ScottBurganFuelMapClassV2.tif"),
+                predV3 = terra::rast("data/validation/version3/v3b/DE-CZ_predictedV3.tif") ,
+               obs = terra::rast("data/validation/WildfireCE_Fuel_map_validation_DE-CZ_CzechGlobe_model.tif")
+ )
+)
+
+risultati <- list()
+for(area in names(todos) ){
+  pred <- todos[[area]][["predV3"]]
+  ref <- todos[[area]][["obs"]]
+  cls<- terra::project(as.points(pred), ref)
+
+
+  
+  k <- errorTables(ref, cls)
+  for(t in k){ 
+    print(t)
+    cat("\\newpage\n")  
+  }
+
+}
+  
+```
+
