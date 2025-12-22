@@ -1,4 +1,0 @@
-"0","  cm_ext <- cbind(cm_ext, ""Prod.Acc"" = sprintf(""%.1f%%"", prod_acc2*100)) 
-"
-"2","Error: object 'prod_acc2' not found
-"

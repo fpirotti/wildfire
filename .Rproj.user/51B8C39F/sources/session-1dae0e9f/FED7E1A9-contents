@@ -1,6 +1,0 @@
-library(terra)
-folder <- "/archivio/software/Cell2Fire/data/CentralKootenay/"
-forest <- rast( file.path(folder, "Forest.asc"))
-plot(forest)
-saz <- rast( file.path(folder, "Fire1/saz.asc"))
-plot(saz)

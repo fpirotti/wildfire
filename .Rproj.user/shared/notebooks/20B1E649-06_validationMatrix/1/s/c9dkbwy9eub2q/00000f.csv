@@ -1,7 +1,0 @@
-"0","  cls<- terra::project(as.points(pred), ref)
-  cls<- terra::project(as.points(pred), ref)
-  cls[cls==0] <- NA
-"
-"2","Error in h(simpleError(msg, call)) : 
-  error in evaluating the argument 'i' in selecting a method for function '[<-': comparison (==) is possible only for atomic and list types
-"
