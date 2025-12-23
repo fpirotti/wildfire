@@ -23,56 +23,68 @@ pilotSites <- ee$FeatureCollection(
 )
 
 ### Pilot sites list -----------
-ps_list <- pilotSites$toList(pilotSites$size())
-n <- pilotSites$size()$getInfo()
 
-for (i2 in seq_len(n) - 1) {
+for(reg in c("pilotRegions", "pilotSites")){
+  obj <- get(reg)
+  ps_list <- obj$toList(obj$size())
+  n <- obj$size()$getInfo()
+  tp = reg
 
-  feat <- ee$Feature(ps_list$get(i2))
-  # nm <- feat$get("ID")$getInfo()
-  nm <- feat$get("pilot_id")$getInfo()
-  geom <- feat$geometry()$buffer(100, 1)
+  for (i2 in seq_len(n) - 1) {
 
-  dem <- img$
-    clip(geom)$divide(10L)
+    feat <- ee$Feature(ps_list$get(i2))
+    # nm <- feat$get("ID")$getInfo()
+    inf <- feat$get("pilot_id")$getInfo()
+    if(is.null(inf)){
+      inf <- feat$get("ID")$getInfo()
+    }
+    nm <- paste0(tp, "_", inf, "_topograpy" )
+    geom <- feat$geometry()$buffer(100, 1)
 
-  task <- ee_image_to_drive(
-    image       = dem$toInt16(),
-    description = paste0(nm, "_dem"),
-    folder      = paste0("pilotSites_", nm),
-    region      = geom,
-    scale       = 30,
-    timePrefix = F,
-    crs         = "EPSG:3035",
-    maxPixels   = 1e13
-  )
-  task$start()
+    dem <- img$
+      clip(geom)$divide(10L)$toFloat()
 
-  slopeDeg = ee$Terrain$slope(dem);
-  slopePct = slopeDeg$multiply( pi / 180)$tan()$multiply(100);
+    task <- ee_image_to_drive(
+      image       = dem,
+      description = paste0(nm, "_dem"),
+      folder      = paste0(nm),
+      region      = geom,
+      scale       = 30,
+      timePrefix = F,
+      formatOptions =   list( cloudOptimized= TRUE),
+      crs         = "EPSG:3035",
+      maxPixels   = 1e13
+    )
+    task$start()
 
-  task <- ee_image_to_drive(
-    image       = slopePct,
-    description = paste0( nm, "_slopePercent"),
-    folder      = paste0("pilotSites_", nm),
-    region      = geom,
-    scale       = 30,
-    timePrefix = F,
-    crs         = "EPSG:3035",
-    maxPixels   = 1e13
-  )
-  task$start()
-  aspect = ee$Terrain$aspect(dem);
-  task <- ee_image_to_drive(
-    image       = aspect,
-    description = paste0( nm, "_aspectDegrees"),
-    folder      = paste0("pilotSites_", nm),
-    region      = geom,
-    scale       = 30,
-    timePrefix = F,
-    crs         = "EPSG:3035",
-    maxPixels   = 1e13
-  )
-  task$start()
+    slopeDeg = ee$Terrain$slope(dem);
+    slopePct = slopeDeg$multiply( pi / 180)$tan()$multiply(100);
 
+    task <- ee_image_to_drive(
+      image       = slopePct,
+      description = paste0( nm, "_slopePercent"),
+      folder      = paste0( nm),
+      region      = geom,
+      scale       = 30,
+      timePrefix = F,
+      formatOptions =   list( cloudOptimized= TRUE),
+      crs         = "EPSG:3035",
+      maxPixels   = 1e13
+    )
+    task$start()
+    aspect = ee$Terrain$aspect(dem);
+    task <- ee_image_to_drive(
+      image       = aspect,
+      description = paste0( nm, "_aspectDegrees"),
+      folder      = paste0(  nm),
+      region      = geom,
+      scale       = 30,
+      timePrefix = F,
+      crs         = "EPSG:3035",
+      formatOptions =   list( cloudOptimized= TRUE),
+      maxPixels   = 1e13
+    )
+    task$start()
+
+  }
 }
