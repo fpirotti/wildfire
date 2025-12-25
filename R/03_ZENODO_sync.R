@@ -1,6 +1,6 @@
 
 library(zen4R)
-zenodo_sandbox <- ZenodoManager$new(
+zenodo <- ZenodoManager$new(
   url = "https://sandbox.zenodo.org/api",
   token = Sys.getenv("TOKEN_ZENODO_SANDBOX"),
   logger = "INFO"
@@ -12,9 +12,9 @@ zenodo <- ZenodoManager$new(
   logger = "INFO"
 )
 
- myrec <- zenodo$getRecordById(16690962)
+ myrec <- zenodo$getRecordById(7367871)
 
- myrecLatest <- zenodo$getRecordByDOI("10.5281/zenodo.16690962")
+ myrecLatest <- zenodo$getRecordByDOI("10.5281/zenodo.7367871")
 # myrec2 <- zenodo$ (myrec$getId() )
 # myrec <- ZenodoRecord$new()
 myrec$setTitle("Latest High Resolution Layers (HRL) from Copernicus Land Cover Services")
