@@ -38,7 +38,7 @@ maskS2clouds <- function(image) {
   # also mask for red band above 10...
   # e.g. if B4 is 0 then NDVI will always be 1
   red = image$select('B4');
-  cloudShadowMask = red$gt(10)$And(scl$neq(3))$And(scl$neq(8))$And(scl$neq(9))$And(scl$neq(10))$And(scl$neq(1));
+  cloudShadowMask = red$gt(100)$And(scl$neq(3))$And(scl$neq(8))$And(scl$neq(9))$And(scl$neq(10))$And(scl$neq(1))$And(scl$neq(0));
   return(image$updateMask(cloudShadowMask)$copyProperties(image, list('system:time_start') ))
 }
 
@@ -49,23 +49,23 @@ addNDVI <-function(image) {
 }
 
 ## reducer for Meta 1 m tree height to 30 m grid
-combinedReducer = ee$Reducer$mean()$combine(
-  reducer2= ee$Reducer$stdDev(),
-  sharedInputs= T
-) $combine(
-  reducer2= ee$Reducer$min(),
-  sharedInputs= T
-) $combine(
-  reducer2= ee$Reducer$max(),
-  sharedInputs= T
-);
-
-statsAgg <-function(image) {
-  agg = image$rename("b1")$reduceResolution(
-    reducer   = combinedReducer,
-    maxPixels = 2048L  )#$reproject(crs=proj3035_30m, scale = scale)
-  return(agg);
-}
+# combinedReducer = ee$Reducer$mean()$combine(
+#   reducer2= ee$Reducer$stdDev(),
+#   sharedInputs= T
+# ) $combine(
+#   reducer2= ee$Reducer$min(),
+#   sharedInputs= T
+# ) $combine(
+#   reducer2= ee$Reducer$max(),
+#   sharedInputs= T
+# );
+#
+# statsAgg <-function(image) {
+#   agg = image$rename("b1")$reduceResolution(
+#     reducer   = combinedReducer,
+#     maxPixels = 2048L  )#$reproject(crs=proj3035_30m, scale = scale)
+#   return(agg);
+# }
 
 # LAYERS ------
 ## pilot sites ----

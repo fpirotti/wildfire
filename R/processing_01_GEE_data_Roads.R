@@ -24,8 +24,8 @@ pilotSites <- ee$FeatureCollection(
 )
 
 ### Pilot sites list -----------
-
-for(reg in c( "pilotSites", "pilotRegions")){
+# "pilotSites",
+for(reg in c( "pilotRegions")){
   obj <- get(reg)
   ps_list <- obj$toList(obj$size())
   n <- obj$size()$getInfo()
@@ -39,7 +39,11 @@ for(reg in c( "pilotSites", "pilotRegions")){
     if(is.null(inf)){
       inf <- feat$get("ID")$getInfo()
     }
+
     nm <- paste0(tp, "_", inf, "_roads.gpkg" )
+
+    message(nm, " try...")
+    if(file.exists(file.path("output", nm))) next
 
     aoi <- ee_as_sf(feat) |>
                           st_transform(3035) |>
@@ -48,23 +52,27 @@ for(reg in c( "pilotSites", "pilotRegions")){
 
     bbox <- st_bbox(aoi)
     message(nm, " start query")
-    q <- opq(bbox = st_bbox(aoi), timeout = 180) |>
+    q <- opq(bbox = st_bbox(aoi),osm_types = c( "way" ), timeout = 300) |>
       add_osm_feature(key = "highway")
 
-    message(nm, " start query")
     # ---- DOWNLOAD DATA ----
     osm <- osmdata_sf(q)
+    message(nm, " finish query")
 
     # ---- EXTRACT LINE FEATURES (ROADS) ----
     roads <- osm$osm_lines
-
+    roads <- roads[,"highway"]
     # ---- CLIP TO POLYGON ----
+    message(nm, " intersection of query")
     roads_clip <- st_intersection(roads, aoi)
-    output<-  roads_clip[,"highway"]  |>
+    message(nm, " start clip ")
+    output<-  roads_clip   |>
       st_transform(3035)
 
+    message(nm, " start write tmp ")
     sf::write_sf(output,  "output/tmp.shp"  )
 
+    message(nm, " start write gpkg ")
     sf::write_sf(sf::read_sf("output/tmp.shp"), file.path("output", nm) )
   }
 }
