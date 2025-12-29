@@ -1,6 +1,6 @@
 {
     "dialog-state": {
-        "query": "canopyHeightFromMeta10m",
+        "query": "global_forest_change_2024_v1_12",
         "path": "",
         "regex": false,
         "caseSensitive": false,
@@ -9,7 +9,7 @@
         "useGitGrep": true,
         "excludeGitIgnore": true,
         "excludeFilePatterns": [],
-        "resultsCount": 4,
+        "resultsCount": 2,
         "errorCount": 0,
         "replaceErrors": "",
         "projectRelative": true
