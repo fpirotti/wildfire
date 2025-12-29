@@ -26,18 +26,11 @@ for(file in tiles$filename){
   download.file( paste0("https://www.cirgeo.unipd.it", file), file )
 }
 
-<<<<<<< HEAD
 ctg.sf <- sf::st_as_sf(ctg)
 tiles <- sf::st_intersection(ctg.sf, pilotSiteFriuli$geometry )
-=======
-
-tiles.spl <- split(tiles$filename, as.factor(tiles$pilot_id))
->>>>>>> 395da61 (c)
 
 
 tiles.spl <- split(tiles$filename, as.factor(tiles$pilot_id))
 
-
-tiles.spl <- split(tiles$filename, as.factor(tiles$pilot_id))
 
 write_sf(tiles |> select(filename), "overlapFVGtiles.gpkg")
