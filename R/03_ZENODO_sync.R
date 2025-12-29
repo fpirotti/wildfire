@@ -12,9 +12,12 @@ zenodo <- ZenodoManager$new(
   logger = "INFO"
 )
 
- myrec <- zenodo$getRecordById(7367871)
 
- myrecLatest <- zenodo$getRecordByDOI("10.5281/zenodo.7367871")
+myrec <- zenodo$getDepositions()
+myrec2 <- as.list(myrec)
+myrec3 <- myrec2[[1]]
+poll <- zenodo$uploadFile("/home/pirotti/Downloads/furfaro/GEE_export/pilotRegions_CZ-DE_canopyBulkDensity.tif",
+                          record=myrec3  )
 # myrec2 <- zenodo$ (myrec$getId() )
 # myrec <- ZenodoRecord$new()
 myrec$setTitle("Latest High Resolution Layers (HRL) from Copernicus Land Cover Services")

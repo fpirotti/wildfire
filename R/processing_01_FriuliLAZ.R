@@ -13,5 +13,6 @@ iq <- IQR(areas)
 outliers <- which(as.numeric(areas) > as.numeric(md)+2*iq)
 
 ctg.sf <- sf::st_as_sf(ctg)
-tiles <- sf::st_intersection(ctg.sf, pilotSiteFriuli$geometry[1,] )
+tiles <- sf::st_intersection(ctg.sf, pilotSiteFriuli$geometry )
 
+write_sf(tiles |> select(filename), "overlapFVGtiles.gpkg")
