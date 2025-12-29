@@ -20,25 +20,125 @@ pilotRegions <- ee$FeatureCollection(
 pilotSites <- ee$FeatureCollection(
   "projects/progetto-eu-h2020-cirgeo/assets/wildfire/wildfire_pilot_sites_v3"
 )
-
+## toByte caps at 255 the max biomass, removing errors of overestimation (maybe loosing a bit of higher biomass)
+canopy_height_coll <- ee$ImageCollection(
+  'users/cirgeo/wildfire/canopyHeightFromMeta10m'
+);
+canopy_height30m3035 <- ee$Image(
+  'projects/progetto-eu-h2020-cirgeo/assets/wildfire/canopyHeightFromMeta30m/153'
+);
+canopy_height <- canopy_height_coll$select(0)$mosaic()$setDefaultProjection(canopy_height_coll$first()$projection());
 agbcoll <- ee$ImageCollection("projects/sat-io/open-datasets/ESA/ESA_CCI_AGB")
-heightWeightscoll <- ee$ImageCollection("users/cirgeo/wildfire/biomassCanopyHeightsUpsampleWeights10m")
-heightWeights <- ee$Image(heightWeightscoll$mosaic()$setDefaultProjection(heightWeightscoll$first()$projection()))
-agb <- heightWeights$multiply( agbcoll$
-    filterDate("2021-01-01", "2023-01-01")$
-    first()$
-    select("AGB")
-  )
+agbOriginalTrain <- agbcoll$filterDate("2019-01-01", "2021-01-01")$first()$select("AGB")
+
+srtm = ee$Image("projects/progetto-eu-h2020-cirgeo/assets/eu/dtm_elev_lowestmode_gedi_v03");
+slope = ee$Terrain$slope(srtm);
+aspect = ee$Terrain$aspect(srtm);
+
+
+ch100 = canopy_height$reduceResolution(
+  reducer=ee$Reducer$mean(),
+  maxPixels=256,
+  bestEffort=T
+ )
+
+
+
+
+
+list =  ee$data$listAssets('projects/progetto-eu-h2020-cirgeo/assets/wildfire')
+tb <- tryCatch({
+  data.frame(name=sapply(list$assets, function(x){x[["name"]]}))
+}, error = function(e){
+  as.data.frame(list$assets)
+} )
+if(!any(grepl("RF_classifier_toBiomass", tb$name)) ){
+
+  l8 <- ee$ImageCollection("LANDSAT/LC08/C02/T1_L2")$
+    filterBounds(pilotRegions)$
+    filterDate("2019-01-01", "2020-12-31")$
+    filter(ee$Filter$lt("CLOUD_COVER", 20))$
+    median()$
+    select(c("SR_B4", "SR_B5", "SR_B6"))$
+    multiply(0.0000275)$subtract(0.2)
+
+
+  predictors = ch100$
+    addBands(srtm$rename('elevation'))$
+    addBands(slope$rename('slope'))$
+    addBands(aspect$rename('aspect'))$
+    addBands(l8);
+
+  training = predictors$addBands(agbOriginalTrain$select(0)$rename('agb'))$
+    sample(
+      numPixels= 50000,
+      scale= 100 ,
+      region= pilotRegions,
+      geometries=T
+    );
+
+  # rgee::ee_table_to_drive(training,fileFormat = "SHP")$start()
+
+  inputBands = predictors$bandNames();
+  responseBand = 'agb';
+
+  rfModel = ee$Classifier$smileRandomForest(
+    numberOfTrees=200,
+    minLeafPopulation=5,
+    bagFraction=0.5,
+    seed=42
+  )$setOutputMode('REGRESSION');
+
+  trainedModel = rfModel$train(
+    features= training,
+    classProperty=responseBand,
+    inputProperties=inputBands
+  );
+
+  ee$batch$Export$classifier$toAsset(
+    classifier = trainedModel,
+    description= 'RF_classifier_export',
+    assetId= 'projects/progetto-eu-h2020-cirgeo/assets/wildfire/RF_classifier_toBiomass'
+  )$start();
+
+}
+
+trainedModel <- ee$Classifier$load('projects/progetto-eu-h2020-cirgeo/assets/wildfire/RF_classifier_toBiomass');
+
+l8 <- ee$ImageCollection("LANDSAT/LC08/C02/T1_L2")$
+  filterBounds(pilotRegions)$
+  filterDate("2022-01-01", "2023-12-31")$
+  filter(ee$Filter$lt("CLOUD_COVER", 20))$
+  median()$
+  select(c("SR_B4", "SR_B5", "SR_B6"))$
+  multiply(0.0000275)$subtract(0.2)
+
+predictors = ch100$
+  addBands(srtm$rename('elevation'))$
+  addBands(slope$rename('slope'))$
+  addBands(aspect$rename('aspect'))$
+  addBands(l8);
+
+agbFireRes <- ee$Image("projects/progetto-eu-h2020-cirgeo/assets/fire-res/biomass")$unmask()$resample('bicubic')$reproject(canopy_height30m3035$projection())
+agbcoll <- ee$ImageCollection("projects/sat-io/open-datasets/ESA/ESA_CCI_AGB")
+agbOriginal <- agbcoll$filterDate("2021-01-01", "2023-01-01")$first()$select("AGB")$unmask()$resample('bicubic')$reproject(canopy_height30m3035$projection())
 
 agb_sd <- agbcoll$
   filterDate("2021-01-01", "2023-01-01")$
   first()$
   select("SD")
 
-biomass <- agb
+biomass  <-  predictors$classify(trainedModel)
 biomass_sd <- agb_sd
 
-hansen <- ee$Image("UMD/hansen/global_forest_change_2024_v1_12")
+canopy_cover <- ee$Image("UMD/hansen/global_forest_change_2024_v1_12")
+ ## CANOPY LOSS MAP ----
+ onlyNonDisturbedPixels =  canopy_cover$select("lossyear")$unmask()$eq(0);
+ hansenLossPost2018 =      canopy_cover$select("lossyear")$unmask()$gt(18L);
+ hansenLossPost2010  =     canopy_cover$select("lossyear")$unmask()$gt(10);
+ hansenLossPost2010upTo2019 = hansenLossPost2010$And( canopy_cover$select("lossyear")$unmask()$lt(19)  ) ;
+ hansenLossPost2000   =  canopy_cover$select("lossyear")$unmask()$gt(0)
+ hansenLossPost2000upTo2009   =  hansenLossPost2000$And( canopy_cover$select("lossyear")$unmask()$lt(11) ) ;
 
 clc <- ee$Image(
   "projects/progetto-eu-h2020-cirgeo/assets/copernicus/CLMS_CLCplus_RASTER_2023"
@@ -48,11 +148,6 @@ tcd <- ee$ImageCollection(
   "projects/progetto-eu-h2020-cirgeo/assets/copernicus/CLMS_TCF_TreeDensity_RASTER_2021"
 )
 
-canopy_height_coll <- ee$ImageCollection(
-  'users/cirgeo/wildfire/canopyHeightFromMeta10m'
-);
-
-canopy_height <- canopy_height_coll$select(0)$mosaic()$setDefaultProjection(canopy_height_coll$first()$projection());
 
 nuts <- ee$FeatureCollection(
   "projects/progetto-eu-h2020-cirgeo/assets/NUTS_RG_01M_2024_4326"
@@ -63,14 +158,14 @@ codiciNutsInProject <- c(
   "AT125", "ITH43", "AT211", "AT212",
   "SI043", "ITH42", "SI042"
 )
-
-nutsAll <- nuts$filter(ee$Filter$eq("LEVL_CODE", 3))
-
-nuts2use <- nuts$filter(ee$Filter$inList("NUTS_ID", codiciNutsInProject))
-
-pilotRegions <- nuts2use$map(
-  ee_utils_pyfunc(function(f) f$geometry()$buffer(1000)$dissolve())
-)$geometry()$dissolve()
+#
+# nutsAll <- nuts$filter(ee$Filter$eq("LEVL_CODE", 3))
+#
+# nuts2use <- nuts$filter(ee$Filter$inList("NUTS_ID", codiciNutsInProject))
+#
+# pilotRegions <- nuts2use$map(
+#   ee_utils_pyfunc(function(f) f$geometry()$buffer(1000)$dissolve())
+# )$geometry()$dissolve()
 
 # EQUATION PARAMTERS -----
 ## treeH2treeCBH -----
@@ -93,8 +188,27 @@ parametersCanopyBaseHeight <- ee$Dictionary(list(
   veg_salix_caprea_anv_v3 = c(0.0, 0.389, 2.26567518)
 ))
 ## treeDBH2thinBiomassFraction -----
-dbh2canopyBiomassFraction <- ee$Dictionary(  list(
-  veg_abies_alba_anv_v3 = '1 - (exp(-0.8725) * DBH**0.1271)',
+dbh2canopyBiomassFraction =  ee$Dictionary( list(
+  "veg_abies_alba_anv_v3"=       "exp( -3.4019 +  1.9078*log(DBH) ) / exp(  -2.2085	+ 2.3786*log(DBH) ) ",
+  "veg_castanea_sativa_anv_v3"=  "exp( -6.2950 +  2.3956*log(DBH) ) / exp(  -1.8351	+ 2.2916*log(DBH) ) ",
+  "veg_corylus_avellana_anv_v3"= "exp( -4.2286 +  1.8625*log(DBH) ) / exp(  -1.9958	+ 2.3625*log(DBH) ) ",
+  "veg_fagus_sylvatica_anv_v3"=  "exp( -4.4813 +  1.9073*log(DBH) ) / exp(  -1.6594	+ 2.3589*log(DBH) ) ",
+  "veg_olea_europaea_anv_v3"=    "exp( -4.2286 +  1.8625*log(DBH) ) / exp(  -1.9958	+ 2.3625*log(DBH) ) ",
+  "veg_picea_abies_anv_v3"=      "exp( -2.7957 +  1.8688*log(DBH) ) / exp(  -1.8865	+ 2.3034*log(DBH) ) ",
+  "veg_pinus_halepensis_anv_v3"= "exp( -4.3437 +  2.2347*log(DBH) ) / exp(  -2.5918	+ 2.422 *log(DBH) ) ",
+  "veg_pinus_nigra_anv_v3"=      "exp( -0.6105 +  0.8705*log(DBH) ) / exp(  -2.0236	+ 2.3345*log(DBH) ) ",
+  "veg_pinus_pinea_anv_v3"=      "exp( -3.5276 +  1.7471*log(DBH) ) / exp(  -2.1575	+ 2.3097*log(DBH) ) ",
+  "veg_pinus_sylvestris_anv_v3"= "exp( -3.5276 +  1.7471*log(DBH) ) / exp(  -2.1575	+ 2.3097*log(DBH) ) ",
+  "veg_prunus_avium_anv_v3"=     "exp( -4.9416 +  1.42  *log(DBH) ) / exp(  -2.1575	+ 2.3097*log(DBH) ) ",
+ "veg_quercus_cerris_anv_v3"=   "exp( -4.4663 +  2.1375*log(DBH) ) / exp(  -2.6840	+ 2.7274*log(DBH) )",
+ "veg_quercus_ilex_anv_v3"=     "exp( -4.4998 +  2.1018*log(DBH) ) / exp(  -1.7417	+ 2.3699*log(DBH) )",
+ "veg_quercus_robur_anv_v3"=    "exp( -4.4663 +  2.1375*log(DBH) ) / exp(  -2.6840	+ 2.7274*log(DBH) )",
+ "veg_quercus_suber_anv_v3"=    "exp( -4.4663 +  2.1375*log(DBH) ) / exp(  -2.6840	+ 2.7274*log(DBH) )",
+ "veg_salix_caprea_anv_v3"=     "exp( -4.2286 +  1.8625*log(DBH) ) / exp(  -1.9958	+ 2.3625*log(DBH) )"
+  )
+)
+dbh2canopyBiomassFractionOld <- ee$Dictionary(  list(
+  veg_abies_alba_anv_v3 = '1 - (0.4179055 * DBH**0.1271)',
 
   veg_castanea_sativa_anv_v3 =
     '(0.001845 * DBH**2.3956 + 0.002796 * DBH**2.3812) /
@@ -258,19 +372,23 @@ parametersPolynomialQuadratic_treeH2treeDBH <-  ee$Dictionary( list(
 namesAndDesc <- list(
   canopyHeight               = "Average tree canopy heights from ground in pixel, (m)",
   # canopyHeightSD           = "Estimation of error (sigma) (m)",  # commented out like in JS
-  materassoHeight            = "Average height of canopy-only in pixel, (m)",
-  materassoVolume            = "Average volume of canopy from the forest stand's canopy bottom to tree tops. In cubic meters (m3)",
-  materassoVolumeSigma        = "Estimation of error (sigma) of average volume of canopy from the forest stand's canopy bottom to tree tops. In cubic meters (m3)",
+  # materassoHeight            = "Average height of canopy-only in pixel, (m)",
+  # materassoVolume            = "Average volume of canopy from the forest stand's canopy bottom to tree tops. In cubic meters (m3)",
+  # materassoVolumeSigma        = "Estimation of error (sigma) of average volume of canopy from the forest stand's canopy bottom to tree tops. In cubic meters (m3)",
   canopyBaseHeight           = "The forest Canopy Base Height (CBH) describes the average height from the ground to a forest stand's canopy bottom. Specifically, it is the lowest height in a stand at which there is a sufficient amount of forest canopy fuel to propagate fire vertically into the canopy.",
   canopyBaseHeightSigma       = "Estimation of error (sigma) from propagation of canopy height model errors and CBH model error",
-  averageDbh                 = "Average Diameter at Base Height",
-  averageDbhSigma             = "Estimation of error (sigma) from propagation of canopy height model errors and H=>DBH model error",
-  biomassOfCanopy            = "Biomas (Mg/ha) of the canopy part of AGB",
-  biomassOfCanopySigma        = "Estimation of error (sigma) from propagation of canopy height model errors and H=>DBH model error",
+  # averageDbh                 = "Average Diameter at Base Height",
+  # averageDbhSigma             = "Estimation of error (sigma) from propagation of canopy height model errors and H=>DBH model error",
+  # biomassOfCanopy            = "Biomas (Mg/ha) of the canopy part of AGB",
+  # biomassOfCanopySigma        = "Estimation of error (sigma) from propagation of canopy height model errors and H=>DBH model error",
+  # canopyBulkDensityCCI          = "Canopy Bulk Density (CBD) is the amount of canopy biomass over canopy volume (kg/m3)",
   canopyBulkDensity          = "Canopy Bulk Density (CBD) is the amount of canopy biomass over canopy volume (kg/m3)",
-  canopyBulkDensitySigma      = "Estimation of error (sigma) from propagation of errors coming from the models and input variables (i.e. canopy heights, canopy base height, diameter and canopy biomass).",
-  canopyBiomassFraction      = "Fraction (from 0 to 1) of canopy i.e. leaves with respect to total AGB (leaves+branches+stem). It was calculated with a species-specific model over 16 species.",
-  canopyBiomassFractionSigma  = "Propagated error to the canopy biomass fraction value from the model used for estimation."
+  # canopyBulkDensitySigmaCCI      = "Estimation of error (sigma) from propagation of errors coming from the models and input variables (i.e. canopy heights, canopy base height, diameter and canopy biomass).",
+  canopyBulkDensitySigma      = "Estimation of error (sigma) from propagation of errors coming from the models and input variables (i.e. canopy heights, canopy base height, diameter and canopy biomass)."
+  # canopyBiomassFraction      = "Fraction (from 0 to 1) of canopy i.e. leaves with respect to total AGB (leaves+branches+stem). It was calculated with a species-specific model over 16 species.",
+  # canopyBiomassFractionSigma  = "Propagated error to the canopy biomass fraction value from the model used for estimation.",
+  # BiomassRFfromCCI = "Mg per ha original biomass from RF trained on  CCI 2020",
+  # BiomassCCIoriginal = "per ha original biomass FIRERES 2020"
 )
 
 
@@ -282,7 +400,7 @@ assets <- ee$data$listAssets("users/cirgeo/FIRE-RES/open")
 filt <- lapply(assets$assets, function(el) el$id)
 # Filter asset IDs containing "veg"
 filt2a <- Filter(function(el) grepl("veg", el), filt)
-filt2 <-  Filter(function(el) !grepl("salix|cerris|olea|suber|halepensis", el), filt2a)
+filt2 <-  Filter(function(el) !grepl("salix|olea", el), filt2a)
 
 # Sum of all probability layers
 sumProbs <- ee$ImageCollection(filt2)$sum()
@@ -296,7 +414,7 @@ plotErroPropagation <- function(){
   pow<-function(x,y){x^y}
 
   for(j in basename(unlist(filt2))){
-    for(height in seq(1,70, 2)){
+    for(height in seq(5,50, 2)){
       ch=height
       errCH=4.25
 
@@ -339,8 +457,8 @@ plotErroPropagation <- function(){
 
     labs(
       x = "Canopy Height (m)",
-      y = "Thin biomass fraction",
-      title = "Thin biomass fraction and DBH estimated from Canopy Height with error propagation\nDBH is linearly rescaled for visualization"
+      y = "DBH (cm)",
+      title = "DBH estimated from Canopy Height with error propagation"
     ) +
     theme_minimal(base_size = 13)
   dev.off()
@@ -360,7 +478,7 @@ plotErroPropagation <- function(){
     labs(
       x = "Canopy Height (m)",
       y = "Thin biomass fraction",
-      title = "Thin biomass fraction and DBH estimated from Canopy Height with error propagation\nDBH is linearly rescaled for visualization"
+      title = "Thin biomass fraction estimated from Canopy Height with error propagation"
     ) +
     theme_minimal(base_size = 13)
     dev.off()
@@ -376,21 +494,26 @@ canopyBulkDensfunction <- function(element) {
   # spname$getInfo()
   # ------- CBH parameters ----------
   paramsCBH <- ee$List(parametersCanopyBaseHeight$get(spname))
-  slopev    <- ee$Number(paramsCBH$get(1))
+  slopev    <- ee$Number(paramsCBH$get(1))$multiply(0.75)
   intercept <- ee$Number(paramsCBH$get(0))
   err       <- ee$Number(paramsCBH$get(2))
 
   # spname$getInfo()
-
-  cbht <- canopy_height$select(0)$multiply(slopev)$add(intercept)
+  canopy_height_sigma = 4.25
+  cbht <- canopy_height$select(0)$multiply(slopev) ## $add(intercept) intercept is zero
+  ## CBH must be zero or above zero, not negative
   cbh <- cbht$multiply(cbht$gt(0))
+  ## for trees with height below the uncertainty value of the Tolan Tree height,
+  ## (4.25 m), we assume that CBH is zero, thus crown base reaches the ground
+  cbh <- cbh$multiply(canopy_height$select(0)$gt(canopy_height_sigma))
+
   ## 4.25 m is the uncertainty of the META canopy heights!
   ## it thus propagates linearly 4.1.4. We use RMSE for sigma assuming no bias
   ## Correlation with field data in https://doi.org/10.1016/j.rse.2023.113888
-  cbhsd_chain <- slopev$multiply(4.25)
+  cbhsd_chain <- slopev$multiply(canopy_height_sigma)
   cbhsd_chain <- cbhsd_chain$pow(2)$add(err$pow(2))$sqrt()
 
-  area30mPixel3035 <- canopy_height$pixelArea()
+  areaPixel <- canopy_height$pixelArea()
 
   # --------- DBH parameters ----------
   paramsH2treeDBH <- ee$List(parametersPolynomialQuadratic_treeH2treeDBH$get(spname))
@@ -400,13 +523,17 @@ canopyBulkDensfunction <- function(element) {
 
   # ---------- Canopy layer thickness ----------
   materassoZ <- canopy_height$select(0)$subtract(cbh)
-  materassoZ <- materassoZ$subtract(materassoZ$multiply(materassoZ$lt(0)))$float()
+  ## we keep at least Canopy Height sigma (4.25) m of Z Height to crown base
+  materassoZ <-  materassoZ$multiply(materassoZ$gt(canopy_height_sigma))$add(
+    materassoZ$lt(canopy_height_sigma)$multiply(canopy_height_sigma)
+  )$float()
+  # materassoZ <- materassoZ$subtract(materassoZ$multiply(materassoZ$lt(0)))$float()
 
-  materasso3d <- materassoZ$multiply(area30mPixel3035)
-  materasso3d_sd <-  area30mPixel3035$multiply(cbhsd_chain)
+  materasso3d <- materassoZ$multiply(areaPixel)
+  materasso3d_sd <-  areaPixel$multiply(cbhsd_chain)
 
   # ---------- Average DBH ----------
-  averageDBH <- canopy_height$select(0)$pow(2)$multiply(
+  averageDBH <- canopy_height$float()$select(0)$pow(2)$multiply(
      ee$Number(paramsH2treeDBH$get(2))
   )$add(
     canopy_height$select(0)$multiply(
@@ -442,35 +569,50 @@ canopyBulkDensfunction <- function(element) {
     )
   )
 
-  # Biomass fractions
+  # Biomass fractions - biomass is per ha value, so
   biomassOfCanopyFraction <- biomass$multiply(ff)
   biomassOfCanopyFraction_sd <- biomass$multiply(ff_sd)
 
+  biomassOfCanopyFraction2 <- agbOriginal$multiply(ff)
+  biomassOfCanopyFraction_sd2 <- agbOriginal$multiply(ff_sd)
+
   # Canopy bulk density
-  canopyBulkDensity <- biomassOfCanopyFraction$multiply(1000)$divide(materasso3d)
+  canopyBulkDensity  <- biomassOfCanopyFraction$multiply(10)$divide(materasso3d)
+  canopyBulkDensity2 <- biomassOfCanopyFraction2$multiply(10)$divide(materasso3d)
 
   canopyBulkDensity_sd <- ((
-    biomassOfCanopyFraction_sd$multiply(1000)$pow(2)$multiply(materasso3d$pow(2))
+    biomassOfCanopyFraction_sd$multiply(10)$pow(2)$multiply(materasso3d$pow(2))
     $add(
-      biomassOfCanopyFraction$multiply(1000)$pow(2)$multiply(materasso3d_sd$pow(2))
+      biomassOfCanopyFraction$multiply(10)$pow(2)$multiply(materasso3d_sd$pow(2))
+    )
+  )$divide(materasso3d$pow(4)))$sqrt()
+
+  canopyBulkDensity_sd2 <- ((
+    biomassOfCanopyFraction_sd2$multiply(10)$pow(2)$multiply(materasso3d$pow(2))
+    $add(
+      biomassOfCanopyFraction2$multiply(10)$pow(2)$multiply(materasso3d_sd$pow(2))
     )
   )$divide(materasso3d$pow(4)))$sqrt()
 
   # Final band stack
   final <- canopy_height$
     addBands(list(
-      materassoZ$float(),
-      materasso3d$float(),
-      ee$Image(materasso3d_sd$float()),
+      # materassoZ$float(),
+      # materasso3d$float(),
+      # ee$Image(materasso3d_sd$float()),
       cbh$float(),
       ee$Image(cbhsd_chain)$float(),
-      averageDBH$float(),
-      biomassOfCanopyFraction$float(),
-      biomassOfCanopyFraction_sd$float(),
-      canopyBulkDensity$float(),
-      canopyBulkDensity_sd$float(),
-      ff$float(),
-      ff_sd$float()
+      # averageDBH$float(),
+      # biomassOfCanopyFraction$float(),
+      # biomassOfCanopyFraction_sd$float(),
+      canopyBulkDensity$float()$focalMedian(),
+      # canopyBulkDensity2$float(),
+      canopyBulkDensity_sd$float()
+      # canopyBulkDensity_sd2$float(),
+      # ff$float(),
+      # ff_sd$float(),
+      # biomass$float(),
+      # agbOriginal$float()
     ))$
     rename(names(namesAndDesc))
 
@@ -500,8 +642,10 @@ CBD <- mapped$
   )
 
 ### Pilot sites list -----------
-ps_list <- pilotSites$toList(pilotSites$size())
-n <- pilotSites$size()$getInfo()
+# ps_list <- pilotSites$toList(pilotSites$size())
+# n <- pilotSites$size()$getInfo()
+ps_list <- pilotRegions$toList(pilotRegions$size())
+n <- pilotRegions$size()$getInfo()
 
 # Band names
 bbands <- names(namesAndDesc)
@@ -510,24 +654,41 @@ bbands <- names(namesAndDesc)
 for (i2 in seq_len(n) - 1) {
 
   feat <- ee$Feature(ps_list$get(i2))
+  # if(nm!="AT-IT") next
   nm <- feat$get("pilot_id")$getInfo()
-  geom <- feat$geometry()
+  if(is.null(nm)){
+    nm <- feat$get("ID")$getInfo()
+  }
+  print(nm)
+  # geom <- feat$geometry()
+  geom <- feat$geometry()$buffer(100, 1)
+  CBDexport <- CBD$unmask()$clip(geom)$toFloat()
+
+  # task <- ee_image_to_drive(
+  #   image       = CBDexport,
+  #   description = paste0("pilotSites30m_", nm ),
+  #   folder      = "GEE_exportAll",
+  #   region      = geom,
+  #   timePrefix = F,
+  #   scale       = 30,
+  #   crs         = "EPSG:3035",
+  #   maxPixels   = 1e13
+  # )
+  # task$start()
+  # break
 
   for (b in bbands) {
 
-    img_export <- CBD$
-      unmask()$
-      clip(geom)$
-      select(b)$
-      toFloat()
+    img_export <- CBDexport$select(b)
 
     task <- ee_image_to_drive(
       image       = img_export,
-      description = paste0("pilotSites_", nm, "_", b),
+      description = paste0("pilotRegions_", nm, "_", b),
       folder      = "GEE_export",
       region      = geom,
       timePrefix = F,
       scale       = 30,
+      formatOptions =   list( cloudOptimized= TRUE),
       crs         = "EPSG:3035",
       maxPixels   = 1e13
     )
@@ -535,5 +696,4 @@ for (i2 in seq_len(n) - 1) {
     task$start()
 
   }
-  break
 }
