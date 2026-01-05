@@ -14,30 +14,22 @@ zenodo <- ZenodoManager$new(
 
 
 myrec <- zenodo$getDepositions()
-myrec2 <- as.list(myrec)
-myrec3 <- myrec2[[1]]
-poll <- zenodo$uploadFile("/home/pirotti/Downloads/furfaro/GEE_export/pilotRegions_CZ-DE_canopyBulkDensity.tif",
-                          record=myrec3  )
-# myrec2 <- zenodo$ (myrec$getId() )
-# myrec <- ZenodoRecord$new()
-myrec$setTitle("Latest High Resolution Layers (HRL) from Copernicus Land Cover Services")
-myrec$setDescription("We aggregate some High Resolution Layers (HRL) from the Copernicus Land Cover Service using either 1 or 2 byte rasters
-to save space and make for an  easier download.
-These data are provided by different Data and Information Access services (DIAS) and also by tile.
-Nevertheless it is sometimes better to download the whole grid as one file, instead of the singl 799 tiles to cover the EU contries.
-All data are aligned in the EPSG:3035 grid coordinate system.
-Each layer has its respective confidence layer.
-  - CLCplus Backbone 2023 (raster 10 m)
-  - Tree Cover Density 2021 (raster 10 m)")
-myrec$setResourceType("dataset")
-myrec$setPublisher("Francesco Pirotti")
-myrec$setPublicationDate(as.character(Sys.Date()))
-# myrec$addCreator(firstname = "Francesco", lastname = "Pirotti",
-#                  orcid="0000-0002-4796-6406")
+myrec <- zenodo$getRecordById(18077813)
+myrec$
+files <- myrec$files
+downloaded <- (list.files("output/pilotRegions/", full.names = T))
+nd <- which(! basename(downloaded) %in% names(files))
+toupload <- grep("gpkg", downloaded[nd],value = T )
 
-myrec$setLicense("cc-by-1.0")
-myrec$setPublicationDate(as.character(Sys.Date()))
-myrec$setAccessPolicyRecord(access =  "public" )
+myrecEd <- zenodo$depositRecordVersion(record = myrec , delete_latest_files = FALSE)
+myrecEd$
+for (fto in toupload){
+  poll <- zenodo$uploadFile(fto,
+                            record=myrecEd  )
+}
+
+myrecEd$setPublicationDate(as.character(Sys.Date()))
+myrecst <- zenodo$depositRecord(myrecEd, publish=TRUE)
 
 myrec2 <- zenodo$depositRecordVersion(myrec,
                                       files = "/archivio/shared/geodati/raster/CLMS_TCF_TreeDensity_RASTER_2021/CLMS_TCF_TreeDensity_RASTER_2021.tif",
@@ -49,5 +41,5 @@ poll <- zenodo$uploadFile("/archivio/shared/geodati/raster/CLMS_CLCplus_RASTER_2
 #
 # poll <- zenodo$uploadFile("/archivio/shared/geodati/raster/CLMS_TCF_TreeDensity_RASTER_2021/CLMS_TCF_TreeDensity_RASTER_2021.tif",
 #                           record=myrec2  )
-myrecst <- zenodo$publishRecord(myrec2$getId())
+
 
