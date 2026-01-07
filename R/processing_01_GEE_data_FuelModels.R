@@ -6,18 +6,18 @@ library(googledrive)
 # 1. Authenticate ----
 drive_auth(email = "cirgeo@unipd.it")
 ee_Initialize(user = 'cirgeo'  )
-
-points <- ee$FeatureCollection("projects/progetto-eu-h2020-cirgeo/assets/wildfire/CzechGlobeDE_CZpts")
+## only forest points ----
+points <- ee$FeatureCollection("projects/progetto-eu-h2020-cirgeo/assets/wildfire/CzechGlobeDE_CZpts")$filter(ee$Filter$gt('class', 160))
 withRand = points$randomColumn('rand');
 train = withRand$filter(ee$Filter$lt('rand', 0.1));
 valid = withRand$filter(ee$Filter$gt('rand', 0.1));
-#print(train$size()$getInfo())
+# print(valid$size()$getInfo())
+#print(train$first()$getInfo())
 cat(as.character(date()), "\n", file = "processing_01_GEE_data.log" )
 # ee_install_upgrade()
 ### setting version ----
 versionFuelModel  = 3
 # ee_Initialize(quiet = T)
-ee_Initialize(user = 'cirgeo'  )
 scale = 30
 ### setting scale ----
 proj3035_30m = ee$Projection('EPSG:3035')$atScale(scale);
@@ -27,9 +27,6 @@ proj3035_30m = ee$Projection('EPSG:3035')$atScale(scale);
 task_img_container <- list()
 task_img_containerAsset <- list()
 
-# Time range for NDVI stack
-startDate = '2023-01-01';
-endDate = '2025-09-30';
 
 # Function to mask clouds and shadows using the SCL band
 maskS2clouds <- function(image) {
@@ -38,16 +35,20 @@ maskS2clouds <- function(image) {
   # also mask for red band above 10...
   # e.g. if B4 is 0 then NDVI will always be 1
   red = image$select('B4');
-  cloudShadowMask = red$gt(100)$And(scl$neq(3))$And(scl$neq(8))$And(scl$neq(9))$And(scl$neq(10))$And(scl$neq(1))$And(scl$neq(0));
+  red = image$select('B8');
+  cloudShadowMask = red$gt(100)$And(nir$gt(100))$And(scl$gt(3))$And(scl$lt(6));
   return(image$updateMask(cloudShadowMask)$copyProperties(image, list('system:time_start') ))
 }
 
 # Function to compute NDVI and add it as a band
 addNDVI <-function(image) {
-  ndvi = image$normalizedDifference(c('B8', 'B4'))$rename('b1');
+  ndvi = image$normalizedDifference(c('B8', 'B4'))$rename('ndvi');
   return(ndvi);
 }
-
+addNBR <-function(image) {
+  invnbr = image$normalizedDifference(c('B12', 'B8'))$rename('nbr');
+  return(invnbr);
+}
 ## reducer for Meta 1 m tree height to 30 m grid
 # combinedReducer = ee$Reducer$mean()$combine(
 #   reducer2= ee$Reducer$stdDev(),
@@ -73,39 +74,47 @@ inputVars <- list()
 pilotSites = ee$FeatureCollection("projects/progetto-eu-h2020-cirgeo/assets/wildfire/wildfire_pilot_sites_v3") ;
 nPilots =  pilotSites$size()$getInfo()
 bounds = pilotSites$geometry()$bounds()
+
+# Time range for NDVI stack
+startDate = '2023-01-01';
+endDate = '2025-12-30';
+
 # Load and process S2 collection
-s2 = ee$ImageCollection("COPERNICUS/S2_SR_HARMONIZED")$filterDate(startDate, endDate)$filterBounds(bounds)$filter(ee$Filter$lt('CLOUDY_PIXEL_PERCENTAGE', 50))$map(maskS2clouds)$map(addNDVI);
+s2 = ee$ImageCollection("COPERNICUS/S2_SR_HARMONIZED")$filterDate(startDate, endDate)$filterBounds(bounds)$filter(ee$Filter$lt('CLOUDY_PIXEL_PERCENTAGE', 50))$map(maskS2clouds);
 
 ##  NDVI -----
-inputVars$ndviMax = s2$qualityMosaic('b1')
+inputVars$ndviMax = s2$map(addNDVI)$qualityMosaic('ndvi')
+##  NBR but inverse! higher values mean more burned, this is to use the qualityMosaic -----
+inputVars$nbrMax = s2$map(addNBR)$qualityMosaic('nbr')
 
 
 ## DEM -----
-inputVars$dem = ee$ImageCollection('COPERNICUS/DEM/GLO30')$filterBounds(bounds)$mosaic()$select("DEM") ;
+inputVars$dem =  ee$Image("projects/progetto-eu-h2020-cirgeo/assets/eu/dtm_elev_lowestmode_gedi_v03");
 
 terrain = ee$Terrain$products(inputVars$dem);
 inputVars$slope = terrain$select('slope');
 inputVars$aspect = terrain$select('aspect');
 
 ## Aridity -----
-aridityIndex =  ee$ImageCollection('projects/progetto-eu-h2020-cirgeo/assets/global/AridityIndex')$mosaic()$divide(10000);
+# aridityIndex =  ee$ImageCollection('projects/progetto-eu-h2020-cirgeo/assets/global/AridityIndex')$mosaic()$divide(10000);
 ## NEW! Tree Canopy Density from Copernicus  10 m 2021 -----
 inputVars$canopy_cover = ee$ImageCollection("projects/progetto-eu-h2020-cirgeo/assets/copernicus/CLMS_TCF_TreeDensity_RASTER_2021")$mosaic()
 ## NEW! CLC+ backbone 10 m 2023 ----
-inputVars$clcplus = ee$Image('projects/progetto-eu-h2020-cirgeo/assets/copernicus/CLMS_CLCplus_RASTER_2023')$select('b1')
-## NEW! crop map 10 m 2021 - we assume orchards and vineyards are not changed ----
-inputVars$cropmap = ee$Image('projects/progetto-eu-h2020-cirgeo/assets/copernicus/CLMS_CropTypes_RASTER_2021')$select('b1')$unmask()
-inputVars$cropmapHighVeg = inputVars$cropmap$gt(100)$And(inputVars$cropmap$lt(200))
+clcplus = ee$Image('projects/progetto-eu-h2020-cirgeo/assets/copernicus/CLMS_CLCplus_RASTER_2023')$select('b1')
+## NEW! crop map 10 m 2021 - we assume orchards and vineyards are not changed and lead to Fuel Type ??? ----
+cropmap = ee$Image('projects/progetto-eu-h2020-cirgeo/assets/copernicus/CLMS_CropTypes_RASTER_2021')$select('b1')$unmask()
+cropmapHighVeg = cropmap$gt(100)$And(cropmap$lt(200))
 ## very high threshold to consider all arid ? low values = arid, high values = humid
-aridityThreshold = 100;
+# aridityThreshold = 100;
 
 ## NEW!!  Canopy height META -----
 # inputVars$canopy_height = ee$Image('users/nlang/ETH_GlobalCanopyHeight_2020_10m_v1')$unmask()
-# canopy_heightColl =  ee$ImageCollection("projects/sat-io/open-datasets/facebook/meta-canopy-height")$filterBounds(bounds);
-canopy_height =  ee$ImageCollection("projects/progetto-eu-h2020-cirgeo/assets/wildfire/canopyHeightFromMeta30m")$mosaic() #$clip(bounds) #$map(statsAgg)
+canopy_heightColl =  ee$ImageCollection("projects/sat-io/open-datasets/facebook/meta-canopy-height")$filterBounds(bounds);
+ch30m <- "projects/progetto-eu-h2020-cirgeo/assets/wildfire/canopyHeightFromMeta30m"
+canopy_height =  ee$ImageCollection(ch30m)$mosaic()$setDefaultProjection(ee$ImageCollection(ch30m)$first()$projection()) #$clip(bounds) #$map(statsAgg)
 # canopy_height.proj <- canopy_heightColl$first()$projection()$getInfo()
 
-inputVars$canopy_height = canopy_height$setDefaultProjection(canopy_heightColl$first()$projection())
+inputVars$canopy_height = canopy_height
 
 
 ### TRY OUTPUT ----
@@ -131,14 +140,13 @@ inputVars$canopy_height = canopy_height$setDefaultProjection(canopy_heightColl$f
 #   }
 
 
-
-canopy_cover = ee$Image("UMD/hansen/global_forest_change_2024_v1_12")
-
-
 outputStack_macroClass = { };
 outputStack_scottBurgan = { };
+outputStack_FBP = { };
 
 ## CANOPY LOSS MAP ----
+
+canopy_cover = ee$Image("UMD/hansen/global_forest_change_2024_v1_12")
 onlyNonDisturbedPixels =  canopy_cover$select("lossyear")$unmask()$eq(0);
 hansenLossPost2018 =      canopy_cover$select("lossyear")$unmask()$gt(18L);
 hansenLossPost2010  =     canopy_cover$select("lossyear")$unmask()$gt(10);
@@ -147,17 +155,13 @@ hansenLossPost2000   =  canopy_cover$select("lossyear")$unmask()$gt(0)
 hansenLossPost2000upTo2009   =  hansenLossPost2000$And( canopy_cover$select("lossyear")$unmask()$lt(11) ) ;
 
 
-# RANDOM FOREST #####
+# RANDOM FOREST for FORESTS FM #####
 ## stack the predictors #####
-predictors <- inputVars$clcplus$rename("clc")$toByte()$reduceResolution(
-  reducer = ee$Reducer$mode(),
-  bestEffort= T,
-  maxPixels= 24
-);
+predictors <- inputVars$ndviMax$rename("ndviMax")
 output <- list()
 for( k in names(inputVars) ){
   message(k)
-  if(k=="clcplus") next
+  if(k=="ndviMax") next
   img1 = inputVars[[k]]
   newBnames <- gsub("b1", k, img1$bandNames()$getInfo() )
   predictors <- predictors$addBands(img1$rename(newBnames)) # nouse =  inputVars[[k]]$select(0)$projection()
@@ -377,25 +381,51 @@ outputStack_macroClass$a92 = inputVars$clcplus$eq(11)
 #      file="percentiles.rda")
 
 ## GRASS  ----
-grassCLCplus=inputVars$clcplus$eq(6)$Or(inputVars$clcplus$eq(7))
+grassCLCplus=clcplus$eq(6)$Or(clcplus$eq(7))$byte()
 ## MACRO Classes -----
 ## Grass only if < 10% has vegetation > 1 m
-outputStack_macroClass$a10=clcplus$eq(6)$Or(clcplus$eq(7))$And(
+outputStack_macroClass$a10 = grassCLCplus$And(
   inputVars$canopy_height$select("b1_min")$eq(0L)$And(
-    inputVars$canopy_height$select("b1_mean")$lt(1L)
+    inputVars$canopy_height$select("b1_mean")$lte(1L)
   )
 )
 ## to make sure it is grass, we remove pixels that have any crop type canopy cover
 ## grass shrub only if > 10% has vegetation > 1 m
-outputStack_macroClass$a12=clcplus$eq(6)$Or(clcplus$eq(7))
+outputStack_macroClass$a12= grassCLCplus$And(
+  inputVars$canopy_height$select("b1_min")$neq(0L)$Or(
+    inputVars$canopy_height$select("b1_mean")$gt(1L)
+  )
+)
+
+tmp <- outputStack_macroClass$a10$reduceRegions(
+     reducer= ee$Reducer$sum(),
+     collection= pilotSites,
+     scale= 30
+   )
+
+a10a <- tmp$getInfo()
+a10i2 <- lapply(a10$features, function(x){
+  x[["properties"]][["sum"]]
+} )
+
+
+tmp <- outputStack_macroClass$a12$reduceRegions(
+  reducer= ee$Reducer$sum(),
+  collection= pilotSites,
+  scale= 30
+)
+a12 <- tmp$getInfo()
+a12i <- lapply(a12$features, function(x){
+  x[["properties"]][["sum"]]
+} )
 
 ##  shrub
 outputStack_macroClass$a14=clcplus$eq(5)
-##  tree
-outputStack_macroClass$a16=clcplus$eq(5)
-##  tree1
+##  tree timber understorey
+outputStack_macroClass$a16=clcplus$eq(6)
+##  tree1 timber litter
 outputStack_macroClass$a18=clcplus$eq(5)
-##  blowdown
+##  blowdown - forest with disturbance but with low inverse nbr (high inverse nbr = charred fuel)
 outputStack_macroClass$a20=clcplus$eq(5)
 
 
