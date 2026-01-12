@@ -7,7 +7,8 @@ library(googledrive)
 drive_auth(email = "cirgeo@unipd.it")
 ee_Initialize(user = 'cirgeo'  )
 ## only forest points ----
-points <- ee$FeatureCollection("projects/progetto-eu-h2020-cirgeo/assets/wildfire/CzechGlobeDE_CZpts")$filter(ee$Filter$gt('class', 160))
+points <- ee$FeatureCollection("projects/progetto-eu-h2020-cirgeo/assets/wildfire/ptsCzechGlobeDE_CZ")$filter(ee$Filter$gt('class', 160))
+
 withRand = points$randomColumn('rand');
 train = withRand$filter(ee$Filter$lt('rand', 0.1));
 valid = withRand$filter(ee$Filter$gt('rand', 0.1));
@@ -20,7 +21,11 @@ versionFuelModel  = 3
 # ee_Initialize(quiet = T)
 scale = 30
 ### setting scale ----
-proj3035_30m = ee$Projection('EPSG:3035')$atScale(scale);
+# proj3035_30m = ee$Projection('EPSG:3035')$atScale(scale);
+proj_3035_30m <- list(
+  crs = "EPSG:3035",
+  crsTransform = c(30, 0, 4321000, 0, -30, 3210000)
+)
 
 # 2. START ----
 ### setting tasks containers ----
@@ -35,20 +40,11 @@ maskS2clouds <- function(image) {
   # also mask for red band above 10...
   # e.g. if B4 is 0 then NDVI will always be 1
   red = image$select('B4');
-  red = image$select('B8');
+  nir = image$select('B8');
   cloudShadowMask = red$gt(100)$And(nir$gt(100))$And(scl$gt(3))$And(scl$lt(6));
   return(image$updateMask(cloudShadowMask)$copyProperties(image, list('system:time_start') ))
 }
 
-# Function to compute NDVI and add it as a band
-addNDVI <-function(image) {
-  ndvi = image$normalizedDifference(c('B8', 'B4'))$rename('ndvi');
-  return(ndvi);
-}
-addNBR <-function(image) {
-  invnbr = image$normalizedDifference(c('B12', 'B8'))$rename('nbr');
-  return(invnbr);
-}
 ## reducer for Meta 1 m tree height to 30 m grid
 # combinedReducer = ee$Reducer$mean()$combine(
 #   reducer2= ee$Reducer$stdDev(),
@@ -73,20 +69,32 @@ addNBR <-function(image) {
 inputVars <- list()
 pilotSites = ee$FeatureCollection("projects/progetto-eu-h2020-cirgeo/assets/wildfire/wildfire_pilot_sites_v3") ;
 nPilots =  pilotSites$size()$getInfo()
+pilotSitesNames =  unlist(Map(function(x){ x$properties$pilot_id } , pilotSites$getInfo()$features) )
 bounds = pilotSites$geometry()$bounds()
 
 # Time range for NDVI stack
-startDate = '2023-01-01';
-endDate = '2025-12-30';
+startDate = '2021-01-01';
+endDate = '2024-12-30';
 
+# Function to compute NDVI and add it as a band
+addNDVI <-function(image) {
+  ndvi = image$normalizedDifference(c('B8', 'B4'))$rename('ndvi')$copyProperties(image, list('system:time_start') );
+  return(ndvi);
+}
+addNBR <-function(image) {
+  nbr = ee$Image(image$normalizedDifference(c('B8', 'B12'))$
+    rename('nbr'))
+  nbr <- nbr$copyProperties(image, list('system:time_start') )$set('year', ee$Image(image)$date()$format('YYYY'))
+  return(nbr);
+}
 # Load and process S2 collection
-s2 = ee$ImageCollection("COPERNICUS/S2_SR_HARMONIZED")$filterDate(startDate, endDate)$filterBounds(bounds)$filter(ee$Filter$lt('CLOUDY_PIXEL_PERCENTAGE', 50))$map(maskS2clouds);
+s2 = ee$ImageCollection("COPERNICUS/S2_SR_HARMONIZED")$filterDate(startDate, endDate)$filter(ee$Filter$calendarRange(7L, 9L, 'month'))$filterBounds(bounds)$filter(ee$Filter$lt('CLOUDY_PIXEL_PERCENTAGE', 30))$map(maskS2clouds);
 
 ##  NDVI -----
-inputVars$ndviMax = s2$map(addNDVI)$qualityMosaic('ndvi')
-##  NBR but inverse! higher values mean more burned, this is to use the qualityMosaic -----
-inputVars$nbrMax = s2$map(addNBR)$qualityMosaic('nbr')
+inputVars$ndviMax = s2$map(addNDVI)$qualityMosaic("ndvi")
 
+##  NBR  -----
+inputVars$nbrMin = s2$map(addNBR)$min()
 
 ## DEM -----
 inputVars$dem =  ee$Image("projects/progetto-eu-h2020-cirgeo/assets/eu/dtm_elev_lowestmode_gedi_v03");
@@ -127,7 +135,7 @@ inputVars$canopy_height = canopy_height
 #   folder <- sprintf("wildfireOutProgettoEUv3/%s",idf)
 #   task_img_container[[  id ]] <- ee_image_to_drive(
 #       # image= inputVars$canopy_height$toFloat()$clip(gg),
-#       image= inputVars$clcplus$clip(gg),
+#       image= clcplus$clip(gg),
 #       description= id,
 #       timePrefix = F,
 #       folder=NULL,
@@ -146,15 +154,19 @@ outputStack_FBP = { };
 
 ## CANOPY LOSS MAP ----
 
-canopy_cover = ee$Image("UMD/hansen/global_forest_change_2024_v1_12")
-onlyNonDisturbedPixels =  canopy_cover$select("lossyear")$unmask()$eq(0);
-hansenLossPost2018 =      canopy_cover$select("lossyear")$unmask()$gt(18L);
-hansenLossPost2010  =     canopy_cover$select("lossyear")$unmask()$gt(10);
-hansenLossPost2010upTo2019 = hansenLossPost2010$And( canopy_cover$select("lossyear")$unmask()$lt(19)  ) ;
-hansenLossPost2000   =  canopy_cover$select("lossyear")$unmask()$gt(0)
-hansenLossPost2000upTo2009   =  hansenLossPost2000$And( canopy_cover$select("lossyear")$unmask()$lt(11) ) ;
+hansen = ee$Image("UMD/hansen/global_forest_change_2024_v1_12")
+NonDisturbedPixels =  hansen$select("lossyear")$unmask()$eq(0L);
+DisturbedPixels =  hansen$select("lossyear")$unmask()$gt(0L);
+hansenLossYear =      hansen$select("lossyear")$unmask();
+hansenLossPost2018 =      hansenLossYear$gt(18L);
+hansenLossPost2010  =     hansenLossYear$gt(10);
+hansenLossPost2010upTo2019 = hansenLossPost2010$And( hansenLossYear$lt(19)  ) ;
+hansenLossPost2000   =  hansenLossYear$gt(0)
+hansenLossPost2000upTo2009   =  hansenLossPost2000$And( hansenLossYear$lt(11) ) ;
 
-
+forestLoss4fire = ee$Image("users/sashatyu/2001-2024_fire_forest_loss/EUR_fire_forest_loss_2001-24")
+forestLoss4fire.fire = forestLoss4fire$unmask()$gt(1L)
+forestLoss4fire.NonFire = forestLoss4fire$unmask()$eq(1L)
 # RANDOM FOREST for FORESTS FM #####
 ## stack the predictors #####
 predictors <- inputVars$ndviMax$rename("ndviMax")
@@ -320,69 +332,26 @@ for( i in 1:imgcol$size()$getInfo()){
 }
 # outputStack$updatedHansen = canopy_cover$select(0)$unmask()$mask(onlyNonDisturbedPixels)
 
-
+# MACRO Classes -----
 # 91 Urban or suburban development; insufficient wildland fuel ----
-outputStack_scottBurgan$a91 = inputVars$clcplus$eq(1)
-outputStack_macroClass$a91 = inputVars$clcplus$eq(1)
+outputStack_scottBurgan$a91 = clcplus$eq(1)
+outputStack_macroClass$a91 = clcplus$eq(1)
 # 98 water ----
-outputStack_scottBurgan$a98 = inputVars$clcplus$gt(253)$Or(inputVars$clcplus$eq(10))
-outputStack_macroClass$a98 = inputVars$clcplus$gt(253)$Or(inputVars$clcplus$eq(10))
+outputStack_scottBurgan$a98 = clcplus$gt(253)$Or(clcplus$eq(10))
+outputStack_macroClass$a98 = clcplus$gt(253)$Or(clcplus$eq(10))
 
 # 99 barren ----
-outputStack_scottBurgan$a99 = inputVars$clcplus$gt(253)$Or(inputVars$clcplus$gt(7)$And(inputVars$clcplus$lt(10) ))
-outputStack_macroClass$a99 = inputVars$clcplus$gt(253)$Or(inputVars$clcplus$gt(7)$And(inputVars$clcplus$lt(10) ))
+outputStack_scottBurgan$a99 = clcplus$gt(253)$Or(clcplus$gt(7)$And(clcplus$lt(10) ))
+outputStack_macroClass$a99 = clcplus$gt(253)$Or(clcplus$gt(7)$And(clcplus$lt(10) ))
 
 # 92 snow ice ----
-outputStack_scottBurgan$a92 = inputVars$clcplus$eq(11)
-outputStack_macroClass$a92 = inputVars$clcplus$eq(11)
+outputStack_scottBurgan$a92 = clcplus$eq(11)
+outputStack_macroClass$a92 = clcplus$eq(11)
 
-### PERCENTILES NDVI -----
-## I need to know the percentiles of the NDVI that cover the grass/shrub/tree vegetation,
-## in order to estimate a first idea for fuel load (more for grass/shrub as trees are
-## saturated )
-#
-# percentilesGRASS10 = ndviMax$mask( clcplus$eq(6)$Or(clcplus$eq(7)) )$reduceRegions(
-#   reducer= ee$Reducer$percentile( c(5, 10, 25, 50, 75, 90, 95) ),
-#   collection= pilotSites,
-#   scale= 10
-# )$getInfo()
-# percentilesShrub10 = ndviMax$mask( clcplus$eq(5) )$reduceRegions(
-#   reducer= ee$Reducer$percentile( c(5, 10, 25, 50, 75, 90, 95) ),
-#   collection= pilotSites,
-#   scale= 10
-# )$getInfo()
-#
-# load( file="percentilesGRASS.rda")
-# aa <- lapply( names(percentiles) , function(ppn){
-#   pp <- percentiles[[ppn]]
-#   res<- sapply(pp$features, function(x){
-#     gg<-unlist(x$properties[c(4,2,3,5,6,7,8)])
-#   })
-#   rr<-as.data.frame( t(apply(res, 1, function(s){
-#     c(mean(s), sd(s) )
-#   })) )
-#   names(rr) <- c("Mean", "stdDev")
-#   rr$Quantile <- rownames(res)
-#   rr$Type <-ppn
-#   rr
-# })
-# ndviStats <- do.call(rbind, aa)
-# ndviStats$Quantile <- factor(ndviStats$Quantile,
-#                              levels = (sprintf("p%d", c(5,10,25,50,75,90, 95) ) ) )
-# library(ggplot2)
-# ggplot2::ggplot(ndviStats, aes(fill=Type,  color=Type, y=Mean,x=Quantile,
-#                                group=Type)) +
-#   geom_errorbar(aes( ymin = Mean-stdDev, ymax=Mean+stdDev )) +
-#   facet_wrap(vars( Type)) +
-#   geom_line()
-# percentiles <- list(grass10m=percentilesGRASS10, shurb100m=percentilesShrub100,
-#                     shrub10m=percentilesShrub10)
-# save(percentiles,
-#      file="percentiles.rda")
 
-## GRASS  ----
+# GRASS (10)  ----
 grassCLCplus=clcplus$eq(6)$Or(clcplus$eq(7))$byte()
-## MACRO Classes -----
+
 ## Grass only if < 10% has vegetation > 1 m
 outputStack_macroClass$a10 = grassCLCplus$And(
   inputVars$canopy_height$select("b1_min")$eq(0L)$And(
@@ -391,42 +360,133 @@ outputStack_macroClass$a10 = grassCLCplus$And(
 )
 ## to make sure it is grass, we remove pixels that have any crop type canopy cover
 ## grass shrub only if > 10% has vegetation > 1 m
+
+# GRASS/SHRUB (12)
 outputStack_macroClass$a12= grassCLCplus$And(
   inputVars$canopy_height$select("b1_min")$neq(0L)$Or(
     inputVars$canopy_height$select("b1_mean")$gt(1L)
   )
 )
 
-tmp <- outputStack_macroClass$a10$reduceRegions(
-     reducer= ee$Reducer$sum(),
-     collection= pilotSites,
-     scale= 30
-   )
-
-a10a <- tmp$getInfo()
-a10i2 <- lapply(a10$features, function(x){
-  x[["properties"]][["sum"]]
-} )
-
-
-tmp <- outputStack_macroClass$a12$reduceRegions(
-  reducer= ee$Reducer$sum(),
-  collection= pilotSites,
-  scale= 30
-)
-a12 <- tmp$getInfo()
-a12i <- lapply(a12$features, function(x){
-  x[["properties"]][["sum"]]
-} )
-
-##  shrub
+# SHRUB (14)
 outputStack_macroClass$a14=clcplus$eq(5)
-##  tree timber understorey
-outputStack_macroClass$a16=clcplus$eq(6)
-##  tree1 timber litter
-outputStack_macroClass$a18=clcplus$eq(5)
+
+
+plotNDVIgrassShrub <- function(){
+  ## PERCENTILES NDVI -----
+  # I need to know the percentiles of the NDVI that cover the grass/shrub vegetation,
+  # in order to estimate a first idea for fuel load (not trees as trees are
+  # saturated )
+  ndvi <- list()
+  for(i in names(outputStack_macroClass) ){
+    if(!is.element(i, c("a10", "a12", "a14"))){
+      next
+    }
+    message(i)
+    ndvi[[i]] <- inputVars$ndviMax$reduceRegions(
+      reducer=  ee$Reducer$fixedHistogram(-0.5, 1.0, 150),
+      collection= pilotSites,
+      scale= 30
+    )$getInfo()
+
+
+  }
+
+  ndvi2 <- lapply( ndvi, function(ii){
+
+    ff<- lapply( as.list(ii$features) , function(x){
+      mm <- matrix(unlist(x$properties$histogram), ncol=2, byrow = T)
+      df <- data.frame(pilotSite=x$properties$pilot_id , mid=mm[,1]+0.01 , count=mm[,2], density=mm[,2]/sum(mm[,2]))
+      df$cdf <- cumsum(df$density)
+
+      df
+    })
+
+    df <- data.table::rbindlist(ff)
+    df
+  })
+
+  dtf <- data.table::rbindlist(ndvi2, idcol = "Class")
+
+}
+# TREES (16/18/20)
+CLCtrees <- clcplus$eq(2)$Or( clcplus$eq(3) )$Or( clcplus$eq(4) )
+CLCtrees.NonDisturbed <- CLCtrees$And( NonDisturbedPixels )
+CLCtrees.DisturbedPost2018 <- CLCtrees$And( hansenLossPost2018 )
+CLCtrees.Disturbed <- CLCtrees$And( DisturbedPixels )
+
+
+
+NBRdistribution <- function(){
+
+  type <- list(CLCtrees.NonDisturbed, CLCtrees.DisturbedPost2018, CLCtrees.Disturbed)
+  names(type) <- c("Not Disturbed", "Disturbed Post 2018", "Disturbed Post 2000")
+
+  dfs <- lapply( names(type) , function(d){
+
+    ddd <- type[[d]]
+    task <- ee_image_to_drive(
+      image       = ee$ImageCollection(yearly_NBR_collection)$toBands()$clip(pilotSites$first()$geometry()),
+      description = sprintf("yearlyNBR_%s", d),
+      folder      = "expGEE",
+      region      = pilotSites$first()$geometry(),
+      scale       = 30,
+      timePrefix = F,
+      crs         = "EPSG:3035",
+      maxPixels   = 1e13
+    )
+    task$start()
+  #   inputVars$nbrMax$reduceRegions(
+  #   reducer=  ee$Reducer$fixedHistogram(-0.76, 0.5, 100),
+  #   collection= pilotSites,
+  #   scale= 30
+  # )$getInfo()
+
+  })
+  names(dfs) <- names(type)
+  dfs2 <- lapply( dfs, function(ii){
+
+    ff<- lapply( as.list(ii$features) , function(x){
+      mm <- matrix(unlist(x$properties$histogram), ncol=2, byrow = T)
+      df <- data.frame(mid=mm[,1]+0.01 , count=mm[,2], density=mm[,2]/sum(mm[,2]))
+      df$cdf <- cumsum(df$density)
+      df
+      })
+
+    names(ff) <- pilotSitesNames
+    df <- data.table::rbindlist(ff,idcol = "site")
+    df
+  })
+
+  # names(dfs2) <- c("disturbedPost2000", "disturbedPost2018", "nonDisturbed")
+
+  library(dplyr)
+  library(tidyr)
+  library(ggplot2)
+  library(purrr)
+
+  cdf_dfMax <- data.table::rbindlist(dfs2, idcol = "Type")
+  # bind them into one tall table, adding a column telling which group they came from
+  ggplot(cdf_dfMax , aes(x = mid, y = density, color = Type)) +
+    geom_line(linewidth = 1) +
+    facet_wrap(~site, scales = "free_x") +
+    labs(
+      x = "Value (bin midpoint)",
+      y = "CDF",
+      title = "CDF per dNBR across Sites"
+    ) +
+    theme_minimal()
+
+}
+
+
 ##  blowdown - forest with disturbance but with low inverse nbr (high inverse nbr = charred fuel)
-outputStack_macroClass$a20=clcplus$eq(5)
+outputStack_macroClass$a20= CLCtrees
+##  tree timber understorey
+outputStack_macroClass$a16= CLCtrees
+##  tree1 timber litter
+outputStack_macroClass$a18= CLCtrees
+
 
 
 onlyMacroClass <- T

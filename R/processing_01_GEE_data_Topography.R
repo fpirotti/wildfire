@@ -10,6 +10,10 @@ versionFuelModel  = 3
 # 1. Authenticate ----
 drive_auth(email = "cirgeo@unipd.it")
 ee_Initialize(user = 'cirgeo'  )
+proj_3035_30m <- list(
+  crs = "EPSG:3035",
+  crsTransform = c(30, 0, 4321000, 0, -30, 3210000)
+)
 
 img <- rgee::ee$Image("projects/progetto-eu-h2020-cirgeo/assets/eu/dtm_elev_lowestmode_gedi_v03")
 
@@ -23,6 +27,7 @@ pilotSites <- ee$FeatureCollection(
 )
 
 ### Pilot sites list -----------
+
 
 for(reg in c("pilotRegions", "pilotSites")){
   obj <- get(reg)
@@ -39,20 +44,22 @@ for(reg in c("pilotRegions", "pilotSites")){
       inf <- feat$get("ID")$getInfo()
     }
     nm <- paste0(tp, "_", inf, "_topograpy" )
-    geom <- feat$geometry()$buffer(100, 1)
+    geom <- feat$geometry()$buffer(90, 1)
 
     dem <- img$
-      clip(geom)$divide(10L)$toFloat()
+      clip(geom)$divide(10L)$toFloat()$resample('bilinear')
+
 
     task <- ee_image_to_drive(
       image       = dem,
-      description = paste0(nm, "_dem"),
+      description = paste0(nm, "_dem90buf"),
       folder      = paste0(nm),
       region      = geom,
       scale       = 30,
       timePrefix = F,
       formatOptions =   list( cloudOptimized= TRUE),
-      crs         = "EPSG:3035",
+      crs         = proj_3035_30m$crs,
+      crsTransform = proj_3035_30m$crsTransform,
       maxPixels   = 1e13
     )
     task$start()
@@ -68,7 +75,8 @@ for(reg in c("pilotRegions", "pilotSites")){
       scale       = 30,
       timePrefix = F,
       formatOptions =   list( cloudOptimized= TRUE),
-      crs         = "EPSG:3035",
+      crs         = proj_3035_30m$crs,
+      crsTransform = proj_3035_30m$crsTransform,
       maxPixels   = 1e13
     )
     task$start()
@@ -80,7 +88,8 @@ for(reg in c("pilotRegions", "pilotSites")){
       region      = geom,
       scale       = 30,
       timePrefix = F,
-      crs         = "EPSG:3035",
+      crs         = proj_3035_30m$crs,
+      crsTransform = proj_3035_30m$crsTransform,
       formatOptions =   list( cloudOptimized= TRUE),
       maxPixels   = 1e13
     )

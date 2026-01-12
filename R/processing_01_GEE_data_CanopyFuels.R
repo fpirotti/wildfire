@@ -10,7 +10,10 @@ versionFuelModel  = 3
 # 1. Authenticate ----
 drive_auth(email = "cirgeo@unipd.it")
 ee_Initialize(user = 'cirgeo'  )
-
+proj_3035_30m <- list(
+  crs = "EPSG:3035",
+  crsTransform = c(30, 0, 4321000, 0, -30, 3210000)
+)
 
 # FeatureCollections and Images
 pilotRegions <- ee$FeatureCollection(
@@ -405,6 +408,7 @@ filt2 <-  Filter(function(el) !grepl("salix|olea", el), filt2a)
 # Sum of all probability layers
 sumProbs <- ee$ImageCollection(filt2)$sum()
 
+ee$ImageCollection(filt2)$first()$projection()$getInfo()
 ## here I simulate the error propagation with first order taylor expansion
 plotErroPropagation <- function(){
   output <- list()
@@ -679,7 +683,7 @@ for (i2 in seq_len(n) - 1) {
 
   for (b in bbands) {
 
-    img_export <- CBDexport$select(b)
+    img_export <- CBDexport$select(b)$resample('bilinear')
 
     task <- ee_image_to_drive(
       image       = img_export,
@@ -689,7 +693,8 @@ for (i2 in seq_len(n) - 1) {
       timePrefix = F,
       scale       = 30,
       formatOptions =   list( cloudOptimized= TRUE),
-      crs         = "EPSG:3035",
+      crs         = proj_3035_30m$crs,
+      crsTransform = proj_3035_30m$crsTransform,
       maxPixels   = 1e13
     )
 
