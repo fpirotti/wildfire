@@ -151,6 +151,8 @@ tcd <- ee$ImageCollection(
   "projects/progetto-eu-h2020-cirgeo/assets/copernicus/CLMS_TCF_TreeDensity_RASTER_2021"
 )
 
+tcdMosaic <- tcd$mosaic()$setDefaultProjection(tcd$first()$projection())$rename("canopyCover")
+
 
 nuts <- ee$FeatureCollection(
   "projects/progetto-eu-h2020-cirgeo/assets/NUTS_RG_01M_2024_4326"
@@ -387,7 +389,8 @@ namesAndDesc <- list(
   # canopyBulkDensityCCI          = "Canopy Bulk Density (CBD) is the amount of canopy biomass over canopy volume (kg/m3)",
   canopyBulkDensity          = "Canopy Bulk Density (CBD) is the amount of canopy biomass over canopy volume (kg/m3)",
   # canopyBulkDensitySigmaCCI      = "Estimation of error (sigma) from propagation of errors coming from the models and input variables (i.e. canopy heights, canopy base height, diameter and canopy biomass).",
-  canopyBulkDensitySigma      = "Estimation of error (sigma) from propagation of errors coming from the models and input variables (i.e. canopy heights, canopy base height, diameter and canopy biomass)."
+  canopyBulkDensitySigma      = "Estimation of error (sigma) from propagation of errors coming from the models and input variables (i.e. canopy heights, canopy base height, diameter and canopy biomass).",
+  canopyCover = "Fraction between 0 and 100 of canopies from trees, from copernicus"
   # canopyBiomassFraction      = "Fraction (from 0 to 1) of canopy i.e. leaves with respect to total AGB (leaves+branches+stem). It was calculated with a species-specific model over 16 species.",
   # canopyBiomassFractionSigma  = "Propagated error to the canopy biomass fraction value from the model used for estimation.",
   # BiomassRFfromCCI = "Mg per ha original biomass from RF trained on  CCI 2020",
@@ -611,7 +614,8 @@ canopyBulkDensfunction <- function(element) {
       # biomassOfCanopyFraction_sd$float(),
       canopyBulkDensity$float()$focalMedian(),
       # canopyBulkDensity2$float(),
-      canopyBulkDensity_sd$float()
+      canopyBulkDensity_sd$float(),
+      tcdMosaic$float()
       # canopyBulkDensity_sd2$float(),
       # ff$float(),
       # ff_sd$float(),
@@ -648,57 +652,68 @@ CBD <- mapped$
 ### Pilot sites list -----------
 # ps_list <- pilotSites$toList(pilotSites$size())
 # n <- pilotSites$size()$getInfo()
-ps_list <- pilotRegions$toList(pilotRegions$size())
-n <- pilotRegions$size()$getInfo()
+# ps_list <- pilotRegions$toList(pilotRegions$size())
+# n <- pilotRegions$size()$getInfo()
 
 # Band names
 bbands <- names(namesAndDesc)
 
-# --- Loop over sites & bands ---
-for (i2 in seq_len(n) - 1) {
 
-  feat <- ee$Feature(ps_list$get(i2))
-  # if(nm!="AT-IT") next
-  nm <- feat$get("pilot_id")$getInfo()
-  if(is.null(nm)){
-    nm <- feat$get("ID")$getInfo()
-  }
-  print(nm)
-  # geom <- feat$geometry()
-  geom <- feat$geometry()$buffer(100, 1)
-  CBDexport <- CBD$unmask()$clip(geom)$toFloat()
 
-  # task <- ee_image_to_drive(
-  #   image       = CBDexport,
-  #   description = paste0("pilotSites30m_", nm ),
-  #   folder      = "GEE_exportAll",
-  #   region      = geom,
-  #   timePrefix = F,
-  #   scale       = 30,
-  #   crs         = "EPSG:3035",
-  #   maxPixels   = 1e13
-  # )
-  # task$start()
-  # break
+for(reg in c("pilotRegions", "pilotSites")){
 
-  for (b in bbands) {
+  obj <- get(reg)
+  ps_list <- obj$toList(obj$size())
+  n <- obj$size()$getInfo()
+  tp = reg
+  # --- Loop over sites & bands ---
+  for (i2 in seq_len(n) - 1) {
 
-    img_export <- CBDexport$select(b)$resample('bilinear')
+    feat <- ee$Feature(ps_list$get(i2))
+    # if(nm!="AT-IT") next
+    inf <- feat$get("pilot_id")$getInfo()
+    if(is.null(inf)){
+      inf <- feat$get("ID")$getInfo()
+    }
 
-    task <- ee_image_to_drive(
-      image       = img_export,
-      description = paste0("pilotRegions_", nm, "_", b),
-      folder      = "GEE_export",
-      region      = geom,
-      timePrefix = F,
-      scale       = 30,
-      formatOptions =   list( cloudOptimized= TRUE),
-      crs         = proj_3035_30m$crs,
-      crsTransform = proj_3035_30m$crsTransform,
-      maxPixels   = 1e13
-    )
+    nm <- paste0(tp, "_", inf, "_canopy" )
+    geom <- feat$geometry()$buffer(90, 1)
+    CBDexport <- CBD$unmask()$clip(geom)$toFloat()
 
-    task$start()
+    # task <- ee_image_to_drive(
+    #   image       = CBDexport,
+    #   description = paste0("pilotSites30m_", nm ),
+    #   folder      = "GEE_exportAll",
+    #   region      = geom,
+    #   timePrefix = F,
+    #   scale       = 30,
+    #   crs         = "EPSG:3035",
+    #   maxPixels   = 1e13
+    # )
+    # task$start()
+    # break
 
+    for (b in bbands) {
+
+      img_export <- CBDexport$select(b)$resample('bilinear')
+
+      message(nm)
+      message(b)
+      task <- ee_image_to_drive(
+        image       = img_export,
+        description = paste0(nm, "_", b),
+        folder      = "GEE_export",
+        region      = geom,
+        timePrefix = F,
+        scale       = 30,
+        formatOptions =   list( cloudOptimized= TRUE),
+        crs         = proj_3035_30m$crs,
+        crsTransform = proj_3035_30m$crsTransform,
+        maxPixels   = 1e13
+      )
+
+      task$start()
+
+    }
   }
 }
