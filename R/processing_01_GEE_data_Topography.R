@@ -43,7 +43,7 @@ for(reg in c("pilotRegions", "pilotSites")){
     if(is.null(inf)){
       inf <- feat$get("ID")$getInfo()
     }
-    nm <- paste0(tp, "_", inf, "_topograpy" )
+    nm <- paste0(tp, "_", inf, "_topography" )
     geom <- feat$geometry()$buffer(90, 1)
 
     dem <- img$
@@ -52,7 +52,7 @@ for(reg in c("pilotRegions", "pilotSites")){
 
     task <- ee_image_to_drive(
       image       = dem,
-      description = paste0(nm, "_dem90buf"),
+      description = paste0(nm, "_dem"),
       folder      = paste0(nm),
       region      = geom,
       scale       = 30,
