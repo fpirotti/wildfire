@@ -65,7 +65,7 @@ cropmapHighVeg = cropmap$gt(100)$And(cropmap$lt(200))
 cropmapLowVeg = cropmapHighVeg$Not()
 # MACRO Classes -----
 # 91 Urban or suburban development; insufficient wildland fuel ----
-outputStack_scottBurgan$a91 = clcplus$eq(1)$multiply(0.8) ## so if there are other covers these take precendence (see bare ground)
+outputStack_scottBurgan$a91 = clcplus$eq(1)
 outputStack_macroClass$a91 = clcplus$eq(1)
 outputStack_FBP$a101= clcplus$eq(1)
 
@@ -94,8 +94,6 @@ outputStack_macroClass$a10 = grassCLCplus$And(
     canopy_height_mean$lte(1L)
   )
 )
-# outputStack_scottBurgan$a100 = outputStack_macroClass$a10
-
 ## to make sure it is grass, we remove pixels that have any crop type canopy cover
 ## grass shrub only if > 10% has vegetation > 1 m
 
@@ -105,11 +103,9 @@ outputStack_macroClass$a12= grassCLCplus$And(
     canopy_height_mean$gt(1L)
   )
 )
-# outputStack_scottBurgan$a120 = outputStack_macroClass$a12
 
 # SHRUB (14)
 outputStack_macroClass$a14=clcplus$eq(5)
- # outputStack_scottBurgan$a140 = outputStack_macroClass$a14
 
 # TREES (16/18/20)
 ## CANOPY LOSS MAP ----
@@ -142,17 +138,13 @@ CLCtrees.Disturbed <- CLCtrees$And( DisturbedPixels )
 
 ##  blowdown - forest with disturbance but with low inverse nbr (high inverse nbr = charred fuel)
 outputStack_macroClass$a20 = CLCtrees$And( forestLoss4fire.NonFire )
-# outputStack_scottBurgan$a200 = outputStack_macroClass$a20
 
 ##  tree timber understorey
  outputStack_macroClass$a16= CLCtrees$And( CLCtrees.DisturbedPost2018.notFIRE$Not() )
 # ##  tree1 timber litter
  outputStack_macroClass$a18= CLCtrees$And( CLCtrees.DisturbedPost2018.notFIRE$Not() )
 
- # outputStack_scottBurgan$a160 = outputStack_macroClass$a16
 
-
- # outputStack_scottBurgan$a200 = outputStack_macroClass$a20
 
 onlyMacroClass <- F
 if(!onlyMacroClass){
@@ -161,7 +153,7 @@ if(!onlyMacroClass){
   outputStack_scottBurgan$a101=outputStack_macroClass$a10$multiply( ndviMax$lt(ndviThresholds[[1]]))
   # GRASS LOW load ----
   outputStack_scottBurgan$a102=outputStack_macroClass$a10$multiply(ndviMax$gte(ndviThresholds[[1]])$And(ndviMax$lt(ndviThresholds[[2]]))) #$multiply(aridityIndex$lte(aridityThreshold))
-  # GRASS LOW load also agricultural arable land, which takes precedence (multiply x 2 means that it will have 2x the weight with respect to the 0-1 values) ----
+  # GRASS LOW load also agricultural arable land ----
   outputStack_scottBurgan$a102= outputStack_scottBurgan$a102$add(cropmapLowVeg$unmask()$multiply(2L)) # this will become 3 were already 102+arable land, or 2 in arable land but not 102, giving cropType precedency over others
   # GRASS MOD load ----
   outputStack_scottBurgan$a104 = outputStack_macroClass$a10$And( ndviMax$gte( ndviThresholds[[2]] ) )
@@ -179,41 +171,21 @@ if(!onlyMacroClass){
   ## instead some organic burnable material - so if it falls in clc class 1 but has some type of past (Hansen) or present (2023)
   ## tree height, we then assign class 121 or 122 depending on the max ndvi recorded
   outputStack_scottBurgan$a121  = outputStack_macroClass$a12$multiply( ndviMax$lt( ndviThresholds[[2]] ) )
-
-  canopyHeightSG <-  canopy_height_mean$gt(0L)$And(canopy_height_mean$lte(2L) )
-
-  outputStack_scottBurgan$a121  = outputStack_scottBurgan$a121$add(cropmapHighVeg$unmask()$multiply(2L))$Or(
-    clcplus$eq(1)$And(  canopyHeightSG   )$multiply( ndviMax$lt( ndviThresholds[[2]] ) )
+  outputStack_scottBurgan$a121  = outputStack_scottBurgan$a121$add(cropmapHighVeg$multiply(2L))$Or(
+    clcplus$eq(1)$And(forestLoss4fire$unmask()$Or( canopy_cover$gt(5) )$Or( canopy_height_mean$gt(1L) ) )$multiply( ndviMax$lt( ndviThresholds[[2]] ) )
   ) # this will become 3 were already 102+arable land, or 2 in arable land but not 102, giving cropType precedency over others
   # outputStack_scottBurgan$a121  = clcplus$eq(1)
   outputStack_scottBurgan$a122  = outputStack_macroClass$a12$multiply( ndviMax$gte( ndviThresholds[[2]] ) )$Or(
-    clcplus$eq(1)$And( canopyHeightSG )$multiply( ndviMax$gte( ndviThresholds[[2]] ) )
-  )$Or(
-    hansenLossYear$unmask()$neq(0L)$And(hansenLossYear$unmask()$gt(20L))
+    clcplus$eq(1)$And(forestLoss4fire$unmask()$Or( canopy_cover$gt(5) )$Or( canopy_height_mean$gt(1L) ) )$multiply( ndviMax$gte( ndviThresholds[[2]] ) )
   )
-
-  # outputStack_scottBurgan$a991 =  clcplus$eq(1)$And(forestLoss4fire$unmask()$Or( canopy_cover$gt(5) )$Or( canopy_height_mean$gt(1L) ) )$multiply( ndviMax$lt( ndviThresholds[[2]] ) )
-  # outputStack_scottBurgan$a992 =  clcplus$eq(1)$And(forestLoss4fire$unmask()$Or( canopy_cover$gt(5) )$Or( canopy_height_mean$gt(1L) ) )$multiply( ndviMax$gte( ndviThresholds[[2]] ) )
-  #
-
 
 
 
   #SHRUB  ----
   #SHRUB low load ----
   ## 141 dry ----
-  canopyHeightSH <-  canopy_height_mean$gt(2L)
-  outputStack_scottBurgan$a142  = outputStack_macroClass$a14$multiply( ndviMax$lt( ndviThresholds[[2]] ) )$Or(
-    clcplus$eq(1)$And(forestLoss4fire$unmask()$And( canopyHeightSH ) )$multiply( ndviMax$lt( ndviThresholds[[2]] ) )
-  )$Or(
-    hansenLossYear$unmask()$gt(1L)$And(hansenLossYear$unmask()$lte(20L))
-  )
-
-
-
-  outputStack_scottBurgan$a145  = outputStack_macroClass$a14$multiply( ndviMax$gte( ndviThresholds[[2]] ) )$Or(
-    clcplus$eq(1)$And(forestLoss4fire$unmask()$And( canopyHeightSH ) )$multiply( ndviMax$gte( ndviThresholds[[2]] ) )
-  )
+  outputStack_scottBurgan$a142  = outputStack_macroClass$a14$multiply( ndviMax$lt( ndviThresholds[[2]] ) )
+  outputStack_scottBurgan$a145  = outputStack_macroClass$a14$multiply( ndviMax$gte( ndviThresholds[[2]] ) )
 
   ########## SLASH BLOWDOWN USING HANSEN LOSS -------
   ##  depending on canopy density and tree height the load is inferred
@@ -323,7 +295,7 @@ for(reg in c("pilotRegions")){
 
     nm <- paste0(tp, "_", inf, "_FuelModel" )
     nmConf <- paste0(tp, "_", inf, "_FuelModelConfidence" )
-    geom <- feat$geometry()#$buffer(90, 1)
+    geom <- feat$geometry()$buffer(90, 1)
 
     idOut = paste0( nm,'V', versionFuelModel)
     assetidOutStack <- paste0(fuelModelPredictedStackfinal,idOut)
@@ -334,7 +306,7 @@ for(reg in c("pilotRegions")){
     tryCatch({
       ee$data$deleteAsset(assetidOutStack)
     }, error=function(e){
-      message("did NOT delete ", assetidOutStack)
+      message("did not delete ", assetidOutStack)
     })
 
     ## EXPORT STACK of fuel models with probability from 0 to 100 ---------
@@ -356,17 +328,17 @@ for(reg in c("pilotRegions")){
     )$start()
 
 
-    # message("Try to delete ", assetidOutFinal)
+    message("Try to delete ", assetidOutFinal)
     tryCatch({
       ee$data$deleteAsset(assetidOutFinal)
     }, error=function(e){
       message("did not delete ", assetidOutFinal)
     })
     ## EXPORT Fuel model with probability ---------
-    img_export2 <- ScottBurgan$clip(geom)
+    img_export <- ScottBurgan$clip(geom)
     message(nm)
     task <- ee_image_to_asset(
-      image       = img_export2$toByte(),
+      image       = img_export$toByte(),
       description =  basename(assetidOutFinal) ,
       assetId= assetidOutFinal,
       # folder      = "WildfireFM",
@@ -398,7 +370,7 @@ for(reg in c("pilotRegions")){
 
 ## FINAL EXPORT -----
 
-valRasters <- ee$ImageCollection("projects/progetto-eu-h2020-cirgeo/assets/wildfire/validationRasters")
+
 
 for(reg in c("pilotRegions")){
   obj <- get(reg)
@@ -418,7 +390,7 @@ for(reg in c("pilotRegions")){
     nm <- paste0(tp, "_", inf, "_FuelModel" )
     nm2 <- paste0(tp, "_", inf, "_FuelModelStack" )
     nmConf <- paste0(tp, "_", inf, "_FuelModelConfidence" )
-    geom <- feat$geometry()
+    geom <- feat$geometry()$buffer(90, 1)
 
     idOut = paste0( nm,'V', versionFuelModel)
     assetidOutStack <- paste0(fuelModelPredictedStackfinal,idOut)
@@ -434,6 +406,7 @@ for(reg in c("pilotRegions")){
       folder      = "WildfireFM",
       region      = geom,
       timePrefix = F,
+      scale       = 30,
       formatOptions =   list( cloudOptimized= TRUE),
       crs         = proj_3035_30m$crs,
       crsTransform = proj_3035_30m$crsTransform,
@@ -441,7 +414,7 @@ for(reg in c("pilotRegions")){
     )$start()
 
     ## EXPORT Fuel model with probability ---------
-    # img_export2 <- ScottBurgan$clip(geom)
+    img_export <- ScottBurgan$clip(geom)
     message(nm)
     task <- ee_image_to_drive(
       image       = ee$Image(assetidOutFinal),
@@ -449,31 +422,12 @@ for(reg in c("pilotRegions")){
       folder      = "WildfireFM",
       region      = geom,
       timePrefix = F,
+      scale       = 30,
       formatOptions =   list( cloudOptimized= TRUE),
       crs         = proj_3035_30m$crs,
       crsTransform = proj_3035_30m$crsTransform,
       maxPixels   = 1e13
     )$start()
-
-
-
-
-    ## EXPORT Fuel model with probability ---------
-    confImageClippedT <- ScottBurgan$select("prob")$clip(geom)
-    confImageClipped <- confImageClippedT$clamp(0,100)
-    message(nmConf)
-    task <- ee_image_to_drive(
-      image       = ee$Image(confImageClipped)$multiply(clcConfidence)$divide(100L)$toByte(),
-      description =  nmConf ,
-      folder      = "WildfireFM",
-      region      = geom,
-      timePrefix = F,
-      formatOptions =   list( cloudOptimized= TRUE),
-      crs         = proj_3035_30m$crs,
-      crsTransform = proj_3035_30m$crsTransform,
-      maxPixels   = 1e13
-    )$start()
-
 
   }
 }

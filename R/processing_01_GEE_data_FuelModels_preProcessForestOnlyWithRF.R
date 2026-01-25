@@ -11,16 +11,44 @@ versionFuelModel  = 3
 drive_auth(email = "cirgeo@unipd.it")
 ee_Initialize(user = 'cirgeo'  )
 ## only forest points ----
-pointsTest <- ee$FeatureCollection("projects/progetto-eu-h2020-cirgeo/assets/wildfire/ptsCzechGlobeDE_CZ")$filter(ee$Filter$gt('class', 160))
-points <- ee$FeatureCollection("projects/progetto-eu-h2020-cirgeo/assets/wildfire/ptsCzechGlobeAT_CZ")$filter(ee$Filter$gt('class', 160))
-points2 <- ee$FeatureCollection("projects/progetto-eu-h2020-cirgeo/assets/wildfire/ptsBokuAT_CZ")$filter(ee$Filter$gt('class', 160))
-points3 <- ee$FeatureCollection("projects/progetto-eu-h2020-cirgeo/assets/wildfire/ptsBokuAT_IT")$filter(ee$Filter$gt('class', 160))
+cast_to_source <- function(feature) {
+  ff = feature$set("class", ee$Number(feature$get("class"))$toInt() )
+  return(ff)
+  # return(ff$set("source", ee$String(source)$cat(ee$String(
+  #   ee$Number(feature$get("class"))$toInt()
+  #   ) ) ))
+}
+source <- "CzGl.DE_CZ"
+points0 <- ee$FeatureCollection("projects/progetto-eu-h2020-cirgeo/assets/wildfire/ptsCzechGlobeDE_CZ")$filter(ee$Filter$gt('class', 160))#$map(cast_to_source )
+source <- "CzGl.AT_CZ"
+points1 <- ee$FeatureCollection("projects/progetto-eu-h2020-cirgeo/assets/wildfire/ptsCzechGlobeAT_CZ")$filter(ee$Filter$gt('class', 160))#$map(cast_to_source )
+source <- "Boku.AT_CZ"
+points2 <- ee$FeatureCollection("projects/progetto-eu-h2020-cirgeo/assets/wildfire/ptsBokuAT_CZ")$filter(ee$Filter$gt('class', 160))#$map(cast_to_source )
+source <- "Boku.AT_IT"
+points3 <- ee$FeatureCollection("projects/progetto-eu-h2020-cirgeo/assets/wildfire/ptsBokuAT_IT")$filter(ee$Filter$gt('class', 160))#$map(cast_to_source )
 
-points2train <- points$merge(points2)$merge(points3)
+points2train <- points0$merge(points1)$merge(points2)$merge(points3)
+points2trainHist <- points2train$aggregate_histogram('source')$getInfo();
+# points2trainHist2 <- points2train$aggregate_histogram('class')$getInfo();
+
+ll<-lapply(names(points2trainHist), function(x){
+ list(source=substr(x, 1, 10), class=substr(x, 11, 14), val=points2trainHist[[x]] )
+}) |> data.table::rbindlist() |>   tidyr::pivot_wider(
+  names_from  = c(source), # Can accommodate more variables, if needed.
+  values_from = c( val)
+) |> janitor::adorn_totals(where = c("row", "col"))
+
+writexl::write_xlsx(ll, "training.xlsx")
 
 withRand = points2train$randomColumn('rand');
-train = withRand$filter(ee$Filter$lt('rand', 0.4));
-valid = withRand$filter(ee$Filter$gt('rand', 0.4));
+filter_or <- ee$Filter$Or(
+  ee$Filter$eq("class", 161),
+  ee$Filter$eq("class", 164),
+  ee$Filter$eq("class", 182),
+  ee$Filter$eq("class", 185)
+)
+train = withRand$filter(ee$Filter$lte('rand', 0.2))$merge( points2train$filter(ee$Filter(filter_or)) )$select("class")
+valid = withRand$filter(ee$Filter$gt('rand', 0.4))$select("class");
 
 ### setting scale ----
 # proj3035_30m = ee$Projection('EPSG:3035')$atScale(scale);
@@ -43,7 +71,7 @@ maskS2clouds <- function(image) {
   # e.g. if B4 is 0 then NDVI will always be 1
   red = image$select('B4');
   nir = image$select('B8');
-  cloudShadowMask = red$gt(100)$And(nir$gt(100))$And(scl$gt(3))$And(scl$lt(6));
+  cloudShadowMask = red$gt(100)$And(nir$gt(100))$And(scl$gt(3))$And(scl$lt(7));
   return(image$updateMask(cloudShadowMask)$copyProperties(image, list('system:time_start') ))
 }
 
@@ -97,15 +125,17 @@ addNBR <-function(image) {
 s2 = ee$ImageCollection("COPERNICUS/S2_SR_HARMONIZED")$filterDate(startDate, endDate)$filter(ee$Filter$calendarRange(7L, 9L, 'month'))$filterBounds(bounds)$filter(ee$Filter$lt('CLOUDY_PIXEL_PERCENTAGE', 30))$map(maskS2clouds);
 
 ##  NDVI -----
-inputVars$ndviMax = s2$map(addNDVI)$qualityMosaic("ndvi")$rename("ndviMax")
-inputVars$ndviMedian = s2$map(addNDVI)$median()$rename("ndviMedian")
+inputVars$ndviMax = s2$map(addNDVI)$qualityMosaic("ndvi")$rename("ndviMax")$reproject( s2$first()$select("B8")$projection() )
+inputVars$ndviMedian = s2$map(addNDVI)$median()$rename("ndviMedian")$reproject( s2$first()$select("B8")$projection() )
 
 ##  NBR  -----
-inputVars$nbrMin = s2$map(addNBR)$min()$rename("nbrMin")
-inputVars$nbrMedian = s2$map(addNBR)$median()$rename("nbrMedian")
+inputVars$nbrMin = s2$map(addNBR)$min()$rename("nbrMin")$reproject( s2$first()$select("B8")$projection() )
+inputVars$nbrMedian = s2$map(addNBR)$median()$rename("nbrMedian")$reproject( s2$first()$select("B8")$projection() )
+
+
 
 ## DEM -----
-inputVars$dem =  ee$Image("projects/progetto-eu-h2020-cirgeo/assets/eu/dtm_elev_lowestmode_gedi_v03");
+inputVars$dem =  ee$Image("projects/progetto-eu-h2020-cirgeo/assets/eu/dtm_elev_lowestmode_gedi_v03")$toFloat()$divide(10L);
 
 terrain = ee$Terrain$products(inputVars$dem);
 inputVars$slope = terrain$select('slope');
@@ -135,11 +165,42 @@ canopy_height =  ee$ImageCollection(ch30m)$mosaic()$setDefaultProjection(ee$Imag
 
 inputVars$canopy_height = canopy_height
 
+## ALOS -----
+alosC= ee$ImageCollection("JAXA/ALOS/PALSAR/YEARLY/SAR_EPOCH")$
+  filterDate("2022-01-01", "2026-01-01")$
+  select(c("HH", "HV"))
+
+alos_db = alosC$
+          median()$
+          reproject( alosC$first()$projection() )$
+          log10()$multiply(10)$subtract(83)
+
+inputVars$alos_hh <- alos_db$select("HH")$rename("ALOS_HH")
+inputVars$alos_hv <- alos_db$select("HV")$rename("ALOS_HV")
+inputVars$alos_ratio <- alos_db$select("HV")$divide(alos_db$select("HH"))$rename("ALOS_L_ratio")
+
+## SENTINEL 1 -------
+s1C <- ee$ImageCollection("COPERNICUS/S1_GRD")$
+  filterDate(startDate, endDate)$filter(ee$Filter$calendarRange(7L, 9L, 'month'))$
+  filterBounds(bounds)$
+  filter(ee$Filter$listContains('transmitterReceiverPolarisation', 'VV'))$
+  filter(ee$Filter$listContains('transmitterReceiverPolarisation', 'VH'))$
+  select(c("VV","VH"))
+
+s1 <- s1C$median()$
+      reproject( s1C$first()$projection() )
+
+
+inputVars$s1_vv <- s1$select("VV")$rename("S1_VV")
+inputVars$s1_vh <- s1$select("VH")$rename("S1_VH")
+inputVars$s1_ratio <- s1$select("VH")$divide(s1$select("VV") )$rename("S1_C_ratio")
+inputVars$s1_alos_cross_diff <- alos_db$select("HV")$subtract(s1$select("VH"))$rename("ALOS_L_minus_S1_C_crossPol_dB")
 
 ## CREATE PREDICTORS STACK  -----------
-assetRootPred = 'projects/progetto-eu-h2020-cirgeo/assets/wildfire/fuelModelPredictors/';
+assetRootPred  = 'projects/progetto-eu-h2020-cirgeo/assets/wildfire/fuelModelPredictors/';
+assetRootPred2 = 'projects/progetto-eu-h2020-cirgeo/assets/wildfire/fuelModelPredictorsStack/';
 assetRootClassified = 'projects/progetto-eu-h2020-cirgeo/assets/wildfire/fuelModelPredictedRF/';
-assetRootClassified2 = 'projects/progetto-eu-h2020-cirgeo/assets/wildfire/fuelModelPredictedRF2/';
+assetRootClassified2 = 'projects/progetto-eu-h2020-cirgeo/assets/wildfire/predictedForestStack/';
 
 # RANDOM FOREST for FORESTS FM #####
 doRandomForest <- function(forceRecreation = T){
@@ -183,20 +244,33 @@ doRandomForest <- function(forceRecreation = T){
       id = paste0(idf,'_', reg, "_V", versionFuelModel)
       message(id)
       assetid <- paste0(assetRootPred,id)
+      assetid2 <- paste0(assetRootPred2,id)
 
-      if( is.element(assetid, tb$name)  ) {
-        if(forceRecreation)  {
-          ee$data$deleteAsset(assetid)
-        } else {
-          message(assetid, " exists, skipping")
+      # if( is.element(assetid, tb$name)  ) {
+      #   if(forceRecreation)  {
+      #     ee$data$deleteAsset(assetid)
+      #   } else {
+      #     message(assetid, " exists, skipping")
+      #     next
+      #     }
+      # }
+
+      predictors <-  ee$Image(assetid)$unmask()
+      for( k in names(inputVars) ){
+        if(!grepl("^s1_|^alos_", k)) {
           next
-          }
+        }
+        message(k)
+        img1 = inputVars[[k]]
+        newBnames <- gsub("b1", k, img1$bandNames()$getInfo() )
+        message("adding ", newBnames)
+        predictors <- predictors$addBands(img1$rename(newBnames)$resample('bilinear') ) # nouse =  inputVars[[k]]$select(0)$projection()
       }
 
      ee_image_to_asset(
         image=  predictors$clip(gg)$float(),
         description= id,
-        assetId= assetid,
+        assetId= assetid2,
         region= gg,
         crs         = proj_3035_10m$crs,
         crsTransform = proj_3035_10m$crsTransform,
@@ -210,22 +284,41 @@ doRandomForest <- function(forceRecreation = T){
 
   ## TRAIN -----
   ### RE READ PREDICTORS ?? -----
-  predictorsC <-  ee$ImageCollection(file.path(dirname(assetRootPred), basename(assetRootPred)))
-  predictors <- predictorsC$mosaic()$setDefaultProjection( predictorsC$first()$projection() )
+  predictorsC <-  ee$ImageCollection(file.path(dirname(assetRootPred2), basename(assetRootPred2)))
+  predictors <- predictorsC$mosaic()$setDefaultProjection( predictorsC$first()$projection() )$unmask()
+  bands = predictors$bandNames()
   ## training data from CzGlobe and BOKU -----
-  trainPreds = predictors$sampleRegions(
-    collection= train,
-    properties= list('class')
-  );
+  # trainPreds = predictors$sampleRegions(
+  #   collection= train,
+  #   properties= list('class'),
+  #   geometries = TRUE
+  # );
+  #
+  # ee$data$deleteAsset("projects/progetto-eu-h2020-cirgeo/assets/wildfire/fuelModelTrainPointsWithPredictors")
+  # ee_table_to_asset(
+  #   collection = trainPreds,
+  #   description = "Export_Training_Points_ScottBurgan",
+  #   assetId = "projects/progetto-eu-h2020-cirgeo/assets/wildfire/fuelModelTrainPointsWithPredictors"
+  # )$start()
+  trainPreds <- ee$FeatureCollection("projects/progetto-eu-h2020-cirgeo/assets/wildfire/fuelModelTrainPointsWithPredictors")
   ## train -----
   classifier = ee$Classifier$smileRandomForest(
-    numberOfTrees = 250
+    numberOfTrees = 150
   )$setOutputMode('MULTIPROBABILITY')$train(
     features = trainPreds,
     classProperty = 'class',
     inputProperties = bands
   );
 
+
+
+  # classValuesH = train$aggregate_histogram('class')$getInfo();
+  # trainPreds$first()$getInfo()
+  # barplot(  unlist(classValuesH), names=names(classValuesH) )
+
+  classValues = trainPreds$aggregate_array('class')$distinct()$sort();
+  classValuesR <- classValues$getInfo()
+  classValuesRbn <- sprintf("a%d", classValuesR)
 
   ## CREATE CLASSIFIED IMAGES   -----------
   list = ee$data$listAssets(assetRootClassified);
@@ -260,85 +353,32 @@ doRandomForest <- function(forceRecreation = T){
       idOut = paste0(idf,'_', reg,'_predictedV', versionFuelModel)
       message(idOut)
 
-      assetidOut <- paste0(assetRootClassified,idOut)
-      # assetidOut2 <- paste0(assetRootClassified2,idOut)
-      ## random forest classes -----
+      assetidOut2 <- paste0(assetRootClassified2,idOut)
 
-      # probabilityImage =  ee$Image(assetidOut)$arrayFlatten(list(as.list(classValuesRbn))   );
-
-      if( is.element(assetidOut, tb$name) ) ee$data$deleteAsset(assetidOut)
-      ee_image_to_asset(
-        image=predictors$mask(clcplus$gt(1)$And(clcplus$lt(5)) )$clip(gg)$classify(classifier)$clip(gg),
-          # probabilityImage$mask(clcplus$gt(1)$And(clcplus$lt(5)) )$clip(gg),
-        #predictors$mask(clcplus$gt(1)$And(clcplus$lt(5)) )$clip(gg)$classify(classifier),
-        description= idOut,
-        assetId= assetidOut,
-        region= gg,
-        scale= 10,
-        crs         = proj_3035_30m$crs,
-        crsTransform = proj_3035_30m$crsTransform,
-        maxPixels= 1e13
-      )$start()
-    }
-  }
-
-  list = ee$data$listAssets(assetRootClassified2);
-  tb <- tryCatch({
-    data.frame(name=sapply(list$assets, function(x){x[["name"]]}))
-  }, error = function(e){
-    as.data.frame(list$assets)
-  } )
-
-
-  classValues = train$aggregate_array('class')$distinct()$sort();
-  classValuesR <- classValues$getInfo()
-  classValuesRbn <- sprintf("c%d", classValuesR)
-
-  for(reg in c("pilotRegions")){
-    obj <- get(reg)
-    ps_list <- obj$toList(obj$size())
-    n <- obj$size()$getInfo()
-    tp = reg
-    # --- Loop over sites   ---
-    for (i2 in seq_len(n) - 1) {
-      feat <- ee$Feature(ps_list$get(i2))
-      # if(nm!="AT-IT") next
-      inf <- feat$get("pilot_id")$getInfo()
-      if(is.null(inf)){
-        inf <- feat$get("ID")$getInfo()
+      if( is.element(assetidOut2, tb$name)  ) {
+         if(forceRecreation)  {
+           ee$data$deleteAsset(assetidOut2)
+         } else {
+           message(assetidOut2, " exists, skipping")
+           next
+         }
       }
 
-      feature = feat
-      gg = feature$geometry();
-      idf = inf ;
-
-      id = paste0(idf,'_', reg, "_V", versionFuelModel)
-      message(id)
-      assetid <- paste0(assetRootPred,id)
-
-      idOut = paste0(idf,'_', reg,'_predictedV', versionFuelModel)
-      message(idOut)
-
-      assetidOut <- paste0(assetRootClassified,idOut)
-      assetidOut2 <- paste0(assetRootClassified2,idOut)
-      ## random forest classes -----
-      probabilityImage =  ee$Image(assetidOut)$arrayFlatten(list(as.list(classValuesRbn))   );
-
-      if( is.element(assetidOut2, tb$name) ) ee$data$deleteAsset(assetidOut2)
+       image_to_classify <- predictors$clip(gg)$ updateMask(clcplus$gt(1)$And(clcplus$lt(5)))
+       final_classification <- image_to_classify$classify(classifier)
 
       ee_image_to_asset(
-        image=  probabilityImage$mask(clcplus$gt(1)$And(clcplus$lt(5)) )$clip(gg),
+        image= final_classification$arrayFlatten(list(as.list(classValuesRbn)) )$clip(gg),
         description= idOut,
         assetId= assetidOut2,
-        region= gg,
-        scale= 10,
-        crs         = proj_3035_30m$crs,
-        # crsTransform = proj_3035_30m$crsTransform,
+        region= gg$bounds(),
+        # scale=1000L,
+        crs         = proj_3035_10m$crs,
+        crsTransform = proj_3035_10m$crsTransform,
         maxPixels= 1e13
       )$start()
     }
   }
-
 
 
 
