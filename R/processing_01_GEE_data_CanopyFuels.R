@@ -30,7 +30,11 @@ canopy_height_coll <- ee$ImageCollection(
 canopy_height30m3035 <- ee$Image(
   'projects/progetto-eu-h2020-cirgeo/assets/wildfire/canopyHeightFromMeta30m/153'
 );
-canopy_height <- canopy_height_coll$select(0)$mosaic()$setDefaultProjection(canopy_height_coll$first()$projection());
+canopy_height_meta <- canopy_height_coll$select(0)$mosaic()$setDefaultProjection(canopy_height_coll$first()$projection());
+canopy_height <- ee$Image('users/nlang/ETH_GlobalCanopyHeight_2020_10m_v1')
+# canopy_height$bandNames()$getInfo()
+canopy_height <- canopy_height$rename(canopy_height_meta$bandNames())
+
 agbcoll <- ee$ImageCollection("projects/sat-io/open-datasets/ESA/ESA_CCI_AGB")
 agbOriginalTrain <- agbcoll$filterDate("2019-01-01", "2021-01-01")$first()$select("AGB")
 
@@ -55,6 +59,9 @@ tb <- tryCatch({
 }, error = function(e){
   as.data.frame(list$assets)
 } )
+
+# ee$data$deleteAsset("projects/progetto-eu-h2020-cirgeo/assets/wildfire/RF_classifier_toBiomass")
+
 if(!any(grepl("RF_classifier_toBiomass", tb$name)) ){
 
   l8 <- ee$ImageCollection("LANDSAT/LC08/C02/T1_L2")$
@@ -62,7 +69,7 @@ if(!any(grepl("RF_classifier_toBiomass", tb$name)) ){
     filterDate("2019-01-01", "2020-12-31")$
     filter(ee$Filter$lt("CLOUD_COVER", 20))$
     median()$
-    select(c("SR_B4", "SR_B5", "SR_B6"))$
+    select(c("SR_B3","SR_B4", "SR_B5", "SR_B6"))$
     multiply(0.0000275)$subtract(0.2)
 
 
@@ -74,7 +81,7 @@ if(!any(grepl("RF_classifier_toBiomass", tb$name)) ){
 
   training = predictors$addBands(agbOriginalTrain$select(0)$rename('agb'))$
     sample(
-      numPixels= 50000,
+      numPixels= 330000,
       scale= 100 ,
       region= pilotRegions,
       geometries=T
@@ -110,10 +117,10 @@ trainedModel <- ee$Classifier$load('projects/progetto-eu-h2020-cirgeo/assets/wil
 
 l8 <- ee$ImageCollection("LANDSAT/LC08/C02/T1_L2")$
   filterBounds(pilotRegions)$
-  filterDate("2022-01-01", "2023-12-31")$
+  filterDate("2023-01-01", "2024-12-31")$
   filter(ee$Filter$lt("CLOUD_COVER", 20))$
   median()$
-  select(c("SR_B4", "SR_B5", "SR_B6"))$
+  select(c("SR_B3", "SR_B4", "SR_B5", "SR_B6"))$
   multiply(0.0000275)$subtract(0.2)
 
 predictors = ch100$
@@ -122,7 +129,7 @@ predictors = ch100$
   addBands(aspect$rename('aspect'))$
   addBands(l8);
 
-agbFireRes <- ee$Image("projects/progetto-eu-h2020-cirgeo/assets/fire-res/biomass")$unmask()$resample('bicubic')$reproject(canopy_height30m3035$projection())
+# agbFireRes <- ee$Image("projects/progetto-eu-h2020-cirgeo/assets/fire-res/biomass")$unmask()$resample('bicubic')$reproject(canopy_height30m3035$projection())
 agbcoll <- ee$ImageCollection("projects/sat-io/open-datasets/ESA/ESA_CCI_AGB")
 agbOriginal <- agbcoll$filterDate("2021-01-01", "2023-01-01")$first()$select("AGB")$unmask()$resample('bicubic')$reproject(canopy_height30m3035$projection())
 
@@ -601,21 +608,22 @@ canopyBulkDensfunction <- function(element) {
     )
   )$divide(materasso3d$pow(4)))$sqrt()
 
+  canopyCoverMask <- tcdMosaic$gt(0)$byte()
   # Final band stack
-  final <- canopy_height$
+  final <- canopy_height$multiply(canopyCoverMask)$
     addBands(list(
       # materassoZ$float(),
       # materasso3d$float(),
       # ee$Image(materasso3d_sd$float()),
-      cbh$float(),
-      ee$Image(cbhsd_chain)$float(),
+      cbh$float()$multiply(canopyCoverMask),
+      ee$Image(cbhsd_chain)$float()$multiply(canopyCoverMask),
       # averageDBH$float(),
       # biomassOfCanopyFraction$float(),
       # biomassOfCanopyFraction_sd$float(),
-      canopyBulkDensity$float()$focalMedian(),
+      canopyBulkDensity$float()$focalMedian()$multiply(canopyCoverMask),
       # canopyBulkDensity2$float(),
-      canopyBulkDensity_sd$float(),
-      tcdMosaic$float()
+      canopyBulkDensity_sd$float()$multiply(canopyCoverMask),
+      tcdMosaic$float()$multiply(canopyCoverMask)
       # canopyBulkDensity_sd2$float(),
       # ff$float(),
       # ff_sd$float(),

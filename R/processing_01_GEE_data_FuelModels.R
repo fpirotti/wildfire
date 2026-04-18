@@ -88,7 +88,7 @@ outputStack_macroClass$a92 = clcplus$eq(11)
 grassCLCplus=clcplus$eq(6)$Or(clcplus$eq(7))
 outputStack_FBP$a32     =    clcplus$eq(6)$Or(clcplus$eq(7))
 
-## Grass only if < 10% has vegetation > 1 m
+## Grass only if min canopy height is 0 m and average canopy height is   < 1 m
 outputStack_macroClass$a10 = grassCLCplus$And(
   canopy_height_min$eq(0L)$And(
     canopy_height_mean$lte(1L)
@@ -100,6 +100,7 @@ outputStack_macroClass$a10 = grassCLCplus$And(
 ## grass shrub only if > 10% has vegetation > 1 m
 
 # GRASS/SHRUB (12)
+## GRASS/SHRUB only if min canopy height is 0 m and average canopy height is   > 1 m
 outputStack_macroClass$a12= grassCLCplus$And(
   canopy_height_min$neq(0L)$Or(
     canopy_height_mean$gt(1L)
@@ -144,9 +145,9 @@ CLCtrees.Disturbed <- CLCtrees$And( DisturbedPixels )
 outputStack_macroClass$a20 = CLCtrees$And( forestLoss4fire.NonFire )
 # outputStack_scottBurgan$a200 = outputStack_macroClass$a20
 
-##  tree timber understorey
+##  tree timber understorey scott burgan TU
  outputStack_macroClass$a16= CLCtrees$And( CLCtrees.DisturbedPost2018.notFIRE$Not() )
-# ##  tree1 timber litter
+# ##  tree timber litter scott burgan TL
  outputStack_macroClass$a18= CLCtrees$And( CLCtrees.DisturbedPost2018.notFIRE$Not() )
 
  # outputStack_scottBurgan$a160 = outputStack_macroClass$a16
@@ -398,7 +399,7 @@ for(reg in c("pilotRegions")){
 
 ## FINAL EXPORT -----
 
-valRasters <- ee$ImageCollection("projects/progetto-eu-h2020-cirgeo/assets/wildfire/validationRasters")
+valRasters <- ee$ImageCollection("projects/progetto-eu-h2020-cirgeo/assets/wildfire/validationRasters")$mosaic()
 
 for(reg in c("pilotRegions")){
   obj <- get(reg)
@@ -428,23 +429,23 @@ for(reg in c("pilotRegions")){
     img_export <- ScottBurganProbs$select("prob")$toBands()$rename(names(outputStack_scottBurganStack) )
     # img_export$bandNames()$getInfo()
     message(nm)
-    task <- ee_image_to_drive(
-      image       = ee$Image(assetidOutStack),
-      description =  nm2 ,
-      folder      = "WildfireFM",
-      region      = geom,
-      timePrefix = F,
-      formatOptions =   list( cloudOptimized= TRUE),
-      crs         = proj_3035_30m$crs,
-      crsTransform = proj_3035_30m$crsTransform,
-      maxPixels   = 1e13
-    )$start()
+    # task <- ee_image_to_drive(
+    #   image       = ee$Image(assetidOutStack),
+    #   description =  nm2 ,
+    #   folder      = "WildfireFM",
+    #   region      = geom,
+    #   timePrefix = F,
+    #   formatOptions =   list( cloudOptimized= TRUE),
+    #   crs         = proj_3035_30m$crs,
+    #   crsTransform = proj_3035_30m$crsTransform,
+    #   maxPixels   = 1e13
+    # )$start()
 
     ## EXPORT Fuel model with probability ---------
     # img_export2 <- ScottBurgan$clip(geom)
     message(nm)
     task <- ee_image_to_drive(
-      image       = ee$Image(assetidOutFinal),
+      image       = ee$Image(assetidOutFinal)$select("class"),
       description =  nm ,
       folder      = "WildfireFM",
       region      = geom,
@@ -459,20 +460,20 @@ for(reg in c("pilotRegions")){
 
 
     ## EXPORT Fuel model with probability ---------
-    confImageClippedT <- ScottBurgan$select("prob")$clip(geom)
-    confImageClipped <- confImageClippedT$clamp(0,100)
-    message(nmConf)
-    task <- ee_image_to_drive(
-      image       = ee$Image(confImageClipped)$multiply(clcConfidence)$divide(100L)$toByte(),
-      description =  nmConf ,
-      folder      = "WildfireFM",
-      region      = geom,
-      timePrefix = F,
-      formatOptions =   list( cloudOptimized= TRUE),
-      crs         = proj_3035_30m$crs,
-      crsTransform = proj_3035_30m$crsTransform,
-      maxPixels   = 1e13
-    )$start()
+    # confImageClippedT <- ScottBurgan$select("prob")$clip(geom)
+    # confImageClipped <- confImageClippedT$clamp(0,100)
+    # message(nmConf)
+    # task <- ee_image_to_drive(
+    #   image       = ee$Image(confImageClipped)$multiply(clcConfidence)$divide(100L)$toByte(),
+    #   description =  nmConf ,
+    #   folder      = "WildfireFM",
+    #   region      = geom,
+    #   timePrefix = F,
+    #   formatOptions =   list( cloudOptimized= TRUE),
+    #   crs         = proj_3035_30m$crs,
+    #   crsTransform = proj_3035_30m$crsTransform,
+    #   maxPixels   = 1e13
+    # )$start()
 
 
   }

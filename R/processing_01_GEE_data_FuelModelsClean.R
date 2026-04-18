@@ -1,28 +1,4 @@
-library(rgee)
-library(rgeeExtra)
-library(stars)
-library(googledrive)
-########### THIS REQUIRES FIRST THAT THE processing_01_GEE_tileMeta.R!
-# 1. Authenticate ----
-drive_auth(email = "cirgeo@unipd.it")
-ee_Initialize(user = 'cirgeo'  )
-## only forest points ----
 
-# ee_install_upgrade()
-### setting version ----
-versionFuelModel  = 3
-# ee_Initialize(quiet = T)
-scale = 30
-### setting scale ----
-# proj3035_30m = ee$Projection('EPSG:3035')$atScale(scale);
-proj_3035_30m <- list(
-  crs = "EPSG:3035",
-  crsTransform = c(30, 0, 4321000, 0, -30, 3210000)
-)
-proj_3035_10m <- list(
-  crs = "EPSG:3035",
-  crsTransform = c(10, 0, 4321000, 0, -10, 3210000)
-)
 # 2. START ----
 ### setting previously classified forest S&B probs ----
 fuelModelPredictedStackfinal = 'projects/progetto-eu-h2020-cirgeo/assets/wildfire/fuelModelPredictedStackfinal/';

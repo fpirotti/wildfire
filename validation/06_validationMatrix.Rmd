@@ -9,6 +9,8 @@ output:
 classoption: landscape
 ---
 
+## PILOT SITES
+
 ```{r echo=FALSE, message=FALSE, warning=FALSE,results='asis'}
 
 library(knitr) 
@@ -34,6 +36,9 @@ todos <- list(
 
 risultati <- list()
 for(area in names(todos) ){
+    print(area)
+    cat("\\newpage\n")  
+  next
   pred <- todos[[area]][["predV3"]]
   ref <- todos[[area]][["obs"]]
   cls<- terra::project(as.points(pred), ref)
@@ -50,3 +55,14 @@ for(area in names(todos) ){
   
 ```
 
+## PILOT REGIONS
+
+```{r echo=FALSE, message=FALSE, warning=FALSE,results='asis'}
+ 
+
+risultati <- list()
+for(area in names(todos) ){
+ 
+}
+  
+```
