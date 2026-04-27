@@ -9,8 +9,6 @@ output:
 classoption: landscape
 ---
 
-## PILOT SITES
-
 ```{r echo=FALSE, message=FALSE, warning=FALSE,results='asis'}
 
 library(knitr) 
@@ -23,22 +21,17 @@ library(tidyverse)
 library(yardstick)
 
 todos <- list(
-"CZ-AT" = list( pred = terra::rast("input/CZ-AT_ScottBurganFuelMapClassV2.tif") ,
-                predV3 = terra::rast("data/validation/version3/v3b/CZ-AT_predictedV3.tif") ,
+"CZ-AT" = list( pred  = terra::rast("/archivio/shared/geodati/wildfire/pilotRegions/pilotRegions_CZ-DE_FuelModel.tif") ,
                 obs = terra::rast("data/validation/WildfireCE_Fuel_map_validation_AT-CZ_CzechGlobe_model.tif") 
             ),
 
-"DE-CZ" = list(pred = terra::rast("input/DE-CZ_ScottBurganFuelMapClassV2.tif"),
-                predV3 = terra::rast("data/validation/version3/v3b/DE-CZ_predictedV3.tif") ,
+"DE-CZ" = list(pred = terra::rast("/archivio/shared/geodati/wildfire/pilotRegions/pilotRegions_CZ-DE_FuelModel.tif"), 
                obs = terra::rast("data/validation/WildfireCE_Fuel_map_validation_DE-CZ_CzechGlobe_model.tif")
  )
 )
 
 risultati <- list()
 for(area in names(todos) ){
-    print(area)
-    cat("\\newpage\n")  
-  next
   pred <- todos[[area]][["predV3"]]
   ref <- todos[[area]][["obs"]]
   cls<- terra::project(as.points(pred), ref)
@@ -55,14 +48,3 @@ for(area in names(todos) ){
   
 ```
 
-## PILOT REGIONS
-
-```{r echo=FALSE, message=FALSE, warning=FALSE,results='asis'}
- 
-
-risultati <- list()
-for(area in names(todos) ){
- 
-}
-  
-```
