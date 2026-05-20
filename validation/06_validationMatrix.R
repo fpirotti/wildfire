@@ -1,86 +1,98 @@
 library(kableExtra)
 
-errorTables <- function(ref,cls, verbose=F){
+errorTables <- function(ref,pred, tit, verbose=F){
   k <- list()
-  # browser()
-  if(terra::is.points(cls)){
 
-    vals <- data.frame(cls[[1]][,1],
-                       terra::extract(ref, cls,  ID=F)[,1] )
-  } else {
 
-    s <- c(ref, cls)
-    # Extract values as a data.frame
-    vals <-  as.data.frame(s, xy=FALSE)
-  }
+
+  target_ext <- terra::ext(ref)
+  src_ext <- terra::project(target_ext, from = ref, to = pred)
+  pred_cropped <- terra::crop(pred, src_ext)
+  cls<- terra::project(as.points(pred_cropped), ref)
+  clsf <-  cls |>  terra::intersect(terra::ext(ref) )
+
+  vals <- data.frame(WildFire = clsf[[1]][,1],
+                       Reference = terra::extract(ref, clsf,  ID=F)[,1] )
+
 
   vals[vals == 0] <- NA
   vals <- na.omit(vals)
-  colnames(vals) <- c("CzechGlobe", "WildFire")
 
-  lvs <- sort(unique(c(vals$WildFire, vals$CzechGlobe)))
+  lvs <- sort(unique(c(vals$WildFire, vals$Reference)))
 
   vals$WildFire <- factor(vals$WildFire, levels = lvs)
-  vals$CzechGlobe <-  factor(vals$CzechGlobe, levels = lvs)
+  vals$Reference <-  factor(vals$Reference, levels = lvs)
 
-  conf_mat <- table(vals$CzechGlobe, vals$WildFire)
-  # Overall accuracy
-  overall_acc <- sum(diag(conf_mat)) / sum(conf_mat)
-  # Producer's accuracy (per class)
-  prod_acc <- diag(conf_mat) / rowSums(conf_mat)
-  # User's accuracy (per class)
-  user_acc <- diag(conf_mat) / colSums(conf_mat)
-  # Kappa
-  pe <- sum(rowSums(conf_mat) * colSums(conf_mat)) / (sum(conf_mat)^2)
-  kappa <- (overall_acc - pe) / (1 - pe)
-  if(verbose) message("Kappa full=", round(kappa,3))
-  cm_ext <-  as.matrix(conf_mat)
-  cm_ext <- cbind(cm_ext, "PA" = sprintf("%.1f%%", prod_acc*100))
-  # Add User’s Accuracy as extra row
-  cm_ext <- rbind(cm_ext, "UA" = c(sprintf("%.1f%%", user_acc*100),
-                                         sprintf("%.1f%%", overall_acc*100)))
+  conf_mat <- table(vals$Reference, vals$WildFire)
+  recall <- diag(conf_mat) / rowSums(conf_mat)    # Equivalent to Producer's Accuracy
+  precision <- diag(conf_mat) / colSums(conf_mat) # Equivalent to User's Accuracy
+  f1_score <- 2 * (precision * recall) / (precision + recall)
 
+  # Create the summary table na.omit
+  class_metrics <- ( data.frame(
+    Class = names(recall),
+    "NWildfire" = colSums(conf_mat),
+    "NReference" = rowSums(conf_mat),
+    "Recall" = round(recall, 3),
+    "Precision" = round(precision, 3),
+    F1_Score = round(f1_score, 3)
+  ) )
 
-  k[["full"]] <- kable(cm_ext, booktabs = TRUE, caption = paste0("--", area, " - Confusion Matrix ALL rows=CzechGlobe (reference)   colums=Wildfire-V2 (Classified)   kappa=", round(kappa,3)) ) %>%
-    kable_styling(full_width = FALSE, latex_options = c("hold_position", "striped", "scale_down")) %>%
-    column_spec(1, bold = TRUE)
+  k[["fullC"]] <- class_metrics %>%
+    kable(
+      digits = 3, align = "r",
+      caption = paste0("Classification Performance Metrics per Class (", names(ref)[[1]] ,")"),
+      col.names = c("Class", "N Wildfire", "N Reference",
+                    "Recall (Prod. Acc.)",
+                    "Precision (User Acc.)", "F1-Score"),
+      booktabs = TRUE
+    ) %>%
+    kable_styling(bootstrap_options = c("striped", "hover", "condensed"))
 
-
-  vals$CzechGlobe2 <-  trunc(as.integer(as.character(vals$CzechGlobe))/10)
+  vals$Reference2 <-  trunc(as.integer(as.character(vals$Reference))/10)
   vals$WildFire2 <- trunc(as.integer(as.character(vals$WildFire))/10)
-  lvs <- sort(unique(c(vals$WildFire2, vals$CzechGlobe2)))
+  lvs <- sort(unique(c(vals$WildFire2, vals$Reference2)))
 
   vals$WildFire2 <- factor(vals$WildFire2, levels = lvs)
-  vals$CzechGlobe2 <-  factor(vals$CzechGlobe2, levels = lvs)
+  vals$Reference2 <-  factor(vals$Reference2, levels = lvs)
 
-  # ids <- rownames(vals)[ vals$WildFire2==vals$CzechGlobe2 ]
+  ## discrepancies -----
+  # ids <- rownames(vals)[ vals$WildFire2==vals$Reference2 ]
   # errors <- s
   # errors[ as.integer(ids) ]<- NA
   # plot(errors)
   # discrepancies <- na.omit(as.points(errors))
   # writeVector(discrepancies, sprintf("%s_discrepancies.gpkg", area), overwrite=TRUE)
-  conf_mat2 <- table(Reference = vals$CzechGlobe2, Classified=vals$WildFire2)
-  # Overall accuracy
-  overall_acc2 <- sum(diag(conf_mat2)) / sum(conf_mat2)
-  # Producer's accuracy (per class)
-  prod_acc2 <- diag(conf_mat2) / rowSums(conf_mat2)
-  # User's accuracy (per class)
-  user_acc2 <- diag(conf_mat2) / colSums(conf_mat2)
-  # Kappa
-  pe2 <- sum(rowSums(conf_mat2) * colSums(conf_mat2)) / (sum(conf_mat2)^2)
-  kappa2 <- (overall_acc2 - pe2) / (1 - pe2)
-  if(verbose) message("Kappa aggr=", round(kappa2,3))
 
-  cm_ext <-  as.matrix(conf_mat2)
-  cm_ext <- cbind(cm_ext, "PA" = sprintf("%.1f%%", prod_acc2*100))
-  # Add User’s Accuracy as extra row
-  cm_ext <- rbind(cm_ext, "UA" = c(sprintf("%.1f%%", user_acc2*100),
-                                         sprintf("%.1f%%", overall_acc2*100)))
+  ########################
+  conf_mat2 <- table(Reference = vals$Reference2, Classified=vals$WildFire2)
+  # Calculate metrics
+  recall <- diag(conf_mat2) / rowSums(conf_mat2)    # Equivalent to Producer's Accuracy
+  precision <- diag(conf_mat2) / colSums(conf_mat2) # Equivalent to User's Accuracy
+  f1_score <- 2 * (precision * recall) / (precision + recall)
 
+  # Create the summary table
+  # Create the summary table na.omit
+  class_metrics_aggr <- ( data.frame(
+    Class = names(recall),
+    "NWildfire" = colSums(conf_mat2),
+    "NReference" = rowSums(conf_mat2),
+    "Recall" = round(recall, 3),
+    "Precision" = round(precision, 3),
+    F1_Score = round(f1_score, 3)
+  ) )
 
-  k[["aggr"]] <- kable(cm_ext, align = "r", caption = paste0("--", area, " - Confusion Matrix rows=CzechGlobe (reference)   colums=Wildfire-V2 (Classified)   kappa=", round(kappa2,3)) ) %>%
-    kable_styling(full_width = FALSE, latex_options = c("hold_position", "striped", "scale_down")) %>%
-    column_spec(1, bold = TRUE)
+  if(exists("risultati") && is.list(risultati)) risultati[[tit]] <<- list(All=class_metrics,
+                                                  Aggr=class_metrics_aggr)
+
+  k[["aggrC"]] <- class_metrics_aggr %>%
+    kable(
+      digits = 3, align = "r",
+      caption = paste("Classification Performance Metrics per Class (Ref=", names(ref)[[1]] ,")"),
+      col.names = c("Class","N Wildfire", "N Reference", "Recall (Prod. Acc)", "Precision (User Acc)", "F1-Score"),
+      booktabs = TRUE
+    ) |>
+    kable_styling(bootstrap_options = c("striped", "hover", "condensed"))
 
   k
 }
