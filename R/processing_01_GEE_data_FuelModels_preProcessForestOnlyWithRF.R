@@ -47,7 +47,7 @@ filter_or <- ee$Filter$Or(
   ee$Filter$eq("class", 182),
   ee$Filter$eq("class", 185)
 )
-train = withRand$filter(ee$Filter$lte('rand', 0.2))$merge( points2train$filter(ee$Filter(filter_or)) )$select("class")
+train = withRand$filter(ee$Filter$lte('rand', 0.4))$merge( points2train$filter(ee$Filter(filter_or)) )$select("class")
 valid = withRand$filter(ee$Filter$gt('rand', 0.4))$select("class");
 
 ### setting scale ----
@@ -160,9 +160,10 @@ cropmapHighVeg = cropmap$gt(100)$And(cropmap$lt(200))
 # inputVars$canopy_height = ee$Image('users/nlang/ETH_GlobalCanopyHeight_2020_10m_v1')$unmask()
 # canopy_heightColl =  ee$ImageCollection("projects/sat-io/open-datasets/facebook/meta-canopy-height")$filterBounds(bounds);
 ch30m <- "projects/progetto-eu-h2020-cirgeo/assets/wildfire/canopyHeightFromMeta30m"
-canopy_height =  ee$ImageCollection(ch30m)$mosaic()$setDefaultProjection(ee$ImageCollection(ch30m)$first()$projection()) #$clip(bounds) #$map(statsAgg)
+# canopy_height =  ee$ImageCollection(ch30m)$mosaic()$setDefaultProjection(ee$ImageCollection(ch30m)$first()$projection()) #$clip(bounds) #$map(statsAgg)
 # canopy_height.proj <- canopy_heightColl$first()$projection()$getInfo()
 
+canopy_height = ee$Image('users/nlang/ETH_GlobalCanopyHeight_2020_10m_v1')$unmask()
 inputVars$canopy_height = canopy_height
 
 ## ALOS -----
@@ -218,7 +219,7 @@ doRandomForest <- function(forceRecreation = T){
 
   bands = predictors$bandNames()
   # bands$getInfo()
-  list = ee$data$listAssets(assetRootPred);
+  list = ee$data$listAssets(assetRootPred2);
   tb <-   data.frame(name=sapply(list$assets, function(x){x[["name"]]}))
 
   # --- PREDICTORS TO ASSETS   -----
@@ -239,33 +240,35 @@ doRandomForest <- function(forceRecreation = T){
       }
 
       feature = feat
-      gg = feature$geometry();
+      gg = feature$geometry()$buffer(120, 1);
       idf = inf ;
       id = paste0(idf,'_', reg, "_V", versionFuelModel)
       message(id)
       assetid <- paste0(assetRootPred,id)
       assetid2 <- paste0(assetRootPred2,id)
 
-      # if( is.element(assetid, tb$name)  ) {
-      #   if(forceRecreation)  {
-      #     ee$data$deleteAsset(assetid)
-      #   } else {
-      #     message(assetid, " exists, skipping")
-      #     next
-      #     }
-      # }
-
-      predictors <-  ee$Image(assetid)$unmask()
-      for( k in names(inputVars) ){
-        if(!grepl("^s1_|^alos_", k)) {
+      if( is.element(assetid2, tb$name)  ) {
+        if(TRUE)  {
+          message(assetid2, " exists, deleting")
+          ee$data$deleteAsset(assetid2)
+        } else {
+          message(assetid2, " exists, skipping")
           next
-        }
-        message(k)
-        img1 = inputVars[[k]]
-        newBnames <- gsub("b1", k, img1$bandNames()$getInfo() )
-        message("adding ", newBnames)
-        predictors <- predictors$addBands(img1$rename(newBnames)$resample('bilinear') ) # nouse =  inputVars[[k]]$select(0)$projection()
+          }
       }
+
+      # predictors2 <-  ee$Image(assetid2)$unmask()
+      #  predictors2$bandNames()$getInfo()
+      # for( k in names(inputVars) ){
+      #   if(!grepl("^s1_|^alos_", k)) {
+      #     next
+      #   }
+      #   message(k)
+      #   img1 = inputVars[[k]]
+      #   newBnames <- gsub("b1", k, img1$bandNames()$getInfo() )
+      #   message("adding ", newBnames)
+      #   predictors <- predictors$addBands(img1$rename(newBnames)$resample('bilinear') ) # nouse =  inputVars[[k]]$select(0)$projection()
+      # }
 
      ee_image_to_asset(
         image=  predictors$clip(gg)$float(),
@@ -287,6 +290,7 @@ doRandomForest <- function(forceRecreation = T){
   predictorsC <-  ee$ImageCollection(file.path(dirname(assetRootPred2), basename(assetRootPred2)))
   predictors <- predictorsC$mosaic()$setDefaultProjection( predictorsC$first()$projection() )$unmask()
   bands = predictors$bandNames()
+  # bands$getInfo()
   ## training data from CzGlobe and BOKU -----
   # trainPreds = predictors$sampleRegions(
   #   collection= train,
@@ -301,6 +305,7 @@ doRandomForest <- function(forceRecreation = T){
   #   assetId = "projects/progetto-eu-h2020-cirgeo/assets/wildfire/fuelModelTrainPointsWithPredictors"
   # )$start()
   trainPreds <- ee$FeatureCollection("projects/progetto-eu-h2020-cirgeo/assets/wildfire/fuelModelTrainPointsWithPredictors")
+  trainPreds$first()$getInfo
   ## train -----
   classifier = ee$Classifier$smileRandomForest(
     numberOfTrees = 150
@@ -321,7 +326,9 @@ doRandomForest <- function(forceRecreation = T){
   classValuesRbn <- sprintf("a%d", classValuesR)
 
   ## CREATE CLASSIFIED IMAGES   -----------
-  list = ee$data$listAssets(assetRootClassified);
+  # classifier <- ee$Classifier$load('projects/progetto-eu-h2020-cirgeo/assets/wildfire/RF_classifier_FuelModelV3');
+
+  list = ee$data$listAssets(assetRootClassified2);
   tb <- tryCatch({
     data.frame(name=sapply(list$assets, function(x){x[["name"]]}))
   }, error = function(e){
@@ -343,7 +350,7 @@ doRandomForest <- function(forceRecreation = T){
       }
 
       feature = feat
-      gg = feature$geometry();
+      gg = feature$geometry()$buffer(120,1);
       idf = inf ;
 
       id = paste0(idf,'_', reg, "_V", versionFuelModel)
@@ -356,12 +363,13 @@ doRandomForest <- function(forceRecreation = T){
       assetidOut2 <- paste0(assetRootClassified2,idOut)
 
       if( is.element(assetidOut2, tb$name)  ) {
-         if(forceRecreation)  {
+         # if(T)  {
+           message(assetidOut2, " exists, deleting")
            ee$data$deleteAsset(assetidOut2)
-         } else {
-           message(assetidOut2, " exists, skipping")
-           next
-         }
+         # } else {
+         #   message(assetidOut2, " exists, skipping")
+         #   next
+         # }
       }
 
        image_to_classify <- predictors$clip(gg)$ updateMask(clcplus$gt(1)$And(clcplus$lt(5)))
@@ -379,8 +387,6 @@ doRandomForest <- function(forceRecreation = T){
       )$start()
     }
   }
-
-
 
 }
 # train$first()$geometry()$projection()$getInfo()
