@@ -11,13 +11,13 @@ versionFuelModel  = 3
 drive_auth(email = "cirgeo@unipd.it")
 ee_Initialize(user = 'cirgeo'  )
 ## only forest points ----
-cast_to_source <- function(feature) {
-  ff = feature$set("class", ee$Number(feature$get("class"))$toInt() )
-  return(ff)
-  # return(ff$set("source", ee$String(source)$cat(ee$String(
-  #   ee$Number(feature$get("class"))$toInt()
-  #   ) ) ))
-}
+# cast_to_source <- function(feature) {
+#   ff = feature$set("class", ee$Number(feature$get("class"))$toInt() )
+#   return(ff)
+#   # return(ff$set("source", ee$String(source)$cat(ee$String(
+#   #   ee$Number(feature$get("class"))$toInt()
+#   #   ) ) ))
+# }
 source <- "CzGl.DE_CZ"
 points0 <- ee$FeatureCollection("projects/progetto-eu-h2020-cirgeo/assets/wildfire/ptsCzechGlobeDE_CZ")$filter(ee$Filter$gt('class', 160))#$map(cast_to_source )
 source <- "CzGl.AT_CZ"
@@ -28,17 +28,17 @@ source <- "Boku.AT_IT"
 points3 <- ee$FeatureCollection("projects/progetto-eu-h2020-cirgeo/assets/wildfire/ptsBokuAT_IT")$filter(ee$Filter$gt('class', 160))#$map(cast_to_source )
 
 points2train <- points0$merge(points1)$merge(points2)$merge(points3)
-points2trainHist <- points2train$aggregate_histogram('source')$getInfo();
+# points2trainHist <- points2train$aggregate_histogram('source')$getInfo();
 # points2trainHist2 <- points2train$aggregate_histogram('class')$getInfo();
 
-ll<-lapply(names(points2trainHist), function(x){
- list(source=substr(x, 1, 10), class=substr(x, 11, 14), val=points2trainHist[[x]] )
-}) |> data.table::rbindlist() |>   tidyr::pivot_wider(
-  names_from  = c(source), # Can accommodate more variables, if needed.
-  values_from = c( val)
-) |> janitor::adorn_totals(where = c("row", "col"))
-
-writexl::write_xlsx(ll, "training.xlsx")
+# ll<-lapply(names(points2trainHist), function(x){
+#  list(source=substr(x, 1, 10), class=substr(x, 11, 14), val=points2trainHist[[x]] )
+# }) |> data.table::rbindlist() |>   tidyr::pivot_wider(
+#   names_from  = c(source), # Can accommodate more variables, if needed.
+#   values_from = c( val)
+# ) |> janitor::adorn_totals(where = c("row", "col"))
+#
+# writexl::write_xlsx(ll, "training.xlsx")
 
 withRand = points2train$randomColumn('rand');
 filter_or <- ee$Filter$Or(
@@ -151,8 +151,8 @@ inputVars$canopy_cover = tcd$mosaic()$setDefaultProjection(tcd$first()$projectio
 clcplus = ee$Image('projects/progetto-eu-h2020-cirgeo/assets/copernicus/CLMS_CLCplus_RASTER_2023')$select('b1')
 inputVars$clcplus <- clcplus
 ## NEW! crop map 10 m 2021 - we assume orchards and vineyards are not changed and lead to Fuel Type ??? ----
-cropmap = ee$Image('projects/progetto-eu-h2020-cirgeo/assets/copernicus/CLMS_CropTypes_RASTER_2021')$select('b1')$unmask()
-cropmapHighVeg = cropmap$gt(100)$And(cropmap$lt(200))
+# cropmap = ee$Image('projects/progetto-eu-h2020-cirgeo/assets/copernicus/CLMS_CropTypes_RASTER_2021')$select('b1')$unmask()
+# cropmapHighVeg = cropmap$gt(100)$And(cropmap$lt(200))
 ## very high threshold to consider all arid ? low values = arid, high values = humid
 # aridityThreshold = 100;
 
@@ -162,8 +162,7 @@ inputVars$canopy_height = ee$Image('users/nlang/ETH_GlobalCanopyHeight_2020_10m_
 #ch30m <- "projects/progetto-eu-h2020-cirgeo/assets/wildfire/canopyHeightFromMeta30m"
 #canopy_height =  ee$ImageCollection(ch30m)$mosaic()$setDefaultProjection(ee$ImageCollection(ch30m)$first()$projection()) #$clip(bounds) #$map(statsAgg)
 # canopy_height.proj <- canopy_heightColl$first()$projection()$getInfo()
-
-inputVars$canopy_height = canopy_height
+# inputVars$canopy_height = canopy_height
 
 ## ALOS -----
 alosC= ee$ImageCollection("JAXA/ALOS/PALSAR/YEARLY/SAR_EPOCH")$
@@ -739,6 +738,7 @@ ScottBurganProbs=ee$ImageCollection( unname(outputStack_scottBurganStack) )
 ScottBurganProbs$size()$getInfo()
 nouse = ScottBurganProbs$first()$projection()
 
+
 ScottBurgan=ScottBurganProbs$qualityMosaic('prob')$
   setDefaultProjection(nouse)$
   rename(c('scottburgan_cprob', 'scottburgan_class') )
@@ -767,7 +767,7 @@ for(reg in c("pilotRegions", "pilotSites")){
     task <- ee_image_to_drive(
       image       = img_export$toInt16(),
       description = paste0(nm, "probs" ),
-      folder      = "WildfireProbs",
+      folder      = "WildfireProbsV4",
       region      = geom,
       timePrefix = F,
       scale       = 30,
