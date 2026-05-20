@@ -1,37 +1,62 @@
 library(terra)
 
+scott_burgan_models <- c(
+  # Grass Models (GR1 - GR9)
+  101, 102, 103, 104, 105, 106, 107, 108, 109,
+  # Grass-Shrub Models (GS1 - GS4)
+  121, 122, 123, 124,
+  # Shrub Models (SH1 - SH9)
+  141, 142, 143, 144, 145, 146, 147, 148, 149,
+  # Timber-Understory Models (TU1 - TU5)
+  161, 162, 163, 164, 165,
+  # Timber Litter Models (TL1 - TL9)
+  181, 182, 183, 184, 185, 186, 187, 188, 189,
+  # Slash-Blowdown Models (SB1 - SB4)
+  201, 202, 203, 204,
+  # Non-Burnable Models (Urban, Ag, Water, Rock)
+  91, 92, 93, 98, 99
+)
 # 1. Set your file paths
-input_folder <- "path/to/your/rasters"
-template_path <- "path/to/template_raster.tif"
-output_folder <- "path/to/aligned_rasters"
+input_folders <- "/archivio/shared/geodati/wildfire/pilotSites"
 
-# Create output folder if it doesn't exist
-if (!dir.exists(output_folder)) dir.create(output_folder)
+for(input_folder in list.dirs(input_folders, recursive = F)){
 
-# 2. Load the template raster
-# This defines the target CRS, resolution, and extent
-template <- rast(template_path)
+  template_path <- list.files(input_folder, full.names = T, pattern = "FuelModel\\.tif$", recursive = T)
+  output_folder <- file.path(input_folder, "aligned")
 
-# 3. List all raster files in the input folder
-raster_files <- list.files(input_folder, pattern = "\\.tif$", full.names = TRUE)
+  # Create output folder if it doesn't exist
+  if (!dir.exists(output_folder)) dir.create(output_folder)
+  else{
+    unlink(output_folder,recursive = T)
+    dir.create(output_folder)
+  }
 
-# 4. Loop through and align
-for (f in raster_files) {
+  # 2. Load the template raster
+  # This defines the target CRS, resolution, and extent
+  template <- rast(template_path)
 
-  # Load current raster
-  r <- rast(f)
+  # 3. List all raster files in the input folder
+  raster_files <- list.files(input_folder, pattern = "\\.tif$", full.names = TRUE)
 
-  # Align (Resample) to template
-  # Method 'bilinear' for continuous data; use 'near' for categorical/discrete
-  aligned_r <- resample(r, template, method = "bilinear")
+  # 4. Loop through and align
+  for (f in raster_files) {
 
-  # Define output filename
-  out_name <- file.path(output_folder, paste0("aligned_", basename(f)))
+    # Load current raster
+    r <- rast(f)
 
-  # Save to disk
-  writeRaster(aligned_r, out_name, overwrite = TRUE)
+    # Align (Resample) to template
+    # Method 'bilinear' for continuous data; use 'near' for categorical/discrete
+    aligned_r <- resample(r, template, method = "bilinear")
 
-  message(paste("Processed:", basename(f)))
+    # Define output filename
+    out_name <- file.path(output_folder, substr(basename(f), 18,56))
+
+    # Save to disk
+    writeRaster(aligned_r, out_name, overwrite = TRUE)
+
+    message(paste("Processed:", basename(f)))
+  }
+
+  print("Alignment complete.")
 }
 
-print("Alignment complete.")

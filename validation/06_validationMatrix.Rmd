@@ -3,16 +3,17 @@ title: "D1.2.2 Fuel Mapping and Validation (Pilot Regions)"
 author: "UNIPD - Francesco Pirotti"
 date: "`r Sys.Date()`"
 output:
-  pdf_document: default
   html_document:
     df_print: paged
+  word_document: default
+  pdf_document: default
 classoption: landscape
 ---
 
 ```{r echo=FALSE, message=FALSE, warning=FALSE,results='asis'}
-
+library(this.path)
 library(knitr) 
-source("06_validationMatrix.R")
+source(file.path(this.path::this.dir() , "06_validationMatrix.R"))
 library(kableExtra)
 library(terra)
 library(Metrics)
@@ -21,30 +22,56 @@ library(tidyverse)
 library(yardstick)
 
 todos <- list(
-"CZ-AT" = list( pred  = terra::rast("/archivio/shared/geodati/wildfire/pilotRegions/pilotRegions_CZ-DE_FuelModel.tif") ,
-                obs = terra::rast("data/validation/WildfireCE_Fuel_map_validation_AT-CZ_CzechGlobe_model.tif") 
+"CZ-AT" = list( pred  = terra::rast("/archivio/shared/geodati/wildfire/zenodoV11/drive-download-20260519T155402Z-3-001/pilotRegions_AT-CZ_FuelModelprobs.tif") ,
+                  obs1 = terra::rast("/archivio/shared/R/wildfire/data/validation/thayatal_forest_fuel_3416.tif") ,
+                  obs2 = terra::rast("/archivio/shared/R/wildfire/data/validation/WildfireCE_Fuel_map_validation_AT-CZ_CzechGlobe_model.tif") 
             ),
 
-"DE-CZ" = list(pred = terra::rast("/archivio/shared/geodati/wildfire/pilotRegions/pilotRegions_CZ-DE_FuelModel.tif"), 
-               obs = terra::rast("data/validation/WildfireCE_Fuel_map_validation_DE-CZ_CzechGlobe_model.tif")
- )
+"AT-IT-SI" = list(pred = terra::rast("/archivio/shared/geodati/wildfire/zenodoV11/drive-download-20260519T155402Z-3-001/pilotRegions_AT-IT-SI_FuelModelprobs.tif") ,
+                  obs1 = terra::rast("/archivio/shared/R/wildfire/data/validation/carinthia_forest_fuel_3416.tif")
+               
+             ),
+
+"DE-CZ" = list(pred = terra::rast("/archivio/shared/geodati/wildfire/zenodoV11/drive-download-20260519T155402Z-3-001/pilotRegions_CZ-DE_FuelModelprobs.tif"),
+                  obs1 = terra::rast("/archivio/shared/R/wildfire/data/validation/WildfireCE_Fuel_map_validation_DE-CZ_CzechGlobe_model.tif")
+             )
 )
 
-risultati <- list()
-for(area in names(todos) ){
-  pred <- todos[[area]][["predV3"]]
-  ref <- todos[[area]][["obs"]]
-  cls<- terra::project(as.points(pred), ref)
-
-
   
-  k <- errorTables(ref, cls)
-  for(t in k){ 
+```
+
+
+
+
+
+```{r  echo=FALSE, message=FALSE, warning=FALSE,results='asis'}
+
+risultati <- list()
+for(area in names(todos) ){ 
+  pred <- todos[[area]][["pred"]][[2]]
+  ref <- todos[[area]][["obs1"]]
+  ref2 <- todos[[area]][["obs2"]]
+ 
+  k <- errorTables(ref, pred, area)
+  cat("\\newpage\n") 
+  cat("\n\n# VALIDATION ON: ", terra::names(ref), "\n\n" ) 
+  cat("\\newpage\n") 
+  for(t in k){  
     print(t)
     cat("\\newpage\n")  
   }
+  
+  if(!is.null(ref2)){
+       k <- errorTables(ref2, pred, paste0(area,"2"))
+      cat("\\newpage\n") 
+      cat("\n\n# VALIDATION ON: ", terra::names(ref2), "\n\n" ) 
+      cat("\\newpage\n") 
+      for(t in k){   
+        print(t)
+        cat("\\newpage\n")  
+      }
+  }
 
 }
-  
 ```
 
