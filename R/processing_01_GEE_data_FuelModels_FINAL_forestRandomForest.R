@@ -11,44 +11,12 @@ versionFuelModel  = 3
 drive_auth(email = "cirgeo@unipd.it")
 ee_Initialize(user = 'cirgeo'  )
 ## only forest points ----
-# cast_to_source <- function(feature) {
-#   ff = feature$set("class", ee$Number(feature$get("class"))$toInt() )
-#   return(ff)
-#   # return(ff$set("source", ee$String(source)$cat(ee$String(
-#   #   ee$Number(feature$get("class"))$toInt()
-#   #   ) ) ))
-# }
-source <- "CzGl.DE_CZ"
-points0 <- ee$FeatureCollection("projects/progetto-eu-h2020-cirgeo/assets/wildfire/ptsCzechGlobeDE_CZ")$filter(ee$Filter$gt('class', 160))#$map(cast_to_source )
-source <- "CzGl.AT_CZ"
-points1 <- ee$FeatureCollection("projects/progetto-eu-h2020-cirgeo/assets/wildfire/ptsCzechGlobeAT_CZ")$filter(ee$Filter$gt('class', 160))#$map(cast_to_source )
-source <- "Boku.AT_CZ"
-points2 <- ee$FeatureCollection("projects/progetto-eu-h2020-cirgeo/assets/wildfire/ptsBokuAT_CZ")$filter(ee$Filter$gt('class', 160))#$map(cast_to_source )
-source <- "Boku.AT_IT"
-points3 <- ee$FeatureCollection("projects/progetto-eu-h2020-cirgeo/assets/wildfire/ptsBokuAT_IT")$filter(ee$Filter$gt('class', 160))#$map(cast_to_source )
 
-points2train <- points0$merge(points1)$merge(points2)$merge(points3)
-# points2trainHist <- points2train$aggregate_histogram('source')$getInfo();
-# points2trainHist2 <- points2train$aggregate_histogram('class')$getInfo();
+assetRootPred  = 'projects/progetto-eu-h2020-cirgeo/assets/wildfire/fuelModelPredictors/';
+assetRootPred2 = 'projects/progetto-eu-h2020-cirgeo/assets/wildfire/fuelModelPredictorsStack/';
+assetRootClassified = 'projects/progetto-eu-h2020-cirgeo/assets/wildfire/fuelModelPredictedRF/';
+assetRootClassified2 = 'projects/progetto-eu-h2020-cirgeo/assets/wildfire/predictedForestStack/';
 
-# ll<-lapply(names(points2trainHist), function(x){
-#  list(source=substr(x, 1, 10), class=substr(x, 11, 14), val=points2trainHist[[x]] )
-# }) |> data.table::rbindlist() |>   tidyr::pivot_wider(
-#   names_from  = c(source), # Can accommodate more variables, if needed.
-#   values_from = c( val)
-# ) |> janitor::adorn_totals(where = c("row", "col"))
-#
-# writexl::write_xlsx(ll, "training.xlsx")
-
-withRand = points2train$randomColumn('rand');
-filter_or <- ee$Filter$Or(
-  ee$Filter$eq("class", 161),
-  ee$Filter$eq("class", 164),
-  ee$Filter$eq("class", 182),
-  ee$Filter$eq("class", 185)
-)
-train = withRand$filter(ee$Filter$lte('rand', 0.2))$merge( points2train$filter(ee$Filter(filter_or)) )$select("class")
-valid = withRand$filter(ee$Filter$gt('rand', 0.4))$select("class");
 
 ### setting scale ----
 # proj3035_30m = ee$Projection('EPSG:3035')$atScale(scale);
@@ -60,20 +28,7 @@ proj_3035_10m <- list(
   crs = "EPSG:3035",
   crsTransform = c(10, 0, 4321000, 0, -10, 3210000)
 )
-# 2. START ----
-### setting tasks containers ----
 
-# Function to mask clouds and shadows using the SCL band
-maskS2clouds <- function(image) {
-  scl = image$select('SCL');
-  # because we need at least a bit of reflectance, we
-  # also mask for red band above 10...
-  # e.g. if B4 is 0 then NDVI will always be 1
-  red = image$select('B4');
-  nir = image$select('B8');
-  cloudShadowMask = red$gt(100)$And(nir$gt(100))$And(scl$gt(3))$And(scl$lt(7));
-  return(image$updateMask(cloudShadowMask)$copyProperties(image, list('system:time_start') ))
-}
 
 ## reducer for Meta 1 m tree height to 30 m grid
 # combinedReducer = ee$Reducer$mean()$combine(
@@ -96,7 +51,6 @@ maskS2clouds <- function(image) {
 
 # LAYERS ------
 ## pilot sites ----
-inputVars <- list()
 pilotSites = ee$FeatureCollection("projects/progetto-eu-h2020-cirgeo/assets/wildfire/wildfire_pilot_sites_v3") ;
 nPilots =  pilotSites$size()$getInfo()
 pilotSitesNames =  unlist(Map(function(x){ x$properties$pilot_id } , pilotSites$getInfo()$features) )
@@ -106,104 +60,148 @@ pilotRegions <- ee$FeatureCollection(
 )
 bounds = pilotRegions$geometry()$bounds()
 
-# Time range for NDVI stack
-startDate = '2021-01-01';
-endDate = '2024-12-30';
-
-# Function to compute NDVI and add it as a band
-addNDVI <-function(image) {
-  ndvi = image$normalizedDifference(c('B8', 'B4'))$rename('ndvi')$copyProperties(image, list('system:time_start') );
-  return(ndvi);
-}
-addNBR <-function(image) {
-  nbr = ee$Image(image$normalizedDifference(c('B8', 'B12'))$
-    rename('nbr'))
-  nbr <- nbr$copyProperties(image, list('system:time_start') )$set('year', ee$Image(image)$date()$format('YYYY'))
-  return(nbr);
-}
-# Load and process S2 collection
-s2 = ee$ImageCollection("COPERNICUS/S2_SR_HARMONIZED")$filterDate(startDate, endDate)$filter(ee$Filter$calendarRange(7L, 9L, 'month'))$filterBounds(bounds)$filter(ee$Filter$lt('CLOUDY_PIXEL_PERCENTAGE', 30))$map(maskS2clouds);
-
-##  NDVI -----
-inputVars$ndviMax = s2$map(addNDVI)$qualityMosaic("ndvi")$rename("ndviMax")$reproject( s2$first()$select("B8")$projection() )
-inputVars$ndviMedian = s2$map(addNDVI)$median()$rename("ndviMedian")$reproject( s2$first()$select("B8")$projection() )
-
-##  NBR  -----
-inputVars$nbrMin = s2$map(addNBR)$min()$rename("nbrMin")$reproject( s2$first()$select("B8")$projection() )
-inputVars$nbrMedian = s2$map(addNBR)$median()$rename("nbrMedian")$reproject( s2$first()$select("B8")$projection() )
-
-
-
-## DEM -----
-inputVars$dem =  ee$Image("projects/progetto-eu-h2020-cirgeo/assets/eu/dtm_elev_lowestmode_gedi_v03")$toFloat()$divide(10L);
-
-terrain = ee$Terrain$products(inputVars$dem);
-inputVars$slope = terrain$select('slope');
-inputVars$aspect = terrain$select('aspect');
-
 ## Aridity -----
 # aridityIndex =  ee$ImageCollection('projects/progetto-eu-h2020-cirgeo/assets/global/AridityIndex')$mosaic()$divide(10000);
 ## NEW! Tree Canopy Density from Copernicus  10 m 2021 -----
 tcd = ee$ImageCollection("projects/progetto-eu-h2020-cirgeo/assets/copernicus/CLMS_TCF_TreeDensity_RASTER_2021")
-
-inputVars$canopy_cover = tcd$mosaic()$setDefaultProjection(tcd$first()$projection());
+canopy_cover = tcd$mosaic()$setDefaultProjection(tcd$first()$projection());
 ## NEW! CLC+ backbone 10 m 2023 ----
 clcplus = ee$Image('projects/progetto-eu-h2020-cirgeo/assets/copernicus/CLMS_CLCplus_RASTER_2023')$select('b1')
-inputVars$clcplus <- clcplus
-## NEW! crop map 10 m 2021 - we assume orchards and vineyards are not changed and lead to Fuel Type ??? ----
-# cropmap = ee$Image('projects/progetto-eu-h2020-cirgeo/assets/copernicus/CLMS_CropTypes_RASTER_2021')$select('b1')$unmask()
-# cropmapHighVeg = cropmap$gt(100)$And(cropmap$lt(200))
-## very high threshold to consider all arid ? low values = arid, high values = humid
-# aridityThreshold = 100;
+canopy_height = ee$Image('users/nlang/ETH_GlobalCanopyHeight_2020_10m_v1')$unmask()
 
-## NEW!!  Canopy height META -----
-inputVars$canopy_height = ee$Image('users/nlang/ETH_GlobalCanopyHeight_2020_10m_v1')$unmask()
-# canopy_heightColl =  ee$ImageCollection("projects/sat-io/open-datasets/facebook/meta-canopy-height")$filterBounds(bounds);
-#ch30m <- "projects/progetto-eu-h2020-cirgeo/assets/wildfire/canopyHeightFromMeta30m"
-#canopy_height =  ee$ImageCollection(ch30m)$mosaic()$setDefaultProjection(ee$ImageCollection(ch30m)$first()$projection()) #$clip(bounds) #$map(statsAgg)
-# canopy_height.proj <- canopy_heightColl$first()$projection()$getInfo()
-# inputVars$canopy_height = canopy_height
-
-## ALOS -----
-alosC= ee$ImageCollection("JAXA/ALOS/PALSAR/YEARLY/SAR_EPOCH")$
-  filterDate("2022-01-01", "2026-01-01")$
-  select(c("HH", "HV"))
-
-alos_db = alosC$
-          median()$
-          reproject( alosC$first()$projection() )$
-          log10()$multiply(10)$subtract(83)
-
-inputVars$alos_hh <- alos_db$select("HH")$rename("ALOS_HH")
-inputVars$alos_hv <- alos_db$select("HV")$rename("ALOS_HV")
-inputVars$alos_ratio <- alos_db$select("HV")$divide(alos_db$select("HH"))$rename("ALOS_L_ratio")
-
-## SENTINEL 1 -------
-s1C <- ee$ImageCollection("COPERNICUS/S1_GRD")$
-  filterDate(startDate, endDate)$filter(ee$Filter$calendarRange(7L, 9L, 'month'))$
-  filterBounds(bounds)$
-  filter(ee$Filter$listContains('transmitterReceiverPolarisation', 'VV'))$
-  filter(ee$Filter$listContains('transmitterReceiverPolarisation', 'VH'))$
-  select(c("VV","VH"))
-
-s1 <- s1C$median()$
-      reproject( s1C$first()$projection() )
-
-
-inputVars$s1_vv <- s1$select("VV")$rename("S1_VV")
-inputVars$s1_vh <- s1$select("VH")$rename("S1_VH")
-inputVars$s1_ratio <- s1$select("VH")$divide(s1$select("VV") )$rename("S1_C_ratio")
-inputVars$s1_alos_cross_diff <- alos_db$select("HV")$subtract(s1$select("VH"))$rename("ALOS_L_minus_S1_C_crossPol_dB")
-
-## CREATE PREDICTORS STACK  -----------
-assetRootPred  = 'projects/progetto-eu-h2020-cirgeo/assets/wildfire/fuelModelPredictors/';
-assetRootPred2 = 'projects/progetto-eu-h2020-cirgeo/assets/wildfire/fuelModelPredictorsStack/';
-assetRootClassified = 'projects/progetto-eu-h2020-cirgeo/assets/wildfire/fuelModelPredictedRF/';
-assetRootClassified2 = 'projects/progetto-eu-h2020-cirgeo/assets/wildfire/predictedForestStack/';
-assetRootOutput = 'projects/progetto-eu-h2020-cirgeo/assets/wildfire/fuelModelV4/';
+# Time range for NDVI stack
+startDate = '2021-01-01';
+endDate = '2024-12-30';
+# Load and process S2 collection
+s2 = ee$ImageCollection("COPERNICUS/S2_SR_HARMONIZED")$filterDate(startDate, endDate)$filter(ee$Filter$calendarRange(7L, 9L, 'month'))$filterBounds(bounds)$filter(ee$Filter$lt('CLOUDY_PIXEL_PERCENTAGE', 30))$map(maskS2clouds);
+# Function to mask clouds and shadows using the SCL band
+maskS2clouds <- function(image) {
+  scl = image$select('SCL');
+  # because we need at least a bit of reflectance, we
+  # also mask for red band above 10...
+  # e.g. if B4 is 0 then NDVI will always be 1
+  red = image$select('B4');
+  nir = image$select('B8');
+  cloudShadowMask = red$gt(100)$And(nir$gt(100))$And(scl$gt(3))$And(scl$lt(7));
+  return(image$updateMask(cloudShadowMask)$copyProperties(image, list('system:time_start') ))
+}
+addNDVI <-function(image) {
+  ndvi = image$normalizedDifference(c('B8', 'B4'))$rename('ndvi')$copyProperties(image, list('system:time_start') );
+  return(ndvi);
+}
+ndviMax = s2$map(addNDVI)$qualityMosaic("ndvi")$rename("ndviMax")$reproject( s2$first()$select("B8")$projection() )
 
 # RANDOM FOREST for FORESTS FM #####
 doRandomForest <- function(forceRecreation = T){
+
+  source <- "CzGl.DE_CZ"
+  points0 <- ee$FeatureCollection("projects/progetto-eu-h2020-cirgeo/assets/wildfire/ptsCzechGlobeDE_CZ")$filter(ee$Filter$gt('class', 160))#$map(cast_to_source )
+  source <- "CzGl.AT_CZ"
+  points1 <- ee$FeatureCollection("projects/progetto-eu-h2020-cirgeo/assets/wildfire/ptsCzechGlobeAT_CZ")$filter(ee$Filter$gt('class', 160))#$map(cast_to_source )
+  source <- "Boku.AT_CZ"
+  points2 <- ee$FeatureCollection("projects/progetto-eu-h2020-cirgeo/assets/wildfire/ptsBokuAT_CZ")$filter(ee$Filter$gt('class', 160))#$map(cast_to_source )
+  source <- "Boku.AT_IT"
+  points3 <- ee$FeatureCollection("projects/progetto-eu-h2020-cirgeo/assets/wildfire/ptsBokuAT_IT")$filter(ee$Filter$gt('class', 160))#$map(cast_to_source )
+
+  points2train <- points0$merge(points1)$merge(points2)$merge(points3)
+  # points2trainHist <- points2train$aggregate_histogram('source')$getInfo();
+  # points2trainHist2 <- points2train$aggregate_histogram('class')$getInfo();
+
+  # ll<-lapply(names(points2trainHist), function(x){
+  #  list(source=substr(x, 1, 10), class=substr(x, 11, 14), val=points2trainHist[[x]] )
+  # }) |> data.table::rbindlist() |>   tidyr::pivot_wider(
+  #   names_from  = c(source), # Can accommodate more variables, if needed.
+  #   values_from = c( val)
+  # ) |> janitor::adorn_totals(where = c("row", "col"))
+  #
+  # writexl::write_xlsx(ll, "training.xlsx")
+
+  withRand = points2train$randomColumn('rand');
+  filter_or <- ee$Filter$Or(
+    ee$Filter$eq("class", 161),
+    ee$Filter$eq("class", 164),
+    ee$Filter$eq("class", 182),
+    ee$Filter$eq("class", 185)
+  )
+  train = withRand$filter(ee$Filter$lte('rand', 0.2))$merge( points2train$filter(ee$Filter(filter_or)) )$select("class")
+  valid = withRand$filter(ee$Filter$gt('rand', 0.4))$select("class");
+
+  inputVars <- list()
+
+
+  # Function to compute NDVI and add it as a band
+  addNDVI <-function(image) {
+    ndvi = image$normalizedDifference(c('B8', 'B4'))$rename('ndvi')$copyProperties(image, list('system:time_start') );
+    return(ndvi);
+  }
+  addNBR <-function(image) {
+    nbr = ee$Image(image$normalizedDifference(c('B8', 'B12'))$
+                     rename('nbr'))
+    nbr <- nbr$copyProperties(image, list('system:time_start') )$set('year', ee$Image(image)$date()$format('YYYY'))
+    return(nbr);
+  }
+
+  ##  NDVI -----
+  inputVars$ndviMax = ndviMax
+  inputVars$ndviMedian = s2$map(addNDVI)$median()$rename("ndviMedian")$reproject( s2$first()$select("B8")$projection() )
+
+  ##  NBR  -----
+  inputVars$nbrMin = s2$map(addNBR)$min()$rename("nbrMin")$reproject( s2$first()$select("B8")$projection() )
+  inputVars$nbrMedian = s2$map(addNBR)$median()$rename("nbrMedian")$reproject( s2$first()$select("B8")$projection() )
+
+  ## DEM -----
+  inputVars$dem =  ee$Image("projects/progetto-eu-h2020-cirgeo/assets/eu/dtm_elev_lowestmode_gedi_v03")$toFloat()$divide(10L);
+
+  terrain = ee$Terrain$products(inputVars$dem);
+  inputVars$slope = terrain$select('slope');
+  inputVars$aspect = terrain$select('aspect');
+
+  inputVars$canopy_cover = canopy_cover;
+
+  inputVars$clcplus <- clcplus
+  ## NEW! crop map 10 m 2021 - we assume orchards and vineyards are not changed and lead to Fuel Type ??? ----
+  # cropmap = ee$Image('projects/progetto-eu-h2020-cirgeo/assets/copernicus/CLMS_CropTypes_RASTER_2021')$select('b1')$unmask()
+  # cropmapHighVeg = cropmap$gt(100)$And(cropmap$lt(200))
+  ## very high threshold to consider all arid ? low values = arid, high values = humid
+  # aridityThreshold = 100;
+
+  ## NEW!!  Canopy height META -----
+  # canopy_heightColl =  ee$ImageCollection("projects/sat-io/open-datasets/facebook/meta-canopy-height")$filterBounds(bounds);
+  #ch30m <- "projects/progetto-eu-h2020-cirgeo/assets/wildfire/canopyHeightFromMeta30m"
+  #canopy_height =  ee$ImageCollection(ch30m)$mosaic()$setDefaultProjection(ee$ImageCollection(ch30m)$first()$projection()) #$clip(bounds) #$map(statsAgg)
+  # canopy_height.proj <- canopy_heightColl$first()$projection()$getInfo()
+  inputVars$canopy_height = canopy_height
+
+  ## ALOS -----
+  alosC= ee$ImageCollection("JAXA/ALOS/PALSAR/YEARLY/SAR_EPOCH")$
+    filterDate("2022-01-01", "2026-01-01")$
+    select(c("HH", "HV"))
+
+  alos_db = alosC$
+    median()$
+    reproject( alosC$first()$projection() )$
+    log10()$multiply(10)$subtract(83)
+
+  inputVars$alos_hh <- alos_db$select("HH")$rename("ALOS_HH")
+  inputVars$alos_hv <- alos_db$select("HV")$rename("ALOS_HV")
+  inputVars$alos_ratio <- alos_db$select("HV")$divide(alos_db$select("HH"))$rename("ALOS_L_ratio")
+
+  ## SENTINEL 1 -------
+  s1C <- ee$ImageCollection("COPERNICUS/S1_GRD")$
+    filterDate(startDate, endDate)$filter(ee$Filter$calendarRange(7L, 9L, 'month'))$
+    filterBounds(bounds)$
+    filter(ee$Filter$listContains('transmitterReceiverPolarisation', 'VV'))$
+    filter(ee$Filter$listContains('transmitterReceiverPolarisation', 'VH'))$
+    select(c("VV","VH"))
+
+  s1 <- s1C$median()$
+    reproject( s1C$first()$projection() )
+
+
+  inputVars$s1_vv <- s1$select("VV")$rename("S1_VV")
+  inputVars$s1_vh <- s1$select("VH")$rename("S1_VH")
+  inputVars$s1_ratio <- s1$select("VH")$divide(s1$select("VV") )$rename("S1_C_ratio")
+  inputVars$s1_alos_cross_diff <- alos_db$select("HV")$subtract(s1$select("VH"))$rename("ALOS_L_minus_S1_C_crossPol_dB")
 
   ## STACK PREDICTORS #####
   predictors <- inputVars$clcplus$rename("clcplus")$toByte()
@@ -445,6 +443,12 @@ doRandomForestValidation <- function(){
 
 
 }
+
+############################
+## FINAL DECISION TREE -----
+############################
+assetRootOutput = 'projects/progetto-eu-h2020-cirgeo/assets/wildfire/fuelModelV4/';
+
 outputStack_scottBurgan <- {}
 outputStack_macroClass <- {}
 # MACRO Classes -----
@@ -473,8 +477,8 @@ grassCLCplus=clcplus$eq(6)$Or(clcplus$eq(7))
 
 ## Grass only if < 10% has vegetation > 1 m
 outputStack_macroClass$a10 = grassCLCplus$And(
-  # inputVars$canopy_height$select("b1_min")$eq(0L)$And(
-    inputVars$canopy_height$select("b1")$lte(2L)
+  # canopy_height$select("b1_min")$eq(0L)$And(
+    canopy_height$select("b1")$lte(2L)
   # )
 )
 ## to make sure it is grass, we remove pixels that have any crop type canopy cover
@@ -482,8 +486,8 @@ outputStack_macroClass$a10 = grassCLCplus$And(
 
 # GRASS/SHRUB (12)
 outputStack_macroClass$a12= grassCLCplus$And(
-  # inputVars$canopy_height$select("b1_min")$neq(0L)$Or(
-    inputVars$canopy_height$select("b1")$gt(2L)
+  # canopy_height$select("b1_min")$neq(0L)$Or(
+    canopy_height$select("b1")$gt(2L)
   # )
 )
 
@@ -642,7 +646,7 @@ outputStack_macroClass$a18= CLCtrees$And( CLCtrees.DisturbedPost2016.notFIRE$Not
 
 onlyMacroClass <- F
 if(!onlyMacroClass){
-  ndviMax <- inputVars$ndviMax
+
   ndviThresholds <- c(0.7, 0.8, 0.9)
   # GRASS SPARSE
   outputStack_scottBurgan$a101=outputStack_macroClass$a10$multiply( ndviMax$lt(ndviThresholds[[1]]))
@@ -673,7 +677,7 @@ if(!onlyMacroClass){
   ## areas with 100% canopy cover and trees 25 meters or above
   ## will have class 204 high load.
   ## load is lowered depending on density and tree height
-  sb = outputStack_macroClass$a20$multiply( inputVars$canopy_cover$select(0) )$
+  sb = outputStack_macroClass$a20$multiply( canopy_cover$select(0) )$
                                   multiply( canopy_height$select(0) )$
                                   divide(1000)$
                                   unmask()
@@ -766,30 +770,20 @@ for(reg in c("pilotRegions")){
 
     img_export <- ScottBurgan$clip(geom)
     # ScottBurganProbs$toBands()
-    message(nm)
-    task <- ee_image_to_asset(
+    ee$data$deleteAsset(paste0( assetRootOutput, nm ))
+    message(paste0( assetRootOutput, nm ))
+    task1 <- ee_image_to_asset(
       image       = img_export$toInt16(),
-      description = paste0(nm, "probsAsset" ),
-      assetId      = "WildfireProbsV4",
+      description = paste0(nm, "probs Asset" ),
+      assetId      = paste0( assetRootOutput, nm ),
       region      = geom,
-      timePrefix = F,
       scale       = 30,
-      formatOptions =   list( cloudOptimized= TRUE),
       crs         = proj_3035_30m$crs,
       crsTransform = proj_3035_30m$crsTransform,
       maxPixels   = 1e13
     )$start()
 
-
-    ee_image_to_asset(
-      image=  predictors$clip(gg)$float(),
-      description= id,
-      assetId= assetid2,
-      region= gg,
-      crs         = proj_3035_10m$crs,
-      crsTransform = proj_3035_10m$crsTransform,
-      maxPixels= 1e13
-    )$start()
+    message(nm)
 
 
     task <- ee_image_to_drive(
