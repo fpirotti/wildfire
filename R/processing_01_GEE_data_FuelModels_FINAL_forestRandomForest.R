@@ -200,6 +200,7 @@ assetRootPred  = 'projects/progetto-eu-h2020-cirgeo/assets/wildfire/fuelModelPre
 assetRootPred2 = 'projects/progetto-eu-h2020-cirgeo/assets/wildfire/fuelModelPredictorsStack/';
 assetRootClassified = 'projects/progetto-eu-h2020-cirgeo/assets/wildfire/fuelModelPredictedRF/';
 assetRootClassified2 = 'projects/progetto-eu-h2020-cirgeo/assets/wildfire/predictedForestStack/';
+assetRootOutput = 'projects/progetto-eu-h2020-cirgeo/assets/wildfire/fuelModelV4/';
 
 # RANDOM FOREST for FORESTS FM #####
 doRandomForest <- function(forceRecreation = T){
@@ -269,7 +270,7 @@ doRandomForest <- function(forceRecreation = T){
      ee_image_to_asset(
         image=  predictors$clip(gg)$float(),
         description= id,
-        assetId= assetid2,
+        assetId= paste(assetRootOutput, id),
         region= gg,
         crs         = proj_3035_10m$crs,
         crsTransform = proj_3035_10m$crsTransform,
@@ -473,7 +474,7 @@ grassCLCplus=clcplus$eq(6)$Or(clcplus$eq(7))
 ## Grass only if < 10% has vegetation > 1 m
 outputStack_macroClass$a10 = grassCLCplus$And(
   # inputVars$canopy_height$select("b1_min")$eq(0L)$And(
-    inputVars$canopy_height$select("b1")$lte(1L)
+    inputVars$canopy_height$select("b1")$lte(2L)
   # )
 )
 ## to make sure it is grass, we remove pixels that have any crop type canopy cover
@@ -482,7 +483,7 @@ outputStack_macroClass$a10 = grassCLCplus$And(
 # GRASS/SHRUB (12)
 outputStack_macroClass$a12= grassCLCplus$And(
   # inputVars$canopy_height$select("b1_min")$neq(0L)$Or(
-    inputVars$canopy_height$select("b1")$gt(1L)
+    inputVars$canopy_height$select("b1")$gt(2L)
   # )
 )
 
@@ -546,7 +547,7 @@ plotNDVIgrassShrub <- function(){
 
 # TREES (16/18/20)
 ## CANOPY LOSS MAP ----
-hansen = ee$Image("UMD/hansen/global_forest_change_2024_v1_12")
+hansen = ee$Image("UMD/hansen/global_forest_change_2025_v1_13")
 NonDisturbedPixels =  hansen$select("lossyear")$unmask()$eq(0L);
 DisturbedPixels =  hansen$select("lossyear")$unmask()$gt(0L);
 hansenLossYear =      hansen$select("lossyear")$unmask();
@@ -743,7 +744,9 @@ ScottBurgan=ScottBurganProbs$qualityMosaic('prob')$
   setDefaultProjection(nouse)$
   rename(c('scottburgan_cprob', 'scottburgan_class') )
 
-for(reg in c("pilotRegions", "pilotSites")){
+# for(reg in c("pilotRegions", "pilotSites")){
+
+for(reg in c("pilotRegions")){
   obj <- get(reg)
   ps_list <- obj$toList(obj$size())
   n <- obj$size()$getInfo()
@@ -764,6 +767,31 @@ for(reg in c("pilotRegions", "pilotSites")){
     img_export <- ScottBurgan$clip(geom)
     # ScottBurganProbs$toBands()
     message(nm)
+    task <- ee_image_to_asset(
+      image       = img_export$toInt16(),
+      description = paste0(nm, "probsAsset" ),
+      assetId      = "WildfireProbsV4",
+      region      = geom,
+      timePrefix = F,
+      scale       = 30,
+      formatOptions =   list( cloudOptimized= TRUE),
+      crs         = proj_3035_30m$crs,
+      crsTransform = proj_3035_30m$crsTransform,
+      maxPixels   = 1e13
+    )$start()
+
+
+    ee_image_to_asset(
+      image=  predictors$clip(gg)$float(),
+      description= id,
+      assetId= assetid2,
+      region= gg,
+      crs         = proj_3035_10m$crs,
+      crsTransform = proj_3035_10m$crsTransform,
+      maxPixels= 1e13
+    )$start()
+
+
     task <- ee_image_to_drive(
       image       = img_export$toInt16(),
       description = paste0(nm, "probs" ),
