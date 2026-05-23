@@ -94,6 +94,16 @@ errorTables <- function(ref,pred, tit, verbose=F){
     ) |>
     kable_styling(bootstrap_options = c("striped", "hover", "condensed"))
 
+
+  # k[["aggrConf"]] <- class_metrics_aggr %>%
+  #   kable(
+  #     digits = 3, align = "r",
+  #     caption = paste("Classification Performance Metrics per Class (Ref=", names(ref)[[1]] ,")"),
+  #     col.names = c("Class","N Wildfire", "N Reference", "Recall (Prod. Acc)", "Precision (User Acc)", "F1-Score"),
+  #     booktabs = TRUE
+  #   ) |>
+  #   kable_styling(bootstrap_options = c("striped", "hover", "condensed"))
+
   k
 }
 

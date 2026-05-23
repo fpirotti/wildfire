@@ -22,17 +22,17 @@ library(tidyverse)
 library(yardstick)
 
 todos <- list(
-"CZ-AT" = list( pred  = terra::rast("/archivio/shared/geodati/wildfire/zenodoV11/drive-download-20260519T155402Z-3-001/pilotRegions_AT-CZ_FuelModelprobs.tif") ,
+"CZ-AT" = list( pred  = terra::rast("/archivio/shared/geodati/wildfire/zenodoV12/pilotRegions_AT-CZ_FuelModelprobs.tif") ,
                   obs1 = terra::rast("/archivio/shared/R/wildfire/data/validation/thayatal_forest_fuel_3416.tif") ,
                   obs2 = terra::rast("/archivio/shared/R/wildfire/data/validation/WildfireCE_Fuel_map_validation_AT-CZ_CzechGlobe_model.tif") 
             ),
 
-"AT-IT-SI" = list(pred = terra::rast("/archivio/shared/geodati/wildfire/zenodoV11/drive-download-20260519T155402Z-3-001/pilotRegions_AT-IT-SI_FuelModelprobs.tif") ,
+"AT-IT-SI" = list(pred = terra::rast("/archivio/shared/geodati/wildfire/zenodoV12/pilotRegions_AT-IT-SI_FuelModelprobs.tif") ,
                   obs1 = terra::rast("/archivio/shared/R/wildfire/data/validation/carinthia_forest_fuel_3416.tif")
                
              ),
 
-"DE-CZ" = list(pred = terra::rast("/archivio/shared/geodati/wildfire/zenodoV11/drive-download-20260519T155402Z-3-001/pilotRegions_CZ-DE_FuelModelprobs.tif"),
+"DE-CZ" = list(pred = terra::rast("/archivio/shared/geodati/wildfire/zenodoV12/pilotRegions_CZ-DE_FuelModelprobs.tif"),
                   obs1 = terra::rast("/archivio/shared/R/wildfire/data/validation/WildfireCE_Fuel_map_validation_DE-CZ_CzechGlobe_model.tif")
              )
 )

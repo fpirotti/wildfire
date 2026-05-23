@@ -11,7 +11,7 @@ fuelModelPredictors = 'projects/progetto-eu-h2020-cirgeo/assets/wildfire/fuelMod
 
 # LAYERS ------
 ## pilot sites ----
-inputVars <- list()
+
 pilotSites = ee$FeatureCollection("projects/progetto-eu-h2020-cirgeo/assets/wildfire/wildfire_pilot_sites_v3") ;
 nPilots =  pilotSites$size()$getInfo()
 pilotSitesNames =  unlist(Map(function(x){ x$properties$pilot_id } , pilotSites$getInfo()$features) )
@@ -29,7 +29,7 @@ outputStack_FBP = { };
 predictorsStackC <- ee$ImageCollection( fuelModelPredictors )
 predictors       <- predictorsStackC$mosaic()$setDefaultProjection(predictorsStackC$first()$projection())
 clcplus <- predictors$select("clcplus")
-clcplus <- predictors$select("clcplus")
+# clcplus <- predictors$select("clcplus")
 canopy_height_mean <- predictors$select("canopy_height_mean")
 canopy_height_min  <- predictors$select("canopy_height_min")
 ndviMax <- predictors$select("ndviMax")

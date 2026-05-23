@@ -72,8 +72,6 @@ canopy_height = ee$Image('users/nlang/ETH_GlobalCanopyHeight_2020_10m_v1')$unmas
 # Time range for NDVI stack
 startDate = '2021-01-01';
 endDate = '2024-12-30';
-# Load and process S2 collection
-s2 = ee$ImageCollection("COPERNICUS/S2_SR_HARMONIZED")$filterDate(startDate, endDate)$filter(ee$Filter$calendarRange(7L, 9L, 'month'))$filterBounds(bounds)$filter(ee$Filter$lt('CLOUDY_PIXEL_PERCENTAGE', 30))$map(maskS2clouds);
 # Function to mask clouds and shadows using the SCL band
 maskS2clouds <- function(image) {
   scl = image$select('SCL');
@@ -89,6 +87,9 @@ addNDVI <-function(image) {
   ndvi = image$normalizedDifference(c('B8', 'B4'))$rename('ndvi')$copyProperties(image, list('system:time_start') );
   return(ndvi);
 }
+# Load and process S2 collection
+s2 = ee$ImageCollection("COPERNICUS/S2_SR_HARMONIZED")$filterDate(startDate, endDate)$filter(ee$Filter$calendarRange(7L, 9L, 'month'))$filterBounds(bounds)$filter(ee$Filter$lt('CLOUDY_PIXEL_PERCENTAGE', 30))$map(maskS2clouds);
+
 ndviMax = s2$map(addNDVI)$qualityMosaic("ndvi")$rename("ndviMax")$reproject( s2$first()$select("B8")$projection() )
 
 # RANDOM FOREST for FORESTS FM #####
