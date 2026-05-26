@@ -1,20 +1,5 @@
-library(rgee)
-library(rgeeExtra)
-library(stars)
-library(googledrive)
-
-### setting version ----
-versionFuelModel  = 3
-
-########### THIS REQUIRES FIRST THAT THE processing_01_GEE_tileMeta.R!
-# 1. Authenticate ----
-drive_auth(email = "cirgeo@unipd.it")
-ee_Initialize(user = 'cirgeo'  )
-proj_3035_30m <- list(
-  crs = "EPSG:3035",
-  crsTransform = c(30, 0, 4321000, 0, -30, 3210000)
-)
-
+library(this.path)
+source(file.path(this.path::this.dir(), "000_global.R"))
 img <- rgee::ee$Image("projects/progetto-eu-h2020-cirgeo/assets/eu/dtm_elev_lowestmode_gedi_v03")
 
 # FeatureCollections and Images

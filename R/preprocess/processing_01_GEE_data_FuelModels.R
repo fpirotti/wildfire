@@ -114,8 +114,8 @@ outputStack_macroClass$a14=clcplus$eq(5)
 
 # TREES (16/18/20)
 ## CANOPY LOSS MAP ----
-hansen = ee$Image("UMD/hansen/global_forest_change_2024_v1_12")
-hansen = ee$Image("UMD/hansen/global_forest_change_2024_v1_12")
+hansen = ee$Image("UMD/hansen/global_forest_change_2025_v1_13")
+hansen = ee$Image("UMD/hansen/global_forest_change_2025_v1_13")
 NonDisturbedPixels =  hansen$select("lossyear")$unmask()$eq(0L);
 DisturbedPixels =  hansen$select("lossyear")$unmask()$gt(0L);
 hansenLossYear =      hansen$select("lossyear");

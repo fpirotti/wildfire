@@ -1,55 +1,65 @@
-library(rgee)
-library(rgeeExtra)
-library(stars)
-library(googledrive)
+library(this.path)
+source(file.path(this.path::this.dir(), "000_global.R"))
 
 ### setting version ----
 versionFuelModel  = 3
 
-########### THIS REQUIRES FIRST THAT THE processing_01_GEE_tileMeta.R!
-# 1. Authenticate ----
-drive_auth(email = "cirgeo@unipd.it")
-ee_Initialize(user = 'cirgeo'  )
-proj_3035_30m <- list(
-  crs = "EPSG:3035",
-  crsTransform = c(30, 0, 4321000, 0, -30, 3210000)
-)
 
 # FeatureCollections and Images
 pilotRegions <- ee$FeatureCollection(
   "projects/progetto-eu-h2020-cirgeo/assets/wildfire/pilotRegions"
 )
+pilotRegionsROI <- pilotRegions$union()$geometry()$buffer(90, 1)
 
 pilotSites <- ee$FeatureCollection(
   "projects/progetto-eu-h2020-cirgeo/assets/wildfire/wildfire_pilot_sites_v3"
 )
 ## toByte caps at 255 the max biomass, removing errors of overestimation (maybe loosing a bit of higher biomass)
-canopy_height_coll <- ee$ImageCollection(
-  'users/cirgeo/wildfire/canopyHeightFromMeta10m'
-);
-canopy_height30m3035 <- ee$Image(
-  'projects/progetto-eu-h2020-cirgeo/assets/wildfire/canopyHeightFromMeta30m/153'
-);
-canopy_height_meta <- canopy_height_coll$select(0)$mosaic()$setDefaultProjection(canopy_height_coll$first()$projection());
-canopy_height <- ee$Image('users/nlang/ETH_GlobalCanopyHeight_2020_10m_v1')
+# canopy_height_coll <- ee$ImageCollection(
+#   'users/cirgeo/wildfire/canopyHeightFromMeta10m'
+# );
+# canopy_height30m3035 <- ee$Image(
+#   'projects/progetto-eu-h2020-cirgeo/assets/wildfire/canopyHeightFromMeta30m/153'
+# );
+# canopy_height_meta <- canopy_height_coll$select(0)$mosaic()$setDefaultProjection(canopy_height_coll$first()$projection());
+canopy_height <- ee$Image('users/nlang/ETH_GlobalCanopyHeight_2020_10m_v1')$clip(pilotRegionsROI)
+clc <- ee$Image(
+  "projects/progetto-eu-h2020-cirgeo/assets/copernicus/CLMS_CLCplus_RASTER_2023"
+)$clip(pilotRegionsROI)
+
+# tcdC <- ee$ImageCollection(
+#   "projects/progetto-eu-h2020-cirgeo/assets/copernicus/CLMS_TCF_TreeDensity_RASTER_2023"
+# );
+tcd <- ee$Image(
+  "projects/progetto-eu-h2020-cirgeo/assets/copernicus/CLMS_TCF_TreeDensity_RASTER_2023/tile4"
+)$clip(pilotRegionsROI);
+
+tcd2021 <- ee$Image("projects/progetto-eu-h2020-cirgeo/assets/copernicus/CLMS_TCF_TreeDensity_RASTER_2021/CLMS_TCF_TreeDensity_RASTER_2021_1_0")$clip(pilotRegionsROI);
+# tcdC$mosaic()$rename("canopyCover")$clip(pilotRegionsROI)$setDefaultProjection(tcdC$first()$projection()$atScale(100))
+diffTCD <- tcd2021$subtract(tcd)$abs()
 # canopy_height$bandNames()$getInfo()
-canopy_height <- canopy_height$rename(canopy_height_meta$bandNames())
+# canopy_height <- canopy_height$rename(canopy_height_meta$bandNames())
 
 agbcoll <- ee$ImageCollection("projects/sat-io/open-datasets/ESA/ESA_CCI_AGB")
-agbOriginalTrain <- agbcoll$filterDate("2019-01-01", "2021-01-01")$first()$select("AGB")
-
+agbOriginalTrain <- agbcoll$filterDate("2022-01-01", "2024-01-01")$first()$select("AGB")
+agbOriginalTrainInfor <- agbOriginalTrain$getInfo()
 srtm = ee$Image("projects/progetto-eu-h2020-cirgeo/assets/eu/dtm_elev_lowestmode_gedi_v03");
-slope = ee$Terrain$slope(srtm);
-aspect = ee$Terrain$aspect(srtm);
+slope = ee$Terrain$slope(srtm)$clip(pilotRegionsROI);
+aspect = ee$Terrain$aspect(srtm)$clip(pilotRegionsROI);
 
-
-ch100 = canopy_height$reduceResolution(
-  reducer=ee$Reducer$mean(),
-  maxPixels=256,
-  bestEffort=T
- )
-
-
+### we do not need as pyramid policy should work
+# ch100 = canopy_height$reduceResolution(
+#   reducer=ee$Reducer$mean(),
+#   maxPixels=256,
+#   bestEffort=T
+#  )
+#
+# tcd100 = tcd$reduceResolution(
+#   reducer=ee$Reducer$mean(),
+#   maxPixels=256,
+#   bestEffort=T
+# )
+#
 
 
 
@@ -60,7 +70,7 @@ tb <- tryCatch({
   as.data.frame(list$assets)
 } )
 
-# ee$data$deleteAsset("projects/progetto-eu-h2020-cirgeo/assets/wildfire/RF_classifier_toBiomass")
+ee$data$deleteAsset("projects/progetto-eu-h2020-cirgeo/assets/wildfire/RF_classifier_toBiomass")
 
 if(!any(grepl("RF_classifier_toBiomass", tb$name)) ){
 
@@ -72,12 +82,14 @@ if(!any(grepl("RF_classifier_toBiomass", tb$name)) ){
     select(c("SR_B3","SR_B4", "SR_B5", "SR_B6"))$
     multiply(0.0000275)$subtract(0.2)
 
-
-  predictors = ch100$
+  ## we mask to keep only pixels with canopy, otherwise it does not make sense
+  predictors = canopy_height$rename('canopyHeight')$
+    addBands(tcd$rename('treeCoverDensity'))$
     addBands(srtm$rename('elevation'))$
     addBands(slope$rename('slope'))$
     addBands(aspect$rename('aspect'))$
-    addBands(l8);
+    addBands(l8)$mask(tcd$gt(0)$And(diffTCD$lt(5L)));
+
 
   training = predictors$addBands(agbOriginalTrain$select(0)$rename('agb'))$
     sample(
@@ -123,15 +135,16 @@ l8 <- ee$ImageCollection("LANDSAT/LC08/C02/T1_L2")$
   select(c("SR_B3", "SR_B4", "SR_B5", "SR_B6"))$
   multiply(0.0000275)$subtract(0.2)
 
-predictors = ch100$
+predictors = canopy_height$rename('canopyHeight')$
+  addBands(tcd$rename('treeCoverDensity'))$
   addBands(srtm$rename('elevation'))$
   addBands(slope$rename('slope'))$
   addBands(aspect$rename('aspect'))$
-  addBands(l8);
+  addBands(l8)$mask(tcd$gt(0));
 
 # agbFireRes <- ee$Image("projects/progetto-eu-h2020-cirgeo/assets/fire-res/biomass")$unmask()$resample('bicubic')$reproject(canopy_height30m3035$projection())
 agbcoll <- ee$ImageCollection("projects/sat-io/open-datasets/ESA/ESA_CCI_AGB")
-agbOriginal <- agbcoll$filterDate("2021-01-01", "2023-01-01")$first()$select("AGB")$unmask()$resample('bicubic')$reproject(canopy_height30m3035$projection())
+agbOriginal <- agbcoll$filterDate("2021-01-01", "2023-01-01")$first()$select("AGB")$unmask()$resample('bicubic')$reproject(proj_3035_30m)
 
 agb_sd <- agbcoll$
   filterDate("2021-01-01", "2023-01-01")$
@@ -141,35 +154,28 @@ agb_sd <- agbcoll$
 biomass  <-  predictors$classify(trainedModel)
 biomass_sd <- agb_sd
 
-canopy_cover <- ee$Image("UMD/hansen/global_forest_change_2024_v1_12")
+# canopy_cover <- ee$Image("UMD/hansen/global_forest_change_2025_v1_13")
  ## CANOPY LOSS MAP ----
- onlyNonDisturbedPixels =  canopy_cover$select("lossyear")$unmask()$eq(0);
- hansenLossPost2018 =      canopy_cover$select("lossyear")$unmask()$gt(18L);
- hansenLossPost2010  =     canopy_cover$select("lossyear")$unmask()$gt(10);
- hansenLossPost2010upTo2019 = hansenLossPost2010$And( canopy_cover$select("lossyear")$unmask()$lt(19)  ) ;
- hansenLossPost2000   =  canopy_cover$select("lossyear")$unmask()$gt(0)
- hansenLossPost2000upTo2009   =  hansenLossPost2000$And( canopy_cover$select("lossyear")$unmask()$lt(11) ) ;
-
-clc <- ee$Image(
-  "projects/progetto-eu-h2020-cirgeo/assets/copernicus/CLMS_CLCplus_RASTER_2023"
-)
-
-tcd <- ee$ImageCollection(
-  "projects/progetto-eu-h2020-cirgeo/assets/copernicus/CLMS_TCF_TreeDensity_RASTER_2021"
-)
-
-tcdMosaic <- tcd$mosaic()$setDefaultProjection(tcd$first()$projection())$rename("canopyCover")
+ # onlyNonDisturbedPixels =  canopy_cover$select("lossyear")$unmask()$eq(0);
+ # hansenLossPost2018 =      canopy_cover$select("lossyear")$unmask()$gt(18L);
+ # hansenLossPost2010  =     canopy_cover$select("lossyear")$unmask()$gt(10);
+ # hansenLossPost2010upTo2019 = hansenLossPost2010$And( canopy_cover$select("lossyear")$unmask()$lt(19)  ) ;
+ # hansenLossPost2000   =  canopy_cover$select("lossyear")$unmask()$gt(0)
+ # hansenLossPost2000upTo2009   =  hansenLossPost2000$And( canopy_cover$select("lossyear")$unmask()$lt(11) ) ;
+ #
 
 
-nuts <- ee$FeatureCollection(
-  "projects/progetto-eu-h2020-cirgeo/assets/NUTS_RG_01M_2024_4326"
-)
 
-codiciNutsInProject <- c(
-  "DED2F", "CZ042", "CZ064", "AT124",
-  "AT125", "ITH43", "AT211", "AT212",
-  "SI043", "ITH42", "SI042"
-)
+
+# nuts <- ee$FeatureCollection(
+#   "projects/progetto-eu-h2020-cirgeo/assets/NUTS_RG_01M_2024_4326"
+# )
+#
+# codiciNutsInProject <- c(
+#   "DED2F", "CZ042", "CZ064", "AT124",
+#   "AT125", "ITH43", "AT211", "AT212",
+#   "SI043", "ITH42", "SI042"
+# )
 #
 # nutsAll <- nuts$filter(ee$Filter$eq("LEVL_CODE", 3))
 #
@@ -608,7 +614,7 @@ canopyBulkDensfunction <- function(element) {
     )
   )$divide(materasso3d$pow(4)))$sqrt()
 
-  canopyCoverMask <- tcdMosaic$gt(0)$byte()
+  canopyCoverMask <- tcd$gt(0)$byte()
   # Final band stack
   final <- canopy_height$multiply(canopyCoverMask)$
     addBands(list(
@@ -623,7 +629,7 @@ canopyBulkDensfunction <- function(element) {
       canopyBulkDensity$float()$focalMedian()$multiply(canopyCoverMask),
       # canopyBulkDensity2$float(),
       canopyBulkDensity_sd$float()$multiply(canopyCoverMask),
-      tcdMosaic$float()$multiply(canopyCoverMask)
+      tcd$float()$multiply(canopyCoverMask)
       # canopyBulkDensity_sd2$float(),
       # ff$float(),
       # ff_sd$float(),
@@ -668,7 +674,7 @@ bbands <- names(namesAndDesc)
 
 
 
-for(reg in c("pilotRegions", "pilotSites")){
+for(reg in c("pilotRegions")){
 
   obj <- get(reg)
   ps_list <- obj$toList(obj$size())
@@ -688,19 +694,17 @@ for(reg in c("pilotRegions", "pilotSites")){
     geom <- feat$geometry()$buffer(90, 1)
     CBDexport <- CBD$unmask()$clip(geom)$toFloat()
 
-    # task <- ee_image_to_drive(
-    #   image       = CBDexport,
-    #   description = paste0("pilotSites30m_", nm ),
-    #   folder      = "GEE_exportAll",
-    #   region      = geom,
-    #   timePrefix = F,
-    #   scale       = 30,
-    #   crs         = "EPSG:3035",
-    #   maxPixels   = 1e13
-    # )
-    # task$start()
+    message(nm)
+   ee_image_to_asset(
+      image       = CBDexport,
+      assetId  = paste0("projects/progetto-eu-h2020-cirgeo/assets/wildfire/output/canopyFuels/", nm ),
+      region      = geom,
+      scale       = 30,
+      crs         = proj_3035_30m$crs,
+      crsTransform = proj_3035_30m$crsTransform
+    ) $start()
     # break
-
+    next
     for (b in bbands) {
 
       img_export <- CBDexport$select(b)$resample('bilinear')

@@ -59,7 +59,7 @@ aridityIndex = ee$ImageCollection('projects/progetto-eu-h2020-cirgeo/assets/glob
 ## Canopy height LANG -----
 canopy_height = ee$Image('users/nlang/ETH_GlobalCanopyHeight_2020_10m_v1')$unmask()
 ## Canopy COVER -----
-canopy_cover = ee$Image("UMD/hansen/global_forest_change_2023_v1_11")
+canopy_cover = ee$Image("UMD/hansen/global_forest_change_2025_v1_13")
 
 ## Copernicus Global Land Cover 100 m 2019 -----
 proba = ee$Image('COPERNICUS/Landcover/100m/Proba-V-C3/Global/2019')

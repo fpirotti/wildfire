@@ -1,21 +1,6 @@
 library(terra)
 
-scott_burgan_models <- c(
-  # Grass Models (GR1 - GR9)
-  101, 102, 103, 104, 105, 106, 107, 108, 109,
-  # Grass-Shrub Models (GS1 - GS4)
-  121, 122, 123, 124,
-  # Shrub Models (SH1 - SH9)
-  141, 142, 143, 144, 145, 146, 147, 148, 149,
-  # Timber-Understory Models (TU1 - TU5)
-  161, 162, 163, 164, 165,
-  # Timber Litter Models (TL1 - TL9)
-  181, 182, 183, 184, 185, 186, 187, 188, 189,
-  # Slash-Blowdown Models (SB1 - SB4)
-  201, 202, 203, 204,
-  # Non-Burnable Models (Urban, Ag, Water, Rock)
-  91, 92, 93, 98, 99
-)
+source("R/000_global.R")
 # 1. Set your file paths
 input_folders <- "/archivio/shared/geodati/wildfire/pilotSites"
 
