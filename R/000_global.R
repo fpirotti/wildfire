@@ -2,6 +2,7 @@ library(rgee)
 library(rgeeExtra)
 library(stars)
 library(googledrive)
+library(this.path)
 
 ### setting version ----
 versionFuelModel  = 3

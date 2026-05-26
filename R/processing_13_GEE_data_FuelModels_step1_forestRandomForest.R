@@ -1,7 +1,5 @@
-library(rgee)
-library(rgeeExtra)
-library(stars)
-library(googledrive)
+library(this.path)
+source(file.path(this.path::this.dir(), "000_global.R"))
 
 
 ### setting version ----
@@ -11,7 +9,6 @@ versionFuelModel  = 3
 drive_auth(email = "cirgeo@unipd.it")
 ee_Initialize(user = 'cirgeo'  )
 ## only forest points ----
-source("R/000_global.R")
 assetRootPredictorsStack  = 'projects/progetto-eu-h2020-cirgeo/assets/wildfire/fuelModelPredictorsStack/';
 assetRootClassified = 'projects/progetto-eu-h2020-cirgeo/assets/wildfire/fuelModelPredictedRF/';
 assetRootPredictedStack = 'projects/progetto-eu-h2020-cirgeo/assets/wildfire/predictedForestStack/';
@@ -372,7 +369,7 @@ doRandomForest <- function(forceRecreation = T){
         bandNameString <- ee$String(band);
         bandValue = ee$Number$parse(bandNameString$slice(1L));
         constantBand = ee$Image$constant(bandValue)$byte()$rename('class');
-        return(final_classification$select(bandNameString)$rename('prob')$addBands(constantBand));
+        return(final_classification$select(bandNameString)$rename('prob')$multiply(100L)$addBands(constantBand));
       })
       classifiedImage <- ee$ImageCollection(ee$List(final_classification$bandNames())$map(mapbands))$qualityMosaic('prob')
 

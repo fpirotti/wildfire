@@ -4,7 +4,7 @@ library(jsonlite) # Used to convert your JSON text into an R list
 # 1. Initialize the client and authenticate
 # (Replace with your actual WEkEO username and password)
 user <- "fpirotti"
-password <- "XfLUrVLtfuSD94M!!!"
+password <- "*******************************"
 
 client <- Client$new(user = user, password = password, save_credentials = TRUE)
 

@@ -1,7 +1,7 @@
-library(terra)
-
-source("R/000_global.R")
+library(this.path)
+source(file.path(this.path::this.dir(), "000_global.R"))
 # 1. Set your file paths
+
 input_folders <- "/archivio/shared/geodati/wildfire/pilotSites"
 
 for(input_folder in list.dirs(input_folders, recursive = F)){

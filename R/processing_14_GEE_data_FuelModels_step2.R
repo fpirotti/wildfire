@@ -1,29 +1,28 @@
-
+library(this.path)
+source(file.path(this.path::this.dir(), "000_global.R"))
+########## LAST STEP -
+########## REQUIRES ALL PREVIOUS FILES TO HAVE SUCCESFULLY CREATED OUTPUTS
+##########
 # 2. START ----
 ### setting previously classified forest S&B probs ----
 fuelModelPredictedStackfinal = 'projects/progetto-eu-h2020-cirgeo/assets/wildfire/fuelModelPredictedStackfinal/';
 fuelModelPredictedFinal = 'projects/progetto-eu-h2020-cirgeo/assets/wildfire/fuelModelPredictedFinal/';
-predictedForestStack = 'projects/progetto-eu-h2020-cirgeo/assets/wildfire/predictedForestStack';
-
+assetRootClassifiedOnlyForestRF = 'projects/progetto-eu-h2020-cirgeo/assets/wildfire/fuelModelPredictedRF/';
 fuelModelPredictors = 'projects/progetto-eu-h2020-cirgeo/assets/wildfire/fuelModelPredictors';
 
 
 
 # LAYERS ------
-## pilot sites ----
-
-pilotSites = ee$FeatureCollection("projects/progetto-eu-h2020-cirgeo/assets/wildfire/wildfire_pilot_sites_v3") ;
-nPilots =  pilotSites$size()$getInfo()
-pilotSitesNames =  unlist(Map(function(x){ x$properties$pilot_id } , pilotSites$getInfo()$features) )
-
+## pilot pilotRegions ----
 pilotRegions <- ee$FeatureCollection(
   "projects/progetto-eu-h2020-cirgeo/assets/wildfire/pilotRegions"
 )
-bounds = pilotRegions$geometry()$bounds()
+pilotRegionsROI <- pilotRegions$union()$geometry()$buffer(90, 1)
+bounds = pilotRegionsROI$bounds()
 
 outputStack_macroClass = { };
 outputStack_scottBurgan = { };
-outputStack_FBP = { };
+# outputStack_FBP = { };
 
 ## CREATE PREDICTORS STACK  -----------
 predictorsStackC <- ee$ImageCollection( fuelModelPredictors )
@@ -54,7 +53,7 @@ outputStack_FBP$a102 = clcplus$eq(10)
 # 99 barren ----
 outputStack_scottBurgan$a99 = clcplus$gt(7)$And(clcplus$lt(10) )
 outputStack_macroClass$a99  = clcplus$gt(7)$And(clcplus$lt(10) )
-outputStack_FBP$a105     =    clcplus$gt(7)$And(clcplus$lt(10) )$Or(clcplus$eq(11) )
+# outputStack_FBP$a105     =    clcplus$gt(7)$And(clcplus$lt(10) )$Or(clcplus$eq(11) )
 
 # 92 snow ice ----
 outputStack_scottBurgan$a92 = clcplus$eq(11)
@@ -62,7 +61,7 @@ outputStack_macroClass$a92 = clcplus$eq(11)
 
 # GRASS (10)  ----
 grassCLCplus=clcplus$eq(6)$Or(clcplus$eq(7))
-outputStack_FBP$a32     =    clcplus$eq(6)$Or(clcplus$eq(7))
+# outputStack_FBP$a32     =    clcplus$eq(6)$Or(clcplus$eq(7))
 
 ## Grass only if < 10% has vegetation > 1 m
 outputStack_macroClass$a10 = grassCLCplus$And(
