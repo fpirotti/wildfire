@@ -7,8 +7,8 @@ source(file.path(this.path::this.dir(), "000_global.R"))
 ### setting previously classified forest S&B probs ----
 fuelModelPredictedStackfinal = 'projects/progetto-eu-h2020-cirgeo/assets/wildfire/fuelModelPredictedStackfinal/';
 fuelModelPredictedFinal = 'projects/progetto-eu-h2020-cirgeo/assets/wildfire/fuelModelPredictedFinal/';
-assetRootClassifiedOnlyForestRF = 'projects/progetto-eu-h2020-cirgeo/assets/wildfire/fuelModelPredictedRF/';
-fuelModelPredictors = 'projects/progetto-eu-h2020-cirgeo/assets/wildfire/fuelModelPredictors';
+assetRootClassifiedOnlyForestRF = 'projects/progetto-eu-h2020-cirgeo/assets/wildfire/fuelModelPredictedRF';
+fuelModelPredictors = 'projects/progetto-eu-h2020-cirgeo/assets/wildfire/fuelModelPredictorsStack';
 
 
 
@@ -17,38 +17,64 @@ fuelModelPredictors = 'projects/progetto-eu-h2020-cirgeo/assets/wildfire/fuelMod
 pilotRegions <- ee$FeatureCollection(
   "projects/progetto-eu-h2020-cirgeo/assets/wildfire/pilotRegions"
 )
+
+perfect_mask <- ee$Image$constant(1)$setDefaultProjection(proj_3035_30m_ee)
 pilotRegionsROI <- pilotRegions$union()$geometry()$buffer(90, 1)
 bounds = pilotRegionsROI$bounds()
 
 outputStack_macroClass = { };
 outputStack_scottBurgan = { };
 # outputStack_FBP = { };
+combined_reducerShared <- ee$Reducer$mean()$combine(
+  reducer2 = ee$Reducer$min(),
+  sharedInputs = TRUE
+)
+
+
+## PREDICTED FOREST CLASSES  -----------
+predictedForestC <- ee$ImageCollection( assetRootClassifiedOnlyForestRF )
+predictedForest       <- predictedForestC$mosaic()$setDefaultProjection(predictedForestC$first()$projection())
 
 ## CREATE PREDICTORS STACK  -----------
 predictorsStackC <- ee$ImageCollection( fuelModelPredictors )
 predictors       <- predictorsStackC$mosaic()$setDefaultProjection(predictorsStackC$first()$projection())
-clcplus <- predictors$select("clcplus")
+clcplus <- predictors$select("clcplus")$mask(perfect_mask)
 # clcplus <- predictors$select("clcplus")
-canopy_height_mean <- predictors$select("canopy_height_mean")
-canopy_height_min  <- predictors$select("canopy_height_min")
-ndviMax <- predictors$select("ndviMax")
-ndviMedian <- predictors$select("ndviMedian")
-canopy_cover<- predictors$select("canopy_cover")
+# canopy_height  <- predictors$select("canopy_height")$mask(perfect_mask)
 
-cropmap = ee$Image('projects/progetto-eu-h2020-cirgeo/assets/copernicus/CLMS_CropTypes_RASTER_2021')$select('b1')
-cropmapHighVeg = cropmap$gt(100)$And(cropmap$lt(200))
-cropmapLowVeg = cropmapHighVeg$Not()
+# canopy_height30m <- canopy_height$mask(perfect_mask)$
+#   reduceResolution(
+#     reducer = combined_reducerShared,
+#     maxPixels = 1024
+#   )$mask(perfect_mask)$
+#   reproject(
+#     crs = canopy_height$select(0L)$projection()$crs(), # Keeps the original Coordinate Reference System
+#     scale = 30           # Sets target resolution to 30 meters
+#   )$mask(perfect_mask)
+
+
+# canopy_height_min  <- canopy_height30m$select("canopy_height_min")$mask(perfect_mask)
+# canopy_height_mean  <- canopy_height30m$select("canopy_height_mean")$mask(perfect_mask)
+# predictors$bandNames()$getInfo()
+ndviMax <- predictors$select("ndviMax")$mask(perfect_mask)
+ndviMedian <- predictors$select("ndviMedian")$mask(perfect_mask)
+canopy_cover <- predictors$select("canopy_cover")$mask(perfect_mask)
+
+
+# cropmap = ee$Image('projects/progetto-eu-h2020-cirgeo/assets/copernicus/CLMS_CropTypes_RASTER_2021')$select('b1')
+# cropmapHighVeg = cropmap$gt(100)$And(cropmap$lt(200))
+# cropmapLowVeg = cropmapHighVeg$Not()
 # MACRO Classes -----
 # 91 Urban or suburban development; insufficient wildland fuel ----
 outputStack_scottBurgan$a91 = clcplus$eq(1)
 outputStack_macroClass$a91 = clcplus$eq(1)
-outputStack_FBP$a101= clcplus$eq(1)
+# outputStack_FBP$a101= clcplus$eq(1)
 
 
 # 98 water ----
 outputStack_scottBurgan$a98 = clcplus$eq(10)
 outputStack_macroClass$a98 =  clcplus$eq(10)
-outputStack_FBP$a102 = clcplus$eq(10)
+# outputStack_FBP$a102 = clcplus$eq(10)
 
 # 99 barren ----
 outputStack_scottBurgan$a99 = clcplus$gt(7)$And(clcplus$lt(10) )
@@ -63,21 +89,40 @@ outputStack_macroClass$a92 = clcplus$eq(11)
 grassCLCplus=clcplus$eq(6)$Or(clcplus$eq(7))
 # outputStack_FBP$a32     =    clcplus$eq(6)$Or(clcplus$eq(7))
 
+predictorsC <-  ee$ImageCollection('projects/progetto-eu-h2020-cirgeo/assets/wildfire/fuelModelPredictorsStack')
+predictors <- predictorsC$mosaic()$setDefaultProjection( predictorsC$first()$projection() )$unmask()
+bands = predictors$bandNames()
+
+trainedModel100vs120 <- ee$Classifier$load('projects/progetto-eu-h2020-cirgeo/assets/wildfire/output/classify100vs120');
+classified100vs120 <- predictors$mask(grassCLCplus)$classify(trainedModel100vs120)
+# pixel_counts <- classified100vs120$reduceRegion(
+#   reducer = ee$Reducer$frequencyHistogram(),
+#   geometry = predictorsC$first()$geometry(),
+#   scale = 30, # Adjust scale based on your dataset resolution
+#   maxPixels = 1e9
+# )
+# predictorsC$first()$getInfo()
+# 4. Bring the data from the server to your local R session
+# This extracts the dictionary properties into a named R list
+# local_counts <- pixel_counts$getInfo()
+
 ## Grass only if < 10% has vegetation > 1 m
-outputStack_macroClass$a10 = grassCLCplus$And(
-  canopy_height_min$eq(0L)$And(
-    canopy_height_mean$lte(1L)
-  )
-)
+outputStack_macroClass$a10 = grassCLCplus$And(classified100vs120$mask(perfect_mask)$eq(100))
+#   grassCLCplus$And(
+#   # canopy_height_min$eq(0L)$And(
+#     canopy_height_mean$lte(2L)
+#   # )
+# )
 ## to make sure it is grass, we remove pixels that have any crop type canopy cover
 ## grass shrub only if > 10% has vegetation > 1 m
 
 # GRASS/SHRUB (12)
-outputStack_macroClass$a12= grassCLCplus$And(
-  canopy_height_min$neq(0L)$Or(
-    canopy_height_mean$gt(1L)
-  )
-)
+outputStack_macroClass$a12 = grassCLCplus$And(classified100vs120$mask(perfect_mask)$eq(120))
+# outputStack_macroClass$a12= grassCLCplus$And(
+#   # canopy_height_min$neq(0L)$Or(
+#     canopy_height_mean$gt(2L)
+#   # )
+# )
 
 # SHRUB (14)
 outputStack_macroClass$a14=clcplus$eq(5)
@@ -85,40 +130,33 @@ outputStack_macroClass$a14=clcplus$eq(5)
 # TREES (16/18/20)
 ## CANOPY LOSS MAP ----
 hansen = ee$Image("UMD/hansen/global_forest_change_2025_v1_13")
-hansen = ee$Image("UMD/hansen/global_forest_change_2025_v1_13")
-NonDisturbedPixels =  hansen$select("lossyear")$unmask()$eq(0L);
-DisturbedPixels =  hansen$select("lossyear")$unmask()$gt(0L);
+NonDisturbedPixels =  hansen$select("lossyear")$mask(perfect_mask)$eq(0L);
+DisturbedPixels =  hansen$select("lossyear")$mask(perfect_mask)$gt(0L);
 hansenLossYear =      hansen$select("lossyear");
-hansenLossPost2018 =      hansenLossYear$gt(18L)$unmask();
+hansenLossPost2016 =      hansenLossYear$gt(16L)$mask(perfect_mask);
 hansenLossPost2010  =     hansenLossYear$gt(10);
-hansenLossPost2010upTo2019 = hansenLossPost2010$And( hansenLossYear$lt(19)  ) ;
+hansenLossPost2010upTo2019 = hansenLossPost2010$And( hansenLossYear$lt(17)  ) ;
 hansenLossPost2000   =  hansenLossYear$gt(0)
 hansenLossPost2000upTo2009   =  hansenLossPost2000$And( hansenLossYear$lt(11) ) ;
 
 forestLoss4fire = ee$Image("users/sashatyu/2001-2024_fire_forest_loss/EUR_fire_forest_loss_2001-24")
-forestLoss4fire.fire = forestLoss4fire$unmask()$gt(1L)
-forestLoss4fire.NonFire = forestLoss4fire$unmask()$eq(1L)
-
-
-
-
-CLCtrees <- clcplus$eq(2)$Or( clcplus$eq(3) )$Or( clcplus$eq(4) )
+forestLoss4fire.fire = forestLoss4fire$mask(perfect_mask)$gt(1L)
+forestLoss4fire.NonFire = forestLoss4fire$mask(perfect_mask)$eq(1L)
+CLCtrees <- predictedForest$select("class")$gt(0L)  #clcplus$eq(2)$Or( clcplus$eq(3) )$Or( clcplus$eq(4) )
 
 CLCtrees.NonDisturbed <- CLCtrees$And( NonDisturbedPixels )
-CLCtrees.DisturbedPost2018 <- CLCtrees$And( hansenLossPost2018 )
-CLCtrees.NotDisturbedPost2018 <- CLCtrees$And( hansenLossPost2018$Not() )
-CLCtrees.DisturbedPost2018.FIRE <- CLCtrees.DisturbedPost2018$And( forestLoss4fire.fire )
-CLCtrees.DisturbedPost2018.notFIRE <- CLCtrees.DisturbedPost2018$And( forestLoss4fire.NonFire )
+CLCtrees.DisturbedPost2016 <- CLCtrees$And( hansenLossPost2016 )
+CLCtrees.NotDisturbedPost2016 <- CLCtrees$And( hansenLossPost2016$Not() )
+CLCtrees.DisturbedPost2016.FIRE <- CLCtrees.DisturbedPost2016$And( forestLoss4fire.fire )
+CLCtrees.DisturbedPost2016.notFIRE <- CLCtrees.DisturbedPost2016$And( forestLoss4fire.NonFire )
 CLCtrees.Disturbed <- CLCtrees$And( DisturbedPixels )
 
-##  blowdown - forest with disturbance but with low inverse nbr (high inverse nbr = charred fuel)
-outputStack_macroClass$a20 = CLCtrees$And( forestLoss4fire.NonFire )
-
+##  blowdown - forest with disturbance but not from fire!
+outputStack_macroClass$a20 = CLCtrees$And( forestLoss4fire.NonFire )$mask(perfect_mask)
 ##  tree timber understorey
- outputStack_macroClass$a16= CLCtrees$And( CLCtrees.DisturbedPost2018.notFIRE$Not() )
+outputStack_macroClass$a16= CLCtrees$And( forestLoss4fire.NonFire$Not()  )$mask(perfect_mask)
 # ##  tree1 timber litter
- outputStack_macroClass$a18= CLCtrees$And( CLCtrees.DisturbedPost2018.notFIRE$Not() )
-
+outputStack_macroClass$a18= CLCtrees$And( forestLoss4fire.NonFire$Not()  )$mask(perfect_mask)
 
 
 onlyMacroClass <- F
@@ -129,7 +167,7 @@ if(!onlyMacroClass){
   # GRASS LOW load ----
   outputStack_scottBurgan$a102=outputStack_macroClass$a10$multiply(ndviMax$gte(ndviThresholds[[1]])$And(ndviMax$lt(ndviThresholds[[2]]))) #$multiply(aridityIndex$lte(aridityThreshold))
   # GRASS LOW load also agricultural arable land ----
-  outputStack_scottBurgan$a102= outputStack_scottBurgan$a102$add(cropmapLowVeg$unmask()$multiply(2L)) # this will become 3 were already 102+arable land, or 2 in arable land but not 102, giving cropType precedency over others
+  # outputStack_scottBurgan$a102= outputStack_scottBurgan$a102$add(cropmapLowVeg$mask(perfect_mask)$multiply(2L)) # this will become 3 were already 102+arable land, or 2 in arable land but not 102, giving cropType precedency over others
   # GRASS MOD load ----
   outputStack_scottBurgan$a104 = outputStack_macroClass$a10$And( ndviMax$gte( ndviThresholds[[2]] ) )
 
@@ -146,13 +184,14 @@ if(!onlyMacroClass){
   ## instead some organic burnable material - so if it falls in clc class 1 but has some type of past (Hansen) or present (2023)
   ## tree height, we then assign class 121 or 122 depending on the max ndvi recorded
   outputStack_scottBurgan$a121  = outputStack_macroClass$a12$multiply( ndviMax$lt( ndviThresholds[[2]] ) )
-  outputStack_scottBurgan$a121  = outputStack_scottBurgan$a121$add(cropmapHighVeg$multiply(2L))$Or(
-    clcplus$eq(1)$And(forestLoss4fire$unmask()$Or( canopy_cover$gt(5) )$Or( canopy_height_mean$gt(1L) ) )$multiply( ndviMax$lt( ndviThresholds[[2]] ) )
-  ) # this will become 3 were already 102+arable land, or 2 in arable land but not 102, giving cropType precedency over others
+  # outputStack_scottBurgan$a121  = outputStack_scottBurgan$a121$add(cropmapHighVeg$multiply(2L))$Or(
+    # clcplus$eq(1)$And(forestLoss4fire$mask(perfect_mask)$Or( canopy_cover$gt(5) )$Or( canopy_height_mean$gt(1L) ) )$multiply( ndviMax$lt( ndviThresholds[[2]] ) )
+  # ) # this will become 3 were already 102+arable land, or 2 in arable land but not 102, giving cropType precedency over others
   # outputStack_scottBurgan$a121  = clcplus$eq(1)
-  outputStack_scottBurgan$a122  = outputStack_macroClass$a12$multiply( ndviMax$gte( ndviThresholds[[2]] ) )$Or(
-    clcplus$eq(1)$And(forestLoss4fire$unmask()$Or( canopy_cover$gt(5) )$Or( canopy_height_mean$gt(1L) ) )$multiply( ndviMax$gte( ndviThresholds[[2]] ) )
-  )
+  outputStack_scottBurgan$a122  = outputStack_macroClass$a12$multiply( ndviMax$gte( ndviThresholds[[2]] ) )
+  # $Or(
+  #   clcplus$eq(1)$And(forestLoss4fire$mask(perfect_mask)$Or( canopy_cover$gt(5) )$Or( canopy_height_mean$gt(1L) ) )$multiply( ndviMax$gte( ndviThresholds[[2]] ) )
+  # )
 
 
 
@@ -162,6 +201,14 @@ if(!onlyMacroClass){
   outputStack_scottBurgan$a142  = outputStack_macroClass$a14$multiply( ndviMax$lt( ndviThresholds[[2]] ) )
   outputStack_scottBurgan$a145  = outputStack_macroClass$a14$multiply( ndviMax$gte( ndviThresholds[[2]] ) )
 
+  # If a forested area has recently burned but still contains a light, compact
+  # layer of remaining or newly fallen charred surface fuel that can propagate a
+  # fire, the standard choice established by Scott and Burgan is TL1 (Model 181)
+  # (Scott & Burgan, 2005)
+  #
+  #
+  outputStack_scottBurgan$a181 = CLCtrees$And( forestLoss4fire.NonFire$Not()  )$And( clcplus$eq(2L)  )
+  outputStack_scottBurgan$a182 = CLCtrees$And( forestLoss4fire.NonFire$Not()  )$And( clcplus$neq(2L)  )
   ########## SLASH BLOWDOWN USING HANSEN LOSS -------
   ##  depending on canopy density and tree height the load is inferred
   ##  - cover % multiplied by average canopy height, if above 200  it
@@ -169,19 +216,17 @@ if(!onlyMacroClass){
   ## high trees, or 50% cover and 4 m trees will provide the boundary value of 200
   ##
   sb = outputStack_macroClass$a20$multiply(  canopy_cover )$
-                                  multiply( canopy_height_mean )$
-                                  divide(200)$
+                                  # multiply( canopy_height_mean )$
+                                  # divide(200)$
                                   unmask()
   ## lower weight to account for other classes
-  outputStack_scottBurgan$a201 = outputStack_macroClass$a20$multiply(sb$lt(1))$multiply(0.2)
-  outputStack_scottBurgan$a202 = outputStack_macroClass$a20$multiply(sb$gte(1))$multiply(0.2)
+  outputStack_scottBurgan$a201 = outputStack_macroClass$a20$multiply(sb$lt(50))$multiply(0.5)
+  outputStack_scottBurgan$a202 = outputStack_macroClass$a20$multiply(sb$gte(50))$multiply(0.5)
 
 }
 
 
 ### FINAL STACK ------
-outputStack_scottBurganStack <- list()
-
 clcConfidence <- ee$Image("projects/progetto-eu-h2020-cirgeo/assets/wildfire/CLMS_CLC_Confidence")
 
 red_mean <- ee$Reducer$mean()$setOutputs(list("prob"))
@@ -192,6 +237,8 @@ combined_reducer <- red_mean$combine(
   sharedInputs = FALSE
 )
 
+
+outputStack_scottBurganStack <- list()
 for(k in names(outputStack_scottBurgan)){
   bv = as.integer(substr(k, 2,4))
   message(bv)
@@ -200,20 +247,21 @@ for(k in names(outputStack_scottBurgan)){
                           rename('new_band')$
                           setDefaultProjection(nouse);
 
+  # print(outputStack_scottBurgan[[k]]$bandNames()$getInfo())
   outputStack_scottBurganStack[[k]] = outputStack_scottBurgan[[k]]$
     unmask()$multiply(100L)$toByte()$
-    toByte()$
     addBands(newBand)$
-    rename(c("prob","class") )$
+    rename(c("prob","class") )$mask(perfect_mask)$
     reduceResolution(
       reducer   = combined_reducer,
-      maxPixels = 2048L  )
+      maxPixels = 2048L  )$reproject( crs=proj_3035_30m$crs, crsTransform=proj_3035_30m$crsTransform )
 
 
+  # outputStack_scottBurganStack[[k]]$bandNames()$getInfo()
 }
 
 
-predictedC <- ee$ImageCollection(predictedForestStack)
+predictedC <- ee$ImageCollection('projects/progetto-eu-h2020-cirgeo/assets/wildfire/predictedForestStack')
 predictedForestStack <- predictedC$mosaic()$setDefaultProjection(predictedC$first()$projection())
 bn <- predictedForestStack$bandNames()$getInfo()
 for( k in bn ){
@@ -223,36 +271,71 @@ for( k in bn ){
   if(is.na(bv)){
     browser()
   }
+
   nouse =  predictedForestStack$select(bn)$projection()
   newBand = ee$Image$constant( bv )$toByte()$
     rename('new_band')$
     setDefaultProjection(nouse)
 
-    outputStack_scottBurganStack[[k]] = predictedForestStack$select(k)$
-                                                unmask()$multiply(100L)$
-                                                toByte()$
-                                                addBands(newBand)$
-                                                rename(c("prob","class") )$
-                                                reduceResolution(
-                                                    reducer   = combined_reducer,
-                                                    maxPixels = 2048L  )
+  if(!is.null(outputStack_scottBurganStack[[k]])){
+    message(k, " not null")
+
+    pp <- predictedForestStack$select(k)$
+      unmask()$multiply(100L)$
+      toByte()$
+      addBands(newBand)$
+      rename(c("prob","class") )
+
+    outputStack_scottBurganStack[[k]] =
+      ee$ImageCollection(
+        list(outputStack_scottBurganStack[[k]]$updateMask(outputStack_scottBurganStack[[k]]$neq(0)),
+             pp$updateMask(pp$neq(0)))
+        )$mosaic()$mask(perfect_mask)$setDefaultProjection(predictedC$first()$projection())$reduceResolution(
+                reducer   = combined_reducer,
+                maxPixels = 2048L
+            )
+    } else {
+      outputStack_scottBurganStack[[k]] = predictedForestStack$select(k)$
+        unmask()$multiply(100L)$
+        toByte()$
+        addBands(newBand)$
+        rename(c("prob","class") )$
+        reduceResolution(
+          reducer   = combined_reducer,
+          maxPixels = 2048L  )
+    }
+
+  # outputStack_scottBurganStack[[k]]$bandNames()$getInfo()
 
 }
 
 
 
 
-ScottBurganProbs=ee$ImageCollection( unname(outputStack_scottBurganStack) )
+ScottBurganProbs=ee$ImageCollection( unname(outputStack_scottBurganStack) )$map(function(img){ return(img$mask(perfect_mask))})
 
 # ScottBurganProbs$size()$getInfo()
 nouse = ScottBurganProbs$first()$projection()
 
-ScottBurgan=ScottBurganProbs$qualityMosaic('prob')$
-  setDefaultProjection(nouse)$
-  rename(c('prob', 'class') )
+ScottBurgan=ScottBurganProbs$qualityMosaic('prob')
 
+## urban grass
+lon <- 14.167767
+lat <- 50.789719
+## forest
+# lon <- 14.161602
+# lat <- 50.788607
+point <- ee$Geometry$Point(c(lon, lat))
+pixel_data <- ScottBurgan$sampleRegions(
+  collection = point,
+  projection = proj_3035_30m_ee,
+  scale = 30,          # Set to your native/desired resolution in meters
+  geometries = TRUE   # Keeps the output clean by dropping geometry properties
+)
+pixel_values <-   pixel_data$getInfo()
+print(pixel_values)
 
-
+# EXPORT TO ASSET STACK AND FINAL MODEL (CLASS+PROBABILITY)
 for(reg in c("pilotRegions")){
   obj <- get(reg)
   ps_list <- obj$toList(obj$size())
@@ -290,7 +373,7 @@ for(reg in c("pilotRegions")){
     message(nm)
     task <- ee_image_to_asset(
       image       = img_export$clip(geom)$toByte(),
-      description =  nm ,
+      description =  paste0(nm,"STACK") ,
       assetId= assetidOutStack,
       # folder      = "WildfireFM",
       region      = geom,
@@ -301,7 +384,6 @@ for(reg in c("pilotRegions")){
       crsTransform = proj_3035_30m$crsTransform,
       maxPixels   = 1e13
     )$start()
-
 
     message("Try to delete ", assetidOutFinal)
     tryCatch({
@@ -325,28 +407,12 @@ for(reg in c("pilotRegions")){
       crsTransform = proj_3035_30m$crsTransform,
       maxPixels   = 1e13
     )$start()
-    # img_exportConf <- ScottBurgan$select(1)$clip(geom)
-    # message(nmConf)
-    # task <- ee_image_to_drive(
-    #   image       = img_exportConf$toByte(),
-    #   description =  nmConf ,
-    #   folder      = "WildfireFM",
-    #   region      = geom,
-    #   timePrefix = F,
-    #   scale       = 30,
-    #   formatOptions =   list( cloudOptimized= TRUE),
-    #   crs         = proj_3035_30m$crs,
-    #   crsTransform = proj_3035_30m$crsTransform,
-    #   maxPixels   = 1e13
-    # )$start()
+
   }
 }
 
 
 ## FINAL EXPORT -----
-
-
-
 for(reg in c("pilotRegions")){
   obj <- get(reg)
   ps_list <- obj$toList(obj$size())
@@ -371,13 +437,28 @@ for(reg in c("pilotRegions")){
     assetidOutStack <- paste0(fuelModelPredictedStackfinal,idOut)
     assetidOutFinal <- paste0(fuelModelPredictedFinal,idOut)
 
-    ## EXPORT STACK of fuel models with probability from 0 to 100 ---------
-    img_export <- ScottBurganProbs$select("prob")$toBands()$rename(names(outputStack_scottBurganStack) )
-    # img_export$bandNames()$getInfo()
+    ## EXPORT stack fuel model  ---------
+    # img_export <- ScottBurganProbs$select("prob")$toBands()$rename(names(outputStack_scottBurganStack) )
+    # # img_export$bandNames()$getInfo()
+    # message(nm)
+    # task <- ee_image_to_drive(
+    #   image       = ee$Image(assetidOutStack),
+    #   description =  nm2 ,
+    #   folder      = "WildfireFM",
+    #   region      = geom,
+    #   timePrefix = F,
+    #   scale       = 30,
+    #   formatOptions =   list( cloudOptimized= TRUE),
+    #   crs         = proj_3035_30m$crs,
+    #   crsTransform = proj_3035_30m$crsTransform,
+    #   maxPixels   = 1e13
+    # )$start()
+
+    ## EXPORT Fuel model with probability ---------
     message(nm)
     task <- ee_image_to_drive(
-      image       = ee$Image(assetidOutStack),
-      description =  nm2 ,
+      image       = ee$Image(assetidOutFinal)$select("class")$byte(),
+      description =  nm ,
       folder      = "WildfireFM",
       region      = geom,
       timePrefix = F,
@@ -388,12 +469,24 @@ for(reg in c("pilotRegions")){
       maxPixels   = 1e13
     )$start()
 
-    ## EXPORT Fuel model with probability ---------
-    img_export <- ScottBurgan$clip(geom)
-    message(nm)
+    message(nmConf)
     task <- ee_image_to_drive(
-      image       = ee$Image(assetidOutFinal),
-      description =  nm ,
+      image       = ee$Image(assetidOutFinal)$select("prob")$resample('bilinear')$byte(),
+      description =  nmConf ,
+      folder      = "WildfireFM",
+      region      = geom,
+      timePrefix = F,
+      scale       = 30,
+      formatOptions =   list( cloudOptimized= TRUE),
+      crs         = proj_3035_30m$crs,
+      crsTransform = proj_3035_30m$crsTransform,
+      maxPixels   = 1e13
+    )$start()
+
+    message( paste0(nmConf,"CLCconf"))
+    task <- ee_image_to_drive(
+      image       = ee$Image(assetidOutFinal)$select("prob")$multiply(clcConfidence$resample('bilinear'))$divide(100L)$byte(),
+      description =  paste0(nmConf,"CLCconf") ,
       folder      = "WildfireFM",
       region      = geom,
       timePrefix = F,
@@ -470,8 +563,8 @@ plotNDVIgrassShrub <- function(){
 
 NBRdistribution <- function(){
 
-  type <- list(CLCtrees.NonDisturbed, CLCtrees.DisturbedPost2018, CLCtrees.Disturbed)
-  names(type) <- c("Not Disturbed", "Disturbed Post 2018", "Disturbed Post 2000")
+  type <- list(CLCtrees.NonDisturbed, CLCtrees.DisturbedPost2016, CLCtrees.Disturbed)
+  names(type) <- c("Not Disturbed", "Disturbed Post 2016", "Disturbed Post 2000")
 
   dfs <- lapply( names(type) , function(d){
 
@@ -509,7 +602,7 @@ NBRdistribution <- function(){
     df
   })
 
-  # names(dfs2) <- c("disturbedPost2000", "disturbedPost2018", "nonDisturbed")
+  # names(dfs2) <- c("disturbedPost2000", "disturbedPost2016", "nonDisturbed")
 
   library(dplyr)
   library(tidyr)

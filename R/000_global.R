@@ -33,6 +33,12 @@ proj_3035_30m <- list(
   crs = "EPSG:3035",
   crsTransform = c(30, 0, 4321000, 0, -30, 3210000)
 )
+
+proj_3035_30m_ee <- ee$Projection(
+  crs = "EPSG:3035",
+  transform = c(30, 0, 4321000, 0, -30, 3210000)
+)
+
 proj_3035_10m <- list(
   crs = "EPSG:3035",
   crsTransform = c(10, 0, 4321000, 0, -10, 3210000)

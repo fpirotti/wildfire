@@ -323,72 +323,73 @@ doRandomForest <- function(forceRecreation = T){
   ## FINISHED CLASSIFIED STACK ------
 
   ## STARTED  final classification prob and class ------
-  list = ee$data$listAssets(assetRootClassified);
-  tb <- tryCatch({
-    data.frame(name=sapply(list$assets, function(x){x[["name"]]}))
-  }, error = function(e){
-    as.data.frame(list$assets)
-  } )
-
-  for(reg in c("pilotRegions")){
-    obj <- get(reg)
-    ps_list <- obj$toList(obj$size())
-    n <- obj$size()$getInfo()
-    tp = reg
-    # --- Loop over sites   ---
-    for (i2 in seq_len(n) - 1) {
-      feat <- ee$Feature(ps_list$get(i2))
-      # if(nm!="AT-IT") next
-      inf <- feat$get("pilot_id")$getInfo()
-      if(is.null(inf)){
-        inf <- feat$get("ID")$getInfo()
-      }
-
-      feature = feat
-      gg = feature$geometry()$buffer(90,1);
-      idf = inf ;
-
-      id = paste0(idf,'_', reg, "_V", versionFuelModel)
-      message(id)
-      assetid <- paste0(assetRootClassified,id)
-      message(assetid)
-
-      if( is.element(assetid, tb$name)  ) {
-        if(forceRecreation)  {
-          ee$data$deleteAsset(assetid)
-        } else {
-          message(assetid, " exists, skipping")
-          next
-        }
-      }
-
-      assetidIN <- paste0(assetRootPredictedStack,id)
-      #clcplus$gt(1)$And(clcplus$lt(5) )
-      final_classification <-  ee$Image(assetidIN)
-      mapbands <-ee_utils_pyfunc(function(band) {
-        bandNameString <- ee$String(band);
-        bandValue = ee$Number$parse(bandNameString$slice(1L));
-        constantBand = ee$Image$constant(bandValue)$byte()$rename('class');
-        return(final_classification$select(bandNameString)$rename('prob')$multiply(100L)$addBands(constantBand));
-      })
-      classifiedImage <- ee$ImageCollection(ee$List(final_classification$bandNames())$map(mapbands))$qualityMosaic('prob')
-
-      ee_image_to_asset(
-        image= classifiedImage$byte()$clip(gg),
-        description= id,
-        assetId= assetid,
-        region= gg,
-        # scale=1000L,
-        crs         = proj_3035_10m$crs,
-        crsTransform = proj_3035_10m$crsTransform,
-        maxPixels= 1e13
-      )$start()
-    }
-  }
-
-  ## FINISHED  final classification prob and class ------
-
-}
+  ## ##### NOT REALLY NEEDED BECAUSE SCRIPT 14 USES DIRECTLY THE LAYERS
+#   list = ee$data$listAssets(assetRootClassified);
+#   tb <- tryCatch({
+#     data.frame(name=sapply(list$assets, function(x){x[["name"]]}))
+#   }, error = function(e){
+#     as.data.frame(list$assets)
+#   } )
+#
+#   for(reg in c("pilotRegions")){
+#     obj <- get(reg)
+#     ps_list <- obj$toList(obj$size())
+#     n <- obj$size()$getInfo()
+#     tp = reg
+#     # --- Loop over sites   ---
+#     for (i2 in seq_len(n) - 1) {
+#       feat <- ee$Feature(ps_list$get(i2))
+#       # if(nm!="AT-IT") next
+#       inf <- feat$get("pilot_id")$getInfo()
+#       if(is.null(inf)){
+#         inf <- feat$get("ID")$getInfo()
+#       }
+#
+#       feature = feat
+#       gg = feature$geometry()$buffer(90,1);
+#       idf = inf ;
+#
+#       id = paste0(idf,'_', reg, "_V", versionFuelModel)
+#       message(id)
+#       assetid <- paste0(assetRootClassified,id)
+#       message(assetid)
+#
+#       if( is.element(assetid, tb$name)  ) {
+#         if(forceRecreation)  {
+#           ee$data$deleteAsset(assetid)
+#         } else {
+#           message(assetid, " exists, skipping")
+#           next
+#         }
+#       }
+#
+#       assetidIN <- paste0(assetRootPredictedStack,id)
+#       #clcplus$gt(1)$And(clcplus$lt(5) )
+#       final_classification <-  ee$Image(assetidIN)
+#       mapbands <-ee_utils_pyfunc(function(band) {
+#         bandNameString <- ee$String(band);
+#         bandValue = ee$Number$parse(bandNameString$slice(1L));
+#         constantBand = ee$Image$constant(bandValue)$byte()$rename('class');
+#         return(final_classification$select(bandNameString)$rename('prob')$multiply(100L)$addBands(constantBand));
+#       })
+#       classifiedImage <- ee$ImageCollection(ee$List(final_classification$bandNames())$map(mapbands))$qualityMosaic('prob')
+#
+#       ee_image_to_asset(
+#         image= classifiedImage$byte()$clip(gg),
+#         description= id,
+#         assetId= assetid,
+#         region= gg,
+#         # scale=1000L,
+#         crs         = proj_3035_10m$crs,
+#         crsTransform = proj_3035_10m$crsTransform,
+#         maxPixels= 1e13
+#       )$start()
+#     }
+#   }
+#
+#   ## FINISHED  final classification prob and class ------
+#
+# }
 # train$first()$geometry()$projection()$getInfo()
 ### RANDOM FOREST FINISHED -----
 ###

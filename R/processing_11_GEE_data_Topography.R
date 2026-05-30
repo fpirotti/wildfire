@@ -14,7 +14,7 @@ pilotSites <- ee$FeatureCollection(
 ### Pilot sites list -----------
 
 
-for(reg in c("pilotRegions", "pilotSites")){
+for(reg in c("pilotRegions")){ #, "pilotSites"
   obj <- get(reg)
   ps_list <- obj$toList(obj$size())
   n <- obj$size()$getInfo()
