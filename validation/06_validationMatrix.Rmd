@@ -22,17 +22,17 @@ library(tidyverse)
 library(yardstick)
 
 todos <- list(
-"CZ-AT" = list( pred  = terra::rast("/archivio/shared/geodati/wildfire/zenodoV12/pilotRegions_AT-CZ_FuelModelprobs.tif") ,
+"CZ-AT" = list( pred  = terra::rast("/archivio/shared/geodati/wildfire/zenodoV12/pilotRegions_AT-CZ_FuelModel.tif") ,
                   obs1 = terra::rast("/archivio/shared/R/wildfire/data/validation/thayatal_forest_fuel_3416.tif") ,
                   obs2 = terra::rast("/archivio/shared/R/wildfire/data/validation/WildfireCE_Fuel_map_validation_AT-CZ_CzechGlobe_model.tif") 
             ),
 
-"AT-IT-SI" = list(pred = terra::rast("/archivio/shared/geodati/wildfire/zenodoV12/pilotRegions_AT-IT-SI_FuelModelprobs.tif") ,
+"AT-IT-SI" = list(pred = terra::rast("/archivio/shared/geodati/wildfire/zenodoV12/pilotRegions_AT-IT-SI_FuelModel.tif") ,
                   obs1 = terra::rast("/archivio/shared/R/wildfire/data/validation/carinthia_forest_fuel_3416.tif")
                
              ),
 
-"DE-CZ" = list(pred = terra::rast("/archivio/shared/geodati/wildfire/zenodoV12/pilotRegions_CZ-DE_FuelModelprobs.tif"),
+"DE-CZ" = list(pred = terra::rast("/archivio/shared/geodati/wildfire/zenodoV12/pilotRegions_CZ-DE_FuelModel.tif"),
                   obs1 = terra::rast("/archivio/shared/R/wildfire/data/validation/WildfireCE_Fuel_map_validation_DE-CZ_CzechGlobe_model.tif")
              )
 )
@@ -45,13 +45,25 @@ todos <- list(
 
 
 ```{r  echo=FALSE, message=FALSE, warning=FALSE,results='asis'}
+# comuni <- sf::read_sf("/archivio/shared/geodati/vettoriali/Municipality_Borders_GISCO/COMM_RG_01M_2016_3035.shp")
+# raster_r <- todos$`CZ-AT`$pred
+# if (st_crs(comuni) != st_crs(raster_r)) {
+#   polygons <- st_transform(polygons, st_crs(raster_r))
+# }
 
+ 
 risultati <- list()
 for(area in names(todos) ){ 
-  pred <- todos[[area]][["pred"]][[2]]
+  pred <- todos[[area]][["pred"]][[1]]
+
   ref <- todos[[area]][["obs1"]]
   ref2 <- todos[[area]][["obs2"]]
  
+  # raster_bbox <- st_bbox(raster_r) %>% st_as_sfc()
+  # 
+  # overlapping_polygons <- comuni %>%
+  #   filter(st_intersects(geometry, raster_bbox, sparse = FALSE))
+
   k <- errorTables(ref, pred, area)
   cat("\\newpage\n") 
   cat("\n\n# VALIDATION ON: ", terra::names(ref), "\n\n" ) 
