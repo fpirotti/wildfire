@@ -227,7 +227,7 @@ if(!onlyMacroClass){
 
 
 ### FINAL STACK ------
-clcConfidence <- ee$Image("projects/progetto-eu-h2020-cirgeo/assets/wildfire/CLMS_CLC_Confidence")
+clcConfidence <- ee$Image("projects/progetto-eu-h2020-cirgeo/assets/copernicus/CLMS_CLCplut_RASTER_2023confidence")
 
 red_mean <- ee$Reducer$mean()$setOutputs(list("prob"))
 red_mode <- ee$Reducer$mode()$setOutputs(list("class"))

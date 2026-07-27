@@ -2,6 +2,9 @@ library(this.path)
 source(file.path(this.path::this.dir(), "000_global.R"))
 # 1. Set your file paths
 asset_path <- "projects/progetto-eu-h2020-cirgeo/assets/wildfire/AT_test_case_wildfire2025"
+asset_path <- "projects/progetto-eu-h2020-cirgeo/assets/wildfire/IT_test_case_wildfire2024"
+asset_path <- "projects/progetto-eu-h2020-cirgeo/assets/wildfire/CZ_test_case_wildfire2026"
+
 ee_polygon <- ee$FeatureCollection(asset_path)
 
 # 3. Bring it into R as a local 'sf' object (as requested)
@@ -38,7 +41,7 @@ if(!dir.exists(local_destination)) dir.create(local_destination, recursive = T)
     # 6. Optional: Plot the result to verify
     out_name <- file.path(local_destination,"fuel.tif")
     writeRaster(clipped_raster, out_name,
-                datatype = "INT2U",
+                datatype = "INT4U",
                 overwrite = TRUE)
 
     raster_files <- list.files(input_folder,
@@ -57,14 +60,14 @@ if(!dir.exists(local_destination)) dir.create(local_destination, recursive = T)
         if(grepl("cover", basename(f2), ignore.case = T)) outname<-"ccf.tif"
         if(grepl("probability", basename(f2), ignore.case = T)) outname<-"probabilityMap.tif"
         if(grepl("moist|fmc", basename(f2), ignore.case = T)) outname<-"fmc.tif"
-        if(grepl("height|chm", basename(f2), ignore.case = T)) outname<-"ch.tif"
       }
 
-      if(is.null(outname) && grepl("ch", basename(f2), ignore.case = T)) outname<-"ch.tif"
+      if(is.null(outname) && grepl("height|chm|ch", basename(f2), ignore.case = T)) outname<-"ch.tif"
       if(is.null(outname)){
         browser()
       }
 
+      message(basename(f2), " - ", outname)
         out_name2 <- file.path(local_destination, outname)
 
       perfect_match <- compareGeom(clipped_raster, r2, stopOnError = FALSE, messages = TRUE)
