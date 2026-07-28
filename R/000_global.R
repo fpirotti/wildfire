@@ -1,6 +1,7 @@
 library(rgee)
 library(rgeeExtra)
 library(stars)
+library(terra)
 library(googledrive)
 library(this.path)
 
@@ -52,7 +53,7 @@ returnBufferedBounds <- function(local_raster, sf_polygon){
   }
 
   # 5. Create the final constrained SpatExtent object
-  ext(xmin_m, xmax_m, ymin_m, ymax_m)
+  terra::ext(xmin_m, xmax_m, ymin_m, ymax_m)
 }
 ########### THIS REQUIRES FIRST THAT THE processing_01_GEE_tileMeta.R!
 # 1. Authenticate ----
