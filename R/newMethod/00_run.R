@@ -229,4 +229,6 @@ source("01_step.R")
 ## ORGANIZES TRAINING AND CREATES MODEL ----
 source("02_step.R")
 ## CREATES MODEL  ----
-source("R/processing_20_Ronly_FuelModels_step2.R")
+source("03_step.R")
+## CREATES FUEL MAP  ----
+source("04_step.R")

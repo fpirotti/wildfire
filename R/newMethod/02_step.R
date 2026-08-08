@@ -3,8 +3,55 @@
 ######################## LOAD TRAINING ##################
 #########################################################
 ## training data -----
-extractTrainAndValidationData <- function(){
-  train <- list()
+extractTestData <- function(){
+  tud <- terra::rast("validation/fueltype_bohemiansaxonswitzerland_postfire.nc")
+  ## requires complicated LUT as things do not match XLSX in https://zenodo.org/records/8159023
+
+  tud[tud > 10000 ] <- trunc(tud[tud > 10000 ]/10)
+  tud[tud == 1305 ] <- 1303
+  tud[tud == 1306 ] <- 1303
+
+  tud[tud == 1304 ] <- 1302
+  tud[tud == 1303 ] <- 1302
+
+  tud[tud == 1302 ] <- 1301
+
+  # unique(values(tud))
+  # tud[tud > 10000 ]
+
+  ## LUT from https://essd.copernicus.org/articles/15/1287/2023/#section4
+  ## not enough
+  lookup_A <- c(
+    "1111" = 147,  "1112" = 161, "1113" = 147,
+    "1121" = 145, "1122" = 165, "1123" = 145,
+    "1211" = 147, "1212" = 161, "1213" = 147,
+    "1221" = 145, "1222" = 165, "1223" = 145,
+    "1301" = 147, "1302" = 165,
+    "1303" = 147,
+    "21"   = 142, "22"   = 147,
+    "23"   = 145, "31"   = 102, "32"   = 104, "33"   = 107,
+    "41"   = 104, "42"   = 102, "51"   = 147, "52"   = 145,
+    "53"   = 107, "61"   = 91,  "62"   = 142, "7"    = 91, "71"    = 91, "72"    = 91,
+     "8"   = 98,  "81"   = 98,  "82"   = 99,
+    "63"   = 98,  "61"   = 98,  "62"   = 98
+
+  )
+  reclassed_raster_A <- subst(
+    x    = tud,
+    from = as.numeric(names(lookup_A)),
+    to   = as.numeric(lookup_A)
+  )
+  unique(values(reclassed_raster_A))
+  writeRaster(reclassed_raster_A, "validation/sb_crosswalk_A.tif", overwrite = TRUE)
+}
+
+## training data -----
+extractTrainAndValidationData <- function(force=F){
+  if(file.exists("extractTrainAndValidationData.rda")){
+    load("extractTrainAndValidationData.rda", envir = .GlobalEnv)
+    return(dt)
+  }
+  train <- list(reclassed_raster_A)
   validation <- list()
   ### from CzechGlobe ----
 
@@ -48,7 +95,9 @@ extractTrainAndValidationData <- function(){
   valid.boku.values.sf$match <- valid.boku.values.sf[,1][[1]] == valid.bokuClean[,1]
   valid.boku.values.sf <- valid.boku.values.sf |> dplyr::filter(match)  |> select(1,2) |> rename(class=1)
   validation[["BOKU"]] <- valid.boku.values.sf
-  list(train=train, validation=validation)
+  dt <- list(train=train, validation=validation)
+  save(dt, file="extractTrainAndValidationData.rda")
+  dt
 }
 
 dt <- extractTrainAndValidationData()
@@ -56,7 +105,7 @@ dt <- extractTrainAndValidationData()
 #########################################################
 ######################## SAMPLE TESSERA ON TRAINING ##################
 #########################################################
-
+basename(path.TesseraTiles$location)
 
 sampleTrainingAndValidationData <- function(){
 
@@ -75,7 +124,7 @@ sampleTrainingAndValidationData <- function(){
     for(tn in names(dt[[tnSup]])){
       message(tn)
 
-      t <- dt$train[[tn]]
+      t <- dt[[tnSup]][[tn]]
       t.tr <- st_transform(t, st_crs(path.TesseraTiles))
       # t.tr
       result <- st_join(t.tr, path.TesseraTiles, join = st_intersects)
@@ -84,11 +133,15 @@ sampleTrainingAndValidationData <- function(){
       system.time({
         clc.values <- terra::extract(path.CLCplus$`Raster Layer`, terra::vect(result), raw=T, ID=F )
       })
+      system.time({
+        CH.values <- terra::extract(path.CHM$rast.values, terra::vect(result), raw=T, ID=F )
+      })
       if(sum(is.na(clc.values))>0){
         browser()
       }
       message("NA values in CLC value point extraction: ",  sum(is.na(clc.values)) )
       result$clc.values <- clc.values[,1]
+      result$treeHeight.values <- CH.values[,1]
       DT <- data.table(
         location = result$location,
         idx = result$id
@@ -114,10 +167,9 @@ sampleTrainingAndValidationData <- function(){
       result2$location<-NULL
       result2$id<-NULL
       result2$geometry<-NULL
-      result2$class <- as.factor(result2$class)
+      result2$class <-  result2$class
       dt.predictors[[tn]] <- result2
     }
-
 
      Data <- rbindlist(dt.predictors)
     # # sum(
@@ -129,7 +181,91 @@ sampleTrainingAndValidationData <- function(){
     dt.predictors.final[[tnSup]] <- Data
 
   }
+
   dt.predictors.final
 }
 
 TandV<-sampleTrainingAndValidationData()
+DT.all <- rbind(TandV$train,
+                TandV$validation)
+DT.all$clc.values <- factor(
+  DT.all$clc.values,
+  levels = 1:11,
+  labels = levels(clc_classes)
+)
+DT.all$class <- as.factor(DT.all$class)
+DT.all$macro.class<- NULL
+
+
+
+
+plotsNmatrices()  <- function(){
+  mat <- table( trunc(DT.all$class/10),
+                DT.all$clc.values  )
+
+
+
+  writexl::write_xlsx(
+    list(Table = cm_wide <- cbind( rownames(mat),
+                                   as.data.frame.matrix(as.matrix(mat))
+    )  ) ,  "table.xlsx"
+  )
+
+  names(clcplus_colors) <- levels(clc_classes)
+  library(ggplot2)
+
+  DT.all$treeHeight.values[ is.na(DT.all$treeHeight.values) ] <- 0
+  DT.all$macro.class <- factor( trunc((DT.all$class/10)),
+                             levels=sort(unique(trunc(as.numeric(DT.all$class/10)))),
+                             labels=c("NB", "GR", "GS", "SH", "TU", "TL", "SB")
+  )
+  DT.all$clc.values <- factor(
+    DT.all$clc.values,
+    levels = 1:11,
+    labels = levels(clc_classes)
+  )
+
+  p1 <- ggplot(DT.all,
+               aes(x=clc.values, y=treeHeight.values )
+  ) + ggplot2::geom_violin(aes(color=cut(as.numeric(clc.values), breaks=c(0,1,5,8,9)))) +
+    theme_classic() +
+    xlab("CLC+ Classes") +
+    ylab("Tree Heights (m) ") +
+    theme(
+      axis.text.x = element_text(angle = 45, hjust = 1),
+      legend.position = "none"
+    )
+
+  ggsave("violin.png", plot = p1, width = 9, dpi = 300)
+  plot_data <- DT.all |>
+    # filter(class != 142) |>
+    group_by(macro.class, clc.values) |>
+    summarise(
+      median_height = median(treeHeight.values, na.rm = TRUE),
+      n = (n()),
+      .groups = "drop"
+    )
+
+  p2 <- ggplot(plot_data,
+         aes(x = macro.class,
+             y = median_height,
+             fill = clc.values,
+             width = log10(n)/10,
+             height=0.76
+             )) +
+    geom_tile(color="black") +
+    scale_fill_manual(values = clcplus_colors) +
+    theme_classic() +
+
+    labs(
+      x = "S&B Classes",
+      y = "Median Canopy Heights (m)",
+      fill = "CLC+ Class",
+      width = "Number of cells"
+    ) +
+    theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+  ggsave("a.png", plot = p2, width = 9, dpi = 300)
+
+}
+

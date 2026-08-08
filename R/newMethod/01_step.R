@@ -19,11 +19,12 @@ downloadCLCPlus <- function(){
 
   if( !(exists("skip") && skip) ){
     client <- Client$new(user = user, password = password, save_credentials = TRUE)
+    # 2. Check your connection status
+    print(client$token()) # If successful, this will output your active session token
+
   } else {
     message("Skipping check in CLC dataset")
   }
-  # 2. Check your connection status
-  print(client$token()) # If successful, this will output your active session token
 
   # 3. Accept Copernicus Terms and Conditions (Required for downloads)
   # This command automatically accepts all relevant T&Cs for the datasets
@@ -306,6 +307,9 @@ downloadTESSERA <- function(){
     cat(tifs, file="000_list.txt")
     file.remove(sprintf("%s/000_tileindex.gpkg",outdir))
     system( sprintf("gdaltindex %s/000_tileindex.gpkg  -t_srs EPSG:3035 --optfile 000_list.txt",
+                    outdir) )
+    file.remove(sprintf("%s/000_tileindex4326.gpkg",outdir))
+    system( sprintf("gdaltindex %s/000_tileindex4326.gpkg  -t_srs EPSG:4326 --optfile 000_list.txt",
                     outdir) )
     file.remove("000_list.txt")
   }
