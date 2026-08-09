@@ -1,3 +1,171 @@
+checkAutocorrelation <- function(){
+  class_autocorrelation <- function(r, max_distance = 3000) {
+
+  stopifnot(nlyr(r) == 1)
+
+  # Raster dimensions
+  nr <- nrow(r)
+  nc <- ncol(r)
+
+  # Pixel size
+  rx <- res(r)[1]
+  ry <- res(r)[2]
+
+  # Raster as matrix
+  z <- matrix(values(r), nrow = nr, ncol = nc)
+
+  # Classes
+  classes <- sort(unique(z[!is.na(z)]))
+
+  # Maximum lag in pixels
+  max_lag_x <- floor(max_distance / rx)
+  max_lag_y <- floor(max_distance / ry)
+
+  results <- vector("list", length(classes))
+
+  results <- pbmclapply(seq_along(classes), function(cc) {
+
+    cls <- classes[cc]
+
+    # Binary indicator
+    b <- z == cls
+
+    # NA handling
+    b[is.na(z)] <- NA
+
+    # Mean and SD
+    mu <- mean(b, na.rm = TRUE)
+
+    result <- vector("list", max(max_lag_x, max_lag_y))
+
+    for (k in seq_len(max(max_lag_x, max_lag_y))) {
+      message(k)
+      correlations <- c()
+
+      ## horizontal
+      if (k <= max_lag_x) {
+
+        a <- b[, 1:(nc-k)]
+        d <- b[, (k+1):nc]
+
+        ok <- !is.na(a) & !is.na(d)
+
+        if (sum(ok) > 100) {
+
+          aa <- a[ok]
+          dd <- d[ok]
+
+          correlations <- c(
+            correlations,
+            cor(aa, dd)
+          )
+        }
+      }
+
+      ## vertical
+      if (k <= max_lag_y) {
+
+        a <- b[1:(nr-k), ]
+        d <- b[(k+1):nr, ]
+
+        ok <- !is.na(a) & !is.na(d)
+
+        if (sum(ok) > 100) {
+
+          aa <- a[ok]
+          dd <- d[ok]
+
+          correlations <- c(
+            correlations,
+            cor(aa, dd)
+          )
+        }
+      }
+
+      ## diagonal \
+      if (k <= max_lag_x && k <= max_lag_y) {
+
+        a <- b[1:(nr-k), 1:(nc-k)]
+        d <- b[(k+1):nr, (k+1):nc]
+
+        ok <- !is.na(a) & !is.na(d)
+
+        if (sum(ok) > 100) {
+
+          correlations <- c(
+            correlations,
+            cor(a[ok], d[ok])
+          )
+        }
+      }
+
+      ## diagonal /
+      if (k <= max_lag_x && k <= max_lag_y) {
+
+        a <- b[1:(nr-k), (k+1):nc]
+        d <- b[(k+1):nr, 1:(nc-k)]
+
+        ok <- !is.na(a) & !is.na(d)
+
+        if (sum(ok) > 100) {
+
+          correlations <- c(
+            correlations,
+            cor(a[ok], d[ok])
+          )
+        }
+      }
+
+      result[[k]] <- data.frame(
+        class = cls,
+        lag = k,
+        distance = k * mean(c(rx, ry)),
+        correlation = mean(correlations, na.rm = TRUE)
+      )
+    }
+
+    rbindlist(result)
+  },
+  mc.cores = 30)
+
+  rbindlist(results)
+}
+ac <- class_autocorrelation(
+  r,
+  max_distance = 3000
+)
+library(ggplot2)
+
+ggplot(ac, aes(distance, correlation)) +
+  geom_line() +
+  geom_hline(yintercept = 0, linetype = 2) +
+  facet_wrap(~ class) +
+  labs(
+    x = "Distance (m)",
+    y = "Binary indicator correlation"
+  ) + theme_bw()
+}
+extractAndPredict2 <- function(ids, path){
+
+  r <- terra::rast(path[[1]])
+  xy <- xy4326[ids,]
+  pts <- sf::sf_project(
+    from = st_crs(4326)$wkt,
+    to   = st_crs(r)$wkt,
+    pts  = xy
+  )
+  dt <- terra::extract(r, pts)
+  if(sum(is.na(dt[,1]))>0){
+    cat(path, file="output.log", append = T, sep="\n")
+    cat(capture.output(print(xy[1:10,])), file="output.log", append = T, sep="\n")
+  }
+  chm <- terra::extract(path.CHM$rast.values, as.matrix(xy) )[[1]]
+  chm[is.na(chm)] <- 0
+  dt$treeHeight.values <-chm
+  dt$class <- clc.values[ ids ]
+
+  dt
+}
 
 #########################################################
 ######################## LOAD TRAINING ##################
@@ -47,154 +215,94 @@ extractTestData <- function(){
 
 ## training data -----
 extractTrainAndValidationData <- function(force=F){
-  if(file.exists("extractTrainAndValidationData.rda")){
+  if(!force && file.exists("extractTrainAndValidationData.rda")){
     load("extractTrainAndValidationData.rda", envir = .GlobalEnv)
-    return(dt)
+    return(trainers.vals)
   }
-  train <- list(reclassed_raster_A)
-  validation <- list()
+
   ### from CzechGlobe ----
 
   ## DE CZ for training -----
-  train.czg <- terra::rast("validation/WildfireCE_Fuel_map_validation_DE-CZ_CzechGlobe_model.tif")
-  train.czg.values <- sf::st_as_sf(as.data.frame(train.czg,  xy=TRUE, na.rm=T, wide=T ), coords=c("x","y"),
-                                   crs=terra::crs(train.czg))   |> select(1,2) |> rename(class=1)
-  train[["CzechGlobe"]] <- train.czg.values
-
-  ## AT-CZ for validation -----
-  valid.czg <- terra::rast("validation/WildfireCE_Fuel_map_validation_AT-CZ_CzechGlobe_model.tif")
-  valid.czg.values <- sf::st_as_sf(as.data.frame(valid.czg,  xy=TRUE, na.rm=T, wide=T ), coords=c("x","y"),
-                                   crs=terra::crs(valid.czg))   |> select(1,2) |> rename(class=1)
-  validation[["CzechGlobe"]] <- valid.czg.values
-
-  ### from BOKU ----
-  train.boku <- terra::rast("validation/carinthia_forest_fuel_3416.tif")
-  train.boku2 <- terra::aggregate(train.boku, fact=3, fun="mean")
-  train.boku2[] <- ifel(train.boku2 %% 1 == 0, train.boku2, NA)
-  train.boku.values.sf <- sf::st_as_sf(as.data.frame(train.boku2,
-                                                     xy=TRUE, na.rm=T,
-                                                     wide=T ),  coords=c("x","y"),
-                                   crs=terra::crs(train.boku2)
-                                   )
-
-  train.bokuClean <- terra::extract(train.boku, train.boku.values.sf, ID=F, mat=F)
-  train.boku.values.sf$match <- train.boku.values.sf[,1][[1]] == train.bokuClean[,1]
-  train.boku.values.sf <- train.boku.values.sf |> dplyr::filter(match)  |> select(1,2) |> rename(class=1)
-  train[["BOKU"]] <- train.boku.values.sf
-
-  validation.boku <- terra::rast("validation/thayatal_forest_fuel_3416.tif")
-  validation.boku2 <- terra::aggregate(validation.boku, fact=3, fun="mean")
-  validation.boku2[] <- ifel(validation.boku2 %% 1 == 0, validation.boku2, NA)
-  valid.boku.values.sf <- sf::st_as_sf(as.data.frame(validation.boku2,
-                                                     xy=TRUE, na.rm=T,
-                                                     wide=T ),  coords=c("x","y"),
-                                       crs=terra::crs(validation.boku2)
+  trainers <- list(
+    terra::rast("validation/WildfireCE_Fuel_map_validation_DE-CZ_CzechGlobe_model.tif"),
+    terra::rast("validation/WildfireCE_Fuel_map_validation_AT-CZ_CzechGlobe_model.tif"),
+    terra::rast("validation/carinthia_forest_fuel_3416.tif"),
+    terra::rast("validation/thayatal_forest_fuel_3416.tif")
   )
 
-  valid.bokuClean <- terra::extract(validation.boku, valid.boku.values.sf, ID=F, mat=F)
-  valid.boku.values.sf$match <- valid.boku.values.sf[,1][[1]] == valid.bokuClean[,1]
-  valid.boku.values.sf <- valid.boku.values.sf |> dplyr::filter(match)  |> select(1,2) |> rename(class=1)
-  validation[["BOKU"]] <- valid.boku.values.sf
-  dt <- list(train=train, validation=validation)
-  save(dt, file="extractTrainAndValidationData.rda")
-  dt
+  trainers.vals <- list()
+  cat( as.character(Sys.time()) , file="output.log", sep="\n")
+  for(trainer in trainers){
+
+    trainern <- terra::sources(trainer)
+    message(basename(trainern))
+    cat( "#####################", file="output.log", sep="\n", append=T)
+    cat( basename(trainern) , file="output.log", sep="\n", append=T)
+    clc.ids <- terra::cells(trainer)
+    clc.values <-  trainer[[1]][clc.ids][,1]
+    clc.xy <- terra::xyFromCell(trainer, clc.ids)
+    xy4326 <- as.data.table(sf::sf_project(
+      from = st_crs(trainer)$wkt,
+      to   = st_crs(4326)$wkt,
+      pts  = clc.xy
+    ) )
+
+    names(xy4326) <- c("x","y")
+
+    ## group by tile
+    groups <- xy4326[
+      ,
+      .(idx = list(.I)),
+      by = .(
+        lon = trunc(x * 10) / 10 + 0.05,
+        lat = trunc(y * 10) / 10 + 0.05
+      )
+    ]
+
+    message(nrow(groups))
+    # ll2 <- pbmclapply(
+    ll2 <- pbmclapply(
+      # for( i in
+           seq_len(nrow(groups)),
+       function(i)
+        {
+        pathpart <- sprintf("%.2f_%.2f", groups$lon[i], groups$lat[i])
+        path <- grep(pathpart, path.TesseraTiles$location, value = T)
+        if(length(path)!=1){
+          return( warningCondition( sprintf("Pathpart=%s not found", pathpart) ))
+        }
+        out <- extractAndPredict2(groups$idx[[i]], path[[1]] )
+        out$latTile <- trunc(groups$lat[[i]]*10)
+        out
+      }
+      ,
+      mc.cores = 20
+    )
+    tt <- data.table::rbindlist(ll2)
+    trainers.vals[[basename(trainern)]] <- tt
+
+  }
+
+  save(trainers.vals, file="extractTrainAndValidationData.rda")
+  trainers.vals
 }
 
-dt <- extractTrainAndValidationData()
-
+if(!file.exists("DT.all.parquet")){
+  DT <- extractTrainAndValidationData(T)
+  DT.all <-  data.table::rbindlist(DT)
+  DT.all <-  na.omit(DT.all)
+  # for(ii in 1:129) message(sum(is.na(DT.all[,..ii])))
+  DT.all$class <- as.factor(DT.all$class)
+  DT.all$macro.class<- NULL
+  arrow::write_parquet(DT.all, "DT.all.parquet")
+  # DT.all <- arrow::read_parquet( "DT.all.parquet")
+  # length(DT.all$class)
+  # save(DT.all, file="DT.all.rda")
+}
+DT.all <- arrow::read_parquet( "DT.all.parquet")
 #########################################################
 ######################## SAMPLE TESSERA ON TRAINING ##################
 #########################################################
-basename(path.TesseraTiles$location)
-
-sampleTrainingAndValidationData <- function(){
-
-  rsample <- function(geom, path){
-    r <- terra::rast(path[[1]])
-    terra::extract(r, terra::vect(geom),  ID=F)
-  }
-
-
-
-  dt.predictors.final <- list()
-  for(tnSup in names(dt)){
-    message(tnSup)
-
-    dt.predictors <- list()
-    for(tn in names(dt[[tnSup]])){
-      message(tn)
-
-      t <- dt[[tnSup]][[tn]]
-      t.tr <- st_transform(t, st_crs(path.TesseraTiles))
-      # t.tr
-      result <- st_join(t.tr, path.TesseraTiles, join = st_intersects)
-      result$id <- seq_len(nrow(result))
-      message("Sampling" )
-      system.time({
-        clc.values <- terra::extract(path.CLCplus$`Raster Layer`, terra::vect(result), raw=T, ID=F )
-      })
-      system.time({
-        CH.values <- terra::extract(path.CHM$rast.values, terra::vect(result), raw=T, ID=F )
-      })
-      if(sum(is.na(clc.values))>0){
-        browser()
-      }
-      message("NA values in CLC value point extraction: ",  sum(is.na(clc.values)) )
-      result$clc.values <- clc.values[,1]
-      result$treeHeight.values <- CH.values[,1]
-      DT <- data.table(
-        location = result$location,
-        idx = result$id
-      )
-      groups <- DT[, .(idx = list(idx)), by = location]
-      # parallel extraction with progress bar
-      ll2 <- pbmclapply(
-        seq_len(nrow(groups)),
-        function(i) {
-           path <- groups$location[i]
-           out <- rsample(result[groups$idx[[i]], "geometry"], path)
-           out$id <- groups$idx[[i]]
-           out
-        },
-        mc.cores = 32
-      )
-      names(ll2)<-groups$location
-      fn2 <- rbindlist(ll2)
-      setDT(result)     # geometry column is preserved
-      setDT(fn2)
-      setkey(fn2, id)
-      result2 <- fn2[sf::st_drop_geometry(result), on = "id"]
-      result2$location<-NULL
-      result2$id<-NULL
-      result2$geometry<-NULL
-      result2$class <-  result2$class
-      dt.predictors[[tn]] <- result2
-    }
-
-     Data <- rbindlist(dt.predictors)
-    # # sum(
-    #   table(Data$class)
-    # # )
-    # # sum(
-    #   table(Data$clc.values)
-    # # )
-    dt.predictors.final[[tnSup]] <- Data
-
-  }
-
-  dt.predictors.final
-}
-
-TandV<-sampleTrainingAndValidationData()
-DT.all <- rbind(TandV$train,
-                TandV$validation)
-DT.all$clc.values <- factor(
-  DT.all$clc.values,
-  levels = 1:11,
-  labels = levels(clc_classes)
-)
-DT.all$class <- as.factor(DT.all$class)
-DT.all$macro.class<- NULL
 
 
 
