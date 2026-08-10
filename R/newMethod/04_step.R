@@ -1,9 +1,48 @@
+consenusMatch <- function(rids,
+                          fuel,
+                          fuelConf,
+                          rm,
+                          rmConf,
+                          pred_prob,
+                          pred_class){
+  # CLC=>S&B:  11 => 92, 10 => 98, 9 => 99, 8=>103, 7 => 93,
+  from <- c(11L, 10L, 9L, 8L, 7L)
+  to   <- c(92L, 98L, 99L, 103L, 93L)
 
-################################################################################
-################################################################################
-################################################################################
 
+  ## get all the corine values
+  clc <- rm[[1]][rids][,1]
+  ## cross check which belong to the LUT rule-based ones
+  i <- which(clc%in%from)
 
+  clcConf <- rmConf[[1]][rids[i] ][,1]
+
+  iindex <- match(clc[i], from)
+  pred_class[i] <- to[iindex]
+  pred_prob <- pred_prob*100
+  pred_prob[i] <- clcConf
+
+  i <- which(clc%in%from)
+
+  fuelConf[rids] <<-  pred_prob
+  fuel[ rids ] <<-  pred_class
+  ## ASSIGN CLASSES FROM XGBOOST -----
+  levels(fuel) <- data.frame(
+    value = fuel_models$number,
+    class = fuel_models$code
+  )
+
+  coltab(fuel) <- data.frame(value=fuel_models$number, color=fuel_models$hex)
+  message("Writing ",  terra::varnames(fuel)[[1]] )
+  dir.create(outdir,showWarnings = F, recursive = T)
+  writeRaster(fuel, sprintf("%s/fuelSB_%s.tif", outdir,
+                            substr(terra::varnames(fuel)[[1]], 19,40 ) ),
+              datatype="INT1U")
+  dir.create(sprintf("%sConfidence",outdir),showWarnings = F, recursive = T)
+  writeRaster(fuelConf, sprintf("%sConfidence/fuelSBConfidenceLayer_%s.tif", outdir,
+                            substr(terra::varnames(fuelConf)[[1]], 21,42 ) ),
+              datatype="INT1U")
+}
 
 extractAndPredict <- function(ids, path){
 
@@ -24,9 +63,9 @@ extractAndPredict <- function(ids, path){
              )
 
 }
-#########################################################
+#-------------------------------------------------------#
 ######################## APPLY MODEL  ##################
-#########################################################
+#-------------------------------------------------------#
 
 
 
@@ -42,6 +81,8 @@ if(!file.exists("xgb_final.model")) {
 final_model <- xgboost::xgb.load("xgb_final.model")
 
 DT.all <- arrow::read_parquet( "DT.all.parquet", col_select = "class")
+levs<-as.integer(levels(DT.all$class))
+
 
 ## chunk input
 sf_use_s2(FALSE)
@@ -78,7 +119,9 @@ for(clcFile in clcFiles){
     rmConf<- terra::mask(rConf, poly_v)
     message("Prep")
     fuel <- terra::rast(rm)
-    fuelConf <- terra::rast(rm)
+    fuelConf <- terra::rast(rmConf)
+
+    # plot(rm)
     ## get cellids with values
     clc.ids <- terra::cells(rm)
     # xyv <- as.data.frame(rm, xy=TRUE, na.rm=T, wide=T )
@@ -133,19 +176,20 @@ for(clcFile in clcFiles){
     # , mc.cores = 100
       )
 
+    ## ASSIGN CLASSES FROM XGBOOST -----
     message("Assign")
     fin <- data.table::rbindlist(ll2)
     rids <- clc.ids[ unlist( groups$idx)]
-    fuelConf[rids] <- fin$pred_prob
-    fuel[ rids ] <- levs[as.integer(fin$pred_class)]
+    consenusMatch(rids,
+                  fuel,
+                  fuelConf,
+                  rm,
+                  rmConf,
+                  fin$pred_prob,
+                  levs[as.integer(fin$pred_class)] )
 
-    levs<-as.integer(levels(DT.all$class))
-    levels(fuel) <- data.frame(
-      value = fuel_models$number,
-      class = fuel_models$code
-    )
-    coltab(fuel) <- data.frame(value=fuel_models$number, color=fuel_models$hex)
-     plot(fuel)
+
+
 
 
   }

@@ -14,7 +14,7 @@ setwd(this.path::this.dir())
 on.exit(parallel:::mccollect(wait = FALSE), add = TRUE)
 
 
-## data ----
+## S&B fuel model color tables ----
 clc_to_SB <- data.frame(
   clc_code = c(
     1,2,3,4,5,6,7,8,9,10,11
@@ -143,7 +143,7 @@ fuel_models <- data.frame(
     # SB
     150,130,110, 90,
     # NB
-    220,240,240, 60,180
+    250,240,240, 60,180
   ),
 
   G = c(
@@ -190,7 +190,7 @@ fuel_models$hex <- rgb(
   maxColorValue = 255
 )
 
-
+## CLC+ color tables ----
 clc_classes <- factor(
   1:11,
   levels = 1:11,
@@ -221,9 +221,9 @@ clcplus_colors <- c(
   "Snow and ice"                   = "#F7FBFF"
 )
 
-#------------------------------------------
+#------------------------------------------#
 # Confusion matrix
-#------------------------------------------
+#------------------------------------------#
 prettyPrint <- function(perf, agg=F){
 
   cm<-h2o.confusionMatrix(perf)
@@ -269,9 +269,9 @@ prettyPrint <- function(perf, agg=F){
     row.names = NULL
   )
 
-  #------------------------------------------
+  #------------------------------------------#
   # Per-class metrics
-  #------------------------------------------
+  #------------------------------------------#
 
   TP <- diag(cm)
   FP <- colSums(cm) - TP
@@ -293,9 +293,9 @@ prettyPrint <- function(perf, agg=F){
     F1 = round(f1,4)
   )
 
-  #------------------------------------------
+  #------------------------------------------#
   # Overall metrics
-  #------------------------------------------
+  #------------------------------------------#
 
   overall_accuracy <- sum(TP)/sum(cm)
 
@@ -316,9 +316,9 @@ prettyPrint <- function(perf, agg=F){
     ),4)
   )
 
-  #------------------------------------------
+  #------------------------------------------#
   # Create workbook
-  #------------------------------------------
+  #------------------------------------------#
 
   wb <- createWorkbook()
 
