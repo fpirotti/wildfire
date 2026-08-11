@@ -218,15 +218,18 @@ path.CHM <- downloadETHtreeHeight()
 # needs python 3.12 ! Create a virtual environment (only once)
 downloadTESSERA <- function(){
 
+  outdir <- "/archivio02/shared/geodati/raster/GeoTESSERA"
   # diff(range(lat))*diff(range(lon))*100*300/1000
+
+
   tiles <- expand.grid(
-    lat = lat,
-    lon = lon,
+    lat = seq(bbox[[2]]+0.05, bbox[[4]]+0.05, 0.1),
+    lon = seq(bbox[[1]]-0.05, bbox[[3]]+0.05, 0.1),
     KEEP.OUT.ATTRS = FALSE
   )
-
-
-
+  tiles$filename <- sprintf("%s/global_0.1_degree_representation/%d/grid_%.2f_%.2f/grid_%.2f_%.2f_%d.tiff",
+                            outdir, year, tiles$lon, tiles$lat,
+                            tiles$lon,  tiles$lat, year )
   if (!virtualenv_exists("geotessera-env")) {
       virtualenv_create("geotessera-env")
       # Use the environment
@@ -241,28 +244,22 @@ downloadTESSERA <- function(){
       )
   }
 
-  outdir <- "/archivio02/shared/geodati/raster/GeoTESSERA"
   tifs <- list.files(file.path(outdir, "global_0.1_degree_representation"), pattern="\\.tiff$", recursive = T, full.names = T)
+  missing <- which(!(tiles$filename%in%tifs))
+  if(length(missing)==0){
+    message("No missing Geotessera files! returning....")
+    return(  sf::read_sf(sprintf("%s/000_tileindex.gpkg",
+                                 outdir)) )
+  } else {
+    message(length(missing), "  missing Geotessera files - downloading")
+  }
+
   old.nTiffs <- length(tifs)
   dir.create(outdir, showWarnings = FALSE, recursive = TRUE)
 
   download_one<-  function(i) {
     lo <- tiles$lon[i]
     la <- tiles$lat[i]
-    # bbox format: xmin,ymin,xmax,ymax
-    bbox <- sprintf(
-      "%s,%s,%s,%s",
-      lo,
-      la,
-      lo + 0.1,
-      la + 0.5
-    )
-    # bbox <- sprintf(
-    #   "%s,%s,%s,%s",
-    #   10.4, 45.6, 17.7, 51.1)
-
-    # stdout_log <- file.path(outdir, sprintf("stdoutTESSERA_10m_%d", year))
-    # stderr_log <- file.path(outdir, sprintf("stderrTESSERA_10m_%d", year))
 
     stdout_log <- file.path(outdir, sprintf("stdoutTESSERA_10m_%d_%s_%s", year, fmt_lon(lo), fmt_lat(la)))
     stderr_log <- file.path(outdir, sprintf("stderrTESSERA_10m_%d_%s_%s", year, fmt_lon(lo), fmt_lat(la)))
@@ -270,7 +267,8 @@ downloadTESSERA <- function(){
       "/home/pirotti/.virtualenvs/geotessera-env/bin/geotessera",
       c(
         "download",
-        "--bbox", bbox,
+        # "--bbox", bbox,
+        "--tile", paste(lo, la, sep=","),
         "--year", year,
         "--output", outdir
       ),
@@ -282,14 +280,14 @@ downloadTESSERA <- function(){
 
   if( !(exists("skip") && skip) ){
     message("We start downloading tiles, ", length(tifs), " already present, are you sure you need to re-run (existing tiffs will be skipped)?")
-    ans <- readline("Continue? (y/n): ")
-    if (tolower(ans) == "y") {
+    # ans <- readline("Continue? (y/n): ")
+    # if (tolower(ans) == "y") {
       results <- pbmclapply(
-        seq_len(nrow(tiles)),
+        missing,
         download_one,
         mc.cores = 50
       )
-    }
+    # }
   } else {
     message("Skipping check in GeoTESSERA dataset")
   }

@@ -1,26 +1,24 @@
 
-################################################################################
-# MODEL TRAINING ##########################
-################################################################################
-# bm <- h2o.loadModel(file.path(this.path::this.dir(),"model/finalModel"))
-# bm@parameters
 
-source(file.path(this.path::this.dir(), "00_functions.R"))
-#########################################################
+#-------------------------------------------------------#
+# MODEL TRAINING ##########################
+#-------------------------------------------------------#
+# source(file.path(this.path::this.dir(), "00_functions.R"))
+#-------------------------------------------------------#
 ######################## LOAD TRAINING ##################
-#########################################################
+#-------------------------------------------------------#
 
 message("#################################")
 
-message(getwd())
 if( !file.exists("DT.all.parquet")){
   stop("data frame for training not present, DT.all.rda not found - did you run the previous steps?")
 }
-library(xgboost)
-library(arrow)
-message("importing parquet")
-DT.all <- arrow::read_parquet( "DT.all.parquet" )
-message("imported parquet")
+if(!exists("DT.all")){
+  message("importing parquet ")
+  DT.all <- arrow::read_parquet( "DT.all.parquet" )
+  message("imported parquet")
+}
+
 y <- "class"
 x <- setdiff(colnames(DT.all), c(y, "latTile"))
 params <- list(
@@ -72,14 +70,11 @@ runCV <- function(){
   saveRDS(cv, file="xgb_cv_cuda.rds")
 }
 
-if(!file.exists("xgb_cv_cuda.rds")) runCV()
+if(!file.exists("xgb_cv_cuda.rds")) {
+  message("RUNNING XBOOST CV!!")
+  runCV()
+}
 
-message("Loading CV")
-cv <- readRDS("xgb_cv_cuda.rds")
-best_nrounds <- cv$evaluation_log[
-  which.min(cv$evaluation_log$test_merror_mean),
-  iter
-]
 
 if(!file.exists("xgb_final.model")) {
   message("STARTING FINAL TRAINING")
@@ -88,6 +83,12 @@ if(!file.exists("xgb_final.model")) {
     as.matrix(DT.all[, ..x]),
     label = as.integer(DT.all$class)- 1L
   )
+  message("Loading CV")
+  cv <- readRDS("xgb_cv_cuda.rds")
+  best_nrounds <- cv$evaluation_log[
+    which.min(cv$evaluation_log$test_merror_mean),
+    iter
+  ]
   message("starting training with ", best_nrounds, " rounds")
   final_model <- xgboost::xgb.train(
     params = params,
@@ -101,12 +102,7 @@ if(!file.exists("xgb_final.model")) {
     "xgb_final.model"
   )
 } else {
-  final_model <- xgboost::xgb.load("xgb_final.model")
+  message("############################")
+  message("everything done, Cross validataion and training, model ready!!!!")
 }
-## predict
-# class_levels <- levels(DT.all$class)
-# pred_class <- max.col(prob_mat)
-# pred_class <- factor(
-#   class_levels[pred_class],
-#   levels = class_levels
-# )
+

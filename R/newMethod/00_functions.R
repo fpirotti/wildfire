@@ -3,10 +3,10 @@ if (!requireNamespace("pacman", quietly = TRUE)) {
 }
 pacman::p_load(
   pbmcapply, this.path ,
-  terra, hdar,
-  sf, data.table,
+  terra, hdar,arrow,
+  sf, data.table, xgboost,
   parallel, openxlsx,
-    reticulate,
+  reticulate,
   dplyr
 )
 tmpWd <- getwd()

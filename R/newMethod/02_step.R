@@ -288,6 +288,7 @@ extractTrainAndValidationData <- function(force=F){
 }
 
 if(!file.exists("DT.all.parquet")){
+  message("File DT.all does not exist, creating...")
   DT <- extractTrainAndValidationData(T)
   DT.all <-  data.table::rbindlist(DT)
   DT.all <-  na.omit(DT.all)
@@ -299,6 +300,8 @@ if(!file.exists("DT.all.parquet")){
   # length(DT.all$class)
   # save(DT.all, file="DT.all.rda")
 }
+
+message("File DT.all does exists, loading...")
 DT.all <- arrow::read_parquet( "DT.all.parquet")
 #########################################################
 ######################## SAMPLE TESSERA ON TRAINING ##################
@@ -307,7 +310,7 @@ DT.all <- arrow::read_parquet( "DT.all.parquet")
 
 
 
-plotsNmatrices()  <- function(){
+plotsNmatrices  <- function(){
   mat <- table( trunc(DT.all$class/10),
                 DT.all$clc.values  )
 
