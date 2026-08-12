@@ -17,6 +17,8 @@ consenusMatch <- function(rids,
 
   message("Assigning ",  terra::varnames(fuel)[[1]] )
 
+  browser()
+  length(pred_prob)
   fuelConf[rids] <-  pred_prob
   fuel[ rids ] <-  pred_class
   message("Writing ",  terra::varnames(fuel)[[1]] )
@@ -78,6 +80,18 @@ extractAndPredict <- function(ids, path){
              pred_prob= apply(p, 1, max)
              )
 
+}
+
+extractOnly <- function(ids, path){
+  r <- terra::rast(path[[1]])
+  xy <- xy4326[ids,]
+  pts <- sf::sf_project(
+    from = st_crs(4326)$wkt,
+    to   = st_crs(r)$wkt,
+    pts  = xy
+  )
+  dt <- terra::extract(r, pts)
+  dt
 }
 #-------------------------------------------------------#
 ######################## APPLY MODEL  ##################
@@ -158,9 +172,9 @@ for(clcFile in clcFiles){
                          substr(basename(clcFile), 19,40 ) ) )
   ){
 
-    message(basename(clcFile), " interecting but exists... doing again...")
+    message(basename(clcFile), " interecting but exists... SKIPPING...")
     # browser()
-    # next
+    next
   }
 
 
@@ -183,7 +197,7 @@ for(clcFile in clcFiles){
     outer <- 1:2
     while(length(outer)!=0){
       clc.xy <- terra::xyFromCell(rm, clc.ids)
-      message("...", length(clc.xy), " cell centers to lat long")
+      message("......", length(clc.xy), " cell centers to lat long")
       xy4326 <- as.data.table(sf::sf_project(
         from = st_crs(rm)$wkt,
         to   = st_crs(4326)$wkt,
@@ -193,12 +207,29 @@ for(clcFile in clcFiles){
       outer <- which(xy4326$x < bbox[[1]] | xy4326$x > bbox[[3]] |
                        xy4326$y < bbox[[2]] | xy4326$y > bbox[[4]]
       )
-      if(length(outer)!=0) clc.ids <- clc.ids[-1*outer]
+      if(length(outer)!=0) {
+        clc.ids <- clc.ids[-1*outer]
+      } else {
+        ## here means we get the final data because loop will exit
+        clc.xy <- terra::xyFromCell(rm, clc.ids)
+        message("...", nrow(clc.xy), " cell centers to lat long")
+        xy4326 <- as.data.table(sf::sf_project(
+          from = st_crs(rm)$wkt,
+          to   = st_crs(4326)$wkt,
+          pts  = clc.xy
+        ) )
+        names(xy4326) <- c("x","y")
+        message("......", length(clc.xy), "==", nrow(xy4326),
+                " FINAL NUMBER OF cell centers to lat long")
+      }
       if(length(clc.ids)==0){
         stop("Error here , there should be some ids")
       }
     }
 
+    message("...", nrow(clc.xy), "==", nrow(xy4326), " diff is = ",
+            nrow(clc.xy) - nrow(xy4326),
+            " (should be zero) ... FINAL NUMBER OF cell centers to lat long")
     # xy4326[outer,]
     ## group by tile
     message("...group by Geotessera tile")
@@ -213,7 +244,7 @@ for(clcFile in clcFiles){
 
     message("...predict tiles")
     # parallel extraction with progress bar pbmc
-    ll2 <- lapply(
+    ll2 <- pbmclapply(
      # for(i in
       seq_len(nrow(groups))
       # )
@@ -228,29 +259,41 @@ for(clcFile in clcFiles){
         if(length(path)==0){
           return( warningCondition( sprintf("Pathpart=%s not found", pathpart) ))
         }
-        out <- extractAndPredict(groups$idx[[i]], path )
-        if(is.null(out) || nrow(out)==0){
-          browser()
-        }
+        out <- extractOnly(groups$idx[[i]], path )
+        # if(is.null(out) || nrow(out)==0){
+        #   browser()
+        # }
         out
      }
-    # , mc.cores = 100
+    , mc.cores = 100
       )
+
+    # dt <- rbindlist(ll2)
+
 
     ## ASSIGN CLASSES FROM XGBOOST -----
     message("...assign class values")
 
     isData <- which(unlist(lapply(ll2, is.data.frame)))
+    groupsFinal <- groups[isData]
+
     if(length(isData)==0){
       message(" ###################################  SHOULD NOT BE HERE!! ")
       next
     }
     fin <- data.table::rbindlist(ll2[isData])
+
     if(nrow(fin)==0){
       message(" ################################### 0 rows... SHOULD NOT BE HERE!! ")
       next
     }
-    rids <- clc.ids[ unlist( groups$idx)]
+    xy4326Final <- xy4326[ unlist( groupsFinal$idx)]
+    chm <- terra::extract(path.CHM$rast.values, xy4326Final)[[2]]
+    chm[is.na(chm)] <- 0
+    fin$treeHeight.values <-chm
+    rm(chm)
+    ######## do prediction here ###
+    rids <- clc.ids[ unlist( groupsFinal$idx)]
     message("...consensus")
 
     consenusMatch(rids,
