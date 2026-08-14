@@ -13,6 +13,44 @@ tmpWd <- getwd()
 setwd(this.path::this.dir())
 on.exit(parallel:::mccollect(wait = FALSE), add = TRUE)
 
+log_file <-      file.path("00_log", format(Sys.time(), "messages_%Y%m%d_%H%M%S.log"))
+if(!dir.exists("00_log")) dir.create("00_log",showWarnings = F)
+message <- local({
+  old_message <- base::message
+
+  function(...) {
+    txt <- paste0(...)
+    txt <- paste0(
+      format(Sys.time(), "[%Y-%m-%d %H:%M:%S] "),
+      txt
+    )
+    old_message(txt)
+    cat(txt, "\n", file = log_file, append = TRUE)
+
+  }
+})
+
+memlog <- function(label) {
+  if(!memlogOn){
+    message(
+      sprintf(
+        "... [M]  %s ",
+        label
+      )
+    )
+    invisible(NULL)
+  }
+  gc()
+  m <- gc()
+  message(
+    sprintf(
+      "... [M]  %s | Ncells %.3f GB | Vcells %.3f GB",
+      label,
+      m[1, 2] / 1024,
+      m[2, 2] / 1024
+    )
+  )
+}
 
 ## S&B fuel model color tables ----
 clc_to_SB <- data.frame(

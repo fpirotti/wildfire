@@ -1,0 +1,12 @@
+tmp/
+DT.all.parquet
+classification_report.xlsx
+classification_report2.xlsx
+model
+table.xlsx
+unionTessera.gpkg
+validation
+xgb_cv.rds
+xgb_cv_cuda.rds
+xgb_final.model
+06_geotesseraRemoteSample.R

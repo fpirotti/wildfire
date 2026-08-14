@@ -4,16 +4,20 @@ source(file.path(this.path::this.dir(), "00_functions.R"))
 #-------------------------------------------------------#
 #-------------------------------------------------------#
 #-------------------------------------------------------#
-createPredRaster <- function(rids,
+consenusMatch <- function(rids,
                           fuel,
                           fuelConf,
                           rm,
                           rmConf,
                           pred_prob,
                           pred_class){
+  # CLC=>S&B:  11 => 92, 10 => 98, 9 => 99, 8=>103, 7 => 93,
+  from <- c(1L, 11L, 10L, 9L, 8L, 7L)
+  to   <- c(91L,92L, 98L, 99L, 103L, 93L)
 
   message("Assigning ",  terra::varnames(fuel)[[1]] )
 
+  length(pred_prob)
   fuelConf[rids] <-  pred_prob
   fuel[ rids ] <-  pred_class
   message("Writing ",  terra::varnames(fuel)[[1]] )
@@ -23,7 +27,38 @@ createPredRaster <- function(rids,
   writeRaster(fuelConf, sprintf("%sConfidencePre/fuelSBCL_%s.tif", outdir,
                                 substr(terra::varnames(fuelConf)[[1]], 21,42 ) ),
               datatype="INT1U", overwrite=T)
+  return()
 
+  ## get all the corine values
+  clc <- rm[[1]][rids][,1]
+  ## cross check which belong to the LUT rule-based ones
+  i <- which(clc%in%from)
+
+  clcConf <- rmConf[[1]][rids[i] ][,1]
+
+  iindex <- match(clc[i], from)
+  pred_class[i] <- to[iindex]
+  pred_prob <- pred_prob*100
+  pred_prob[i] <- clcConf
+
+  i <- which(clc%in%from)
+
+  fuelConf[rids] <<-  pred_prob
+  fuel[ rids ] <<-  pred_class
+  ## ASSIGN CLASSES FROM XGBOOST -----
+  # levels(fuel) <- data.frame(
+  #   value = fuel_models$number,
+  #   class = fuel_models$code
+  # )
+
+  coltab(fuel) <- data.frame(value=fuel_models$number, color=fuel_models$hex)
+  message("Writing ",  terra::varnames(fuel)[[1]] )
+  writeRaster(fuel, sprintf("%s/fuelSB_%s.tif", outdir,
+                            substr(terra::varnames(fuel)[[1]], 19,40 ) ),
+              datatype="INT1U", overwrite=T)
+  writeRaster(fuelConf, sprintf("%sConfidence/fuelSBCL_%s.tif", outdir,
+                            substr(terra::varnames(fuelConf)[[1]], 21,42 ) ),
+              datatype="INT1U", overwrite=T)
 }
 
 extractAndPredict <- function(ids, path){
@@ -156,7 +191,7 @@ for(clcFile in clcFilesThatIntersect){
     r <- terra::rast(clcFile)
     clcFileConf <- grep( substr(basename(clcFile), 22,34), clcFilesConf, value = T)
     if(length(clcFileConf)!=1){
-      stop(paste0(length(clcFileConf), " clcFileConf files... should be one only") )
+      browser()
     }
     rConf <- terra::rast(clcFileConf)
     # remove partially covered parts
@@ -212,9 +247,11 @@ for(clcFile in clcFilesThatIntersect){
       message("... no cells falling in study area, will skip")
       next
     }
-    message("... N cells diff is = ",
+    message("...", nrow(clc.xy), "==", nrow(xy4326), " diff is = ",
             nrow(clc.xy) - nrow(xy4326),
-            " (should be zero)")
+            " (should be zero) ... FINAL NUMBER OF cell centers to lat long")
+    # xy4326[outer,]
+    ## group by tile
     message("...group by Geotessera tile")
     groups <- xy4326[
       ,
@@ -285,13 +322,28 @@ for(clcFile in clcFilesThatIntersect){
 
     }
 
-    memlog("... before removing stuff")
-    rm(list(fin , p, chm))
-    memlog("... after removing stuff")
+    rm(fin)
+    rm(p)
+    message("...removeing CHM")
+    rm(chm)
 
     pred <- data.table::rbindlist(pred)
 
-    createPredRaster( pred$ids,
+    ######## do prediction here ###
+
+    # ## ASSIGN CLASSES FROM XGBOOST -----
+    #
+    # memlog("start predict")
+    # p <- predict(final_model, fin )
+    # memlog("after predict and before remove pred frame")
+    # rm(fin)
+    # memlog("after predict and after remove pred frame")
+    # pred  <-     data.frame(pred_class=max.col(p),
+    #                             pred_prob= apply(p, 1, max) )
+    # rm(p)
+    # memlog("after predict and after remove pred coll frame")
+    # message("...creating final raster")
+    consenusMatch( pred$ids,
                   fuel,
                   fuelConf,
                   rm,
@@ -299,9 +351,11 @@ for(clcFile in clcFilesThatIntersect){
                   pred$pred_prob,
                   levs[as.integer(pred$pred_class)] )
 
-    memlog("... before pred rem")
-    rm(pred)
-    memlog("... after pred rem")
+    memlog("after creation of raster  and before remove pred frame")
+
+    memlog("after predict and after remove big data frame")
+
+
 
   }
 

@@ -1,23 +1,7 @@
-log_file <-      format(Sys.time(), "messages_%Y%m%d_%H%M%S.log")
+source(file.path(this.path::this.dir(), "00_functions.R"))
 
-message <- local({
-  old_message <- base::message
-
-  function(...) {
-    txt <- paste0(...)
-    txt <- paste0(
-      format(Sys.time(), "[%Y-%m-%d %H:%M:%S] "),
-      txt
-    )
-    old_message(txt)
-    cat(txt, "\n", file = log_file, append = TRUE)
-
-  }
-})
 
 message("Starting processing")
-
-source(file.path(this.path::this.dir(), "00_functions.R"))
 
 year <- 2023
 bbox <- c(10.4, 45.6, 17.7, 51.1)
@@ -57,6 +41,8 @@ rootPathCLCconf <- file.path(root,"CLMS_CLCplus_RASTER_2023confidence/TIFFs")
 ## DOWNLOADS NECESSARY INPUT ACCORDING TO BOUNDS ----
 skip <- TRUE  ## this is used in 01_step.R to skip all checks that files exist
               ## if we are sure that we have all necessary files it saves time
+memlogOn <- TRUE  ##  MEMLOG function reports the memory usage and does garbage
+                ##  cleaning which takes time and might not be necessary.
 message("step 01")
 source("01_step.R")
 ## ORGANIZES TRAINING AND CREATES MODEL ----
