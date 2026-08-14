@@ -701,3 +701,4 @@
 [2026-08-14 17:48:06] ... [M]  ......before predict | Ncells 0.170 GB | Vcells 3.343 GB 
 [2026-08-14 17:48:06] ......chunk 1 of 3 
 [2026-08-14 17:48:06] ......reading parquet 
+[2026-08-14 17:48:52] ......extracting CHM 
