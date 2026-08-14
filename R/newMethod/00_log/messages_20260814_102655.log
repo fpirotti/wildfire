@@ -1,0 +1,51 @@
+[2026-08-14 10:26:55] Starting processing 
+[2026-08-14 10:26:55] step 01 
+[2026-08-14 10:26:55] Skipping check in CLC dataset 
+[2026-08-14 10:26:55] Creating VRT 
+[2026-08-14 10:26:56] Creating VRT 
+[2026-08-14 10:26:58] ETH_GlobalCanopyHeight_10m_2020_N45E009_Map.tif 
+[2026-08-14 10:26:58] ETH_GlobalCanopyHeight_10m_2020_N45E009_Map_SD.tif 
+[2026-08-14 10:26:58] ETH_GlobalCanopyHeight_10m_2020_N48E009_Map.tif 
+[2026-08-14 10:26:58] ETH_GlobalCanopyHeight_10m_2020_N48E009_Map_SD.tif 
+[2026-08-14 10:26:58] ETH_GlobalCanopyHeight_10m_2020_N51E009_Map.tif 
+[2026-08-14 10:26:58] ETH_GlobalCanopyHeight_10m_2020_N51E009_Map_SD.tif 
+[2026-08-14 10:26:58] ETH_GlobalCanopyHeight_10m_2020_N45E012_Map.tif 
+[2026-08-14 10:26:58] ETH_GlobalCanopyHeight_10m_2020_N45E012_Map_SD.tif 
+[2026-08-14 10:26:58] ETH_GlobalCanopyHeight_10m_2020_N48E012_Map.tif 
+[2026-08-14 10:26:58] ETH_GlobalCanopyHeight_10m_2020_N48E012_Map_SD.tif 
+[2026-08-14 10:26:58] ETH_GlobalCanopyHeight_10m_2020_N51E012_Map.tif 
+[2026-08-14 10:26:58] ETH_GlobalCanopyHeight_10m_2020_N51E012_Map_SD.tif 
+[2026-08-14 10:26:58] ETH_GlobalCanopyHeight_10m_2020_N45E015_Map.tif 
+[2026-08-14 10:26:58] ETH_GlobalCanopyHeight_10m_2020_N45E015_Map_SD.tif 
+[2026-08-14 10:26:58] ETH_GlobalCanopyHeight_10m_2020_N48E015_Map.tif 
+[2026-08-14 10:26:58] ETH_GlobalCanopyHeight_10m_2020_N48E015_Map_SD.tif 
+[2026-08-14 10:26:58] ETH_GlobalCanopyHeight_10m_2020_N51E015_Map.tif 
+[2026-08-14 10:26:58] ETH_GlobalCanopyHeight_10m_2020_N51E015_Map_SD.tif 
+[2026-08-14 10:26:58] ETH_GlobalCanopyHeight_10m_2020_N45E018_Map.tif 
+[2026-08-14 10:26:58] ETH_GlobalCanopyHeight_10m_2020_N45E018_Map_SD.tif 
+[2026-08-14 10:26:58] ETH_GlobalCanopyHeight_10m_2020_N48E018_Map.tif 
+[2026-08-14 10:26:58] ETH_GlobalCanopyHeight_10m_2020_N48E018_Map_SD.tif 
+[2026-08-14 10:26:58] ETH_GlobalCanopyHeight_10m_2020_N51E018_Map.tif 
+[2026-08-14 10:26:58] ETH_GlobalCanopyHeight_10m_2020_N51E018_Map_SD.tif 
+[2026-08-14 10:26:58] Creating VRT  
+[2026-08-14 10:26:58] ETH Tree height tiles mosaic returned as list with values and SD rasters 
+[2026-08-14 10:26:58] 3  missing Geotessera files - downloading 
+[2026-08-14 10:26:58] Skipping check in GeoTESSERA dataset 
+[2026-08-14 10:26:58] No new tiles downloaded 
+[2026-08-14 10:26:58] GeoTESSERA Map downloaded and tile index provided (tiles are in different CRS) 
+[2026-08-14 10:26:58] Fire Loss Map downloaded 
+[2026-08-14 10:28:05] Loading xgboost model... 
+[2026-08-14 10:28:06] importing parquet  
+[2026-08-14 10:28:06] imported parquet 
+[2026-08-14 10:28:07]  Getting only intersecting CLC tiles 
+[2026-08-14 10:28:15] 1 CLC tiles to process found 
+[2026-08-14 10:29:12] ...Masking 1 
+[2026-08-14 10:29:19] ...Masking 2 
+[2026-08-14 10:29:24] ...Preparing 
+[2026-08-14 10:29:29] ......75810072 cell centers to lat long 
+[2026-08-14 10:29:49] ......68456611 cell centers to lat long 
+[2026-08-14 10:30:03] ......68456611==68456611 FINAL NUMBER OF cell centers to lat long - removing rest 
+[2026-08-14 10:30:13] ... N cells diff is = 0 (should be zero) 
+[2026-08-14 10:30:14] ...group by Geotessera tile 
+[2026-08-14 10:30:20] ...predict 102 tiles 
+[2026-08-14 10:30:27] ... [M]  start pbmclapply | Ncells 0.184 GB | Vcells 1.833 GB 

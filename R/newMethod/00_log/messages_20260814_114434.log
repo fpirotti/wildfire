@@ -1,0 +1,703 @@
+[2026-08-14 11:44:34] Loading xgboost model... 
+[2026-08-14 11:44:36]  Getting only intersecting CLC tiles 
+[2026-08-14 11:44:43] 48 CLC tiles to process found 
+[2026-08-14 11:44:43] CLMS_CLCPLUS_RAS_S2023_R10m_E43N24_03035_V01_R00.tif  1 of 48 
+[2026-08-14 11:44:43] ...Masking 1 
+[2026-08-14 11:44:49] ...Masking 2 
+[2026-08-14 11:44:55] ...Preparing 
+[2026-08-14 11:44:56] ......converting 671741 cell centers to lat long 
+[2026-08-14 11:44:56] ......converting FINISHED 671741 cell centers to lat long 
+[2026-08-14 11:44:56] ... N cells diff is = 0 (should be zero) 
+[2026-08-14 11:44:56] ...group by Geotessera tile 
+[2026-08-14 11:44:56] ...predict 7 tiles 
+[2026-08-14 11:44:57] ... [M]  start pbmclapply | Ncells 0.162 GB | Vcells 0.051 GB 
+[2026-08-14 11:45:01] ...extraction finished 
+[2026-08-14 11:45:02] ... [M]  ......before predict | Ncells 0.168 GB | Vcells 0.052 GB 
+[2026-08-14 11:45:02] ......chunk 1 of 1 
+[2026-08-14 11:45:02] ......reading parquet 
+[2026-08-14 11:45:03] ......extracting CHM 
+[2026-08-14 11:45:04] ......predict 
+[2026-08-14 11:45:09] ... [M]  ... before removing stuff | Ncells 0.197 GB | Vcells 0.705 GB 
+[2026-08-14 11:45:09] ... [M]  ... after removing stuff | Ncells 0.197 GB | Vcells 0.080 GB 
+[2026-08-14 11:45:09] Assigning CLMS_CLCPLUS_RAS_S2023_R10m_E43N24_03035_V01_R00 
+[2026-08-14 11:45:11] Writing CLMS_CLCPLUS_RAS_S2023_R10m_E43N24_03035_V01_R00 
+[2026-08-14 11:45:14] ... [M]  ... before pred rem | Ncells 0.170 GB | Vcells 0.076 GB 
+[2026-08-14 11:45:15] ... [M]  ... after pred rem | Ncells 0.170 GB | Vcells 0.066 GB 
+[2026-08-14 11:45:15] CLMS_CLCPLUS_RAS_S2023_R10m_E43N25_03035_V01_R00.tif  2 of 48 
+[2026-08-14 11:45:15] ...Masking 1 
+[2026-08-14 11:45:22] ...Masking 2 
+[2026-08-14 11:45:28] ...Preparing 
+[2026-08-14 11:45:29] ......converting 55834721 cell centers to lat long 
+[2026-08-14 11:45:43] ......converting FINISHED 55834721 cell centers to lat long 
+[2026-08-14 11:45:46] ... N cells diff is = 0 (should be zero) 
+[2026-08-14 11:45:46] ...group by Geotessera tile 
+[2026-08-14 11:45:47] ...predict 70 tiles 
+[2026-08-14 11:45:48] ... [M]  start pbmclapply | Ncells 0.170 GB | Vcells 1.333 GB 
+[2026-08-14 11:46:29] ...extraction finished 
+[2026-08-14 11:46:29] ... [M]  ......before predict | Ncells 0.170 GB | Vcells 1.333 GB 
+[2026-08-14 11:46:29] ......chunk 1 of 2 
+[2026-08-14 11:46:29] ......reading parquet 
+[2026-08-14 11:47:46] ......extracting CHM 
+[2026-08-14 11:49:03] ......predict 
+[2026-08-14 11:53:55] ......chunk 2 of 2 
+[2026-08-14 11:53:55] ......reading parquet 
+[2026-08-14 11:54:04] ......extracting CHM 
+[2026-08-14 11:54:17] ......predict 
+[2026-08-14 11:55:30] ... [M]  ... before removing stuff | Ncells 2.256 GB | Vcells 5.253 GB 
+[2026-08-14 11:55:34] ... [M]  ... after removing stuff | Ncells 2.256 GB | Vcells 3.462 GB 
+[2026-08-14 11:55:35] Assigning CLMS_CLCPLUS_RAS_S2023_R10m_E43N25_03035_V01_R00 
+[2026-08-14 11:55:41] Writing CLMS_CLCPLUS_RAS_S2023_R10m_E43N25_03035_V01_R00 
+[2026-08-14 11:55:46] ... [M]  ... before pred rem | Ncells 0.170 GB | Vcells 2.643 GB 
+[2026-08-14 11:55:46] ... [M]  ... after pred rem | Ncells 0.170 GB | Vcells 1.748 GB 
+[2026-08-14 11:55:46] CLMS_CLCPLUS_RAS_S2023_R10m_E43N26_03035_V01_R00.tif  3 of 48 
+[2026-08-14 11:55:46] ...Masking 1 
+[2026-08-14 11:55:48] ...Masking 2 
+[2026-08-14 11:55:50] ...Preparing 
+[2026-08-14 11:55:50] ......converting 56224970 cell centers to lat long 
+[2026-08-14 11:55:59] ......converting FINISHED 56224970 cell centers to lat long 
+[2026-08-14 11:55:59] ... N cells diff is = 0 (should be zero) 
+[2026-08-14 11:55:59] ...group by Geotessera tile 
+[2026-08-14 11:56:02] ...predict 70 tiles 
+[2026-08-14 11:56:03] ... [M]  start pbmclapply | Ncells 0.170 GB | Vcells 1.761 GB 
+[2026-08-14 11:57:07] ...extraction finished 
+[2026-08-14 11:57:08] ... [M]  ......before predict | Ncells 0.170 GB | Vcells 1.761 GB 
+[2026-08-14 11:57:08] ......chunk 1 of 2 
+[2026-08-14 11:57:08] ......reading parquet 
+[2026-08-14 11:57:53] ......extracting CHM 
+[2026-08-14 11:59:00] ......predict 
+[2026-08-14 12:04:24] ......chunk 2 of 2 
+[2026-08-14 12:04:24] ......reading parquet 
+[2026-08-14 12:04:38] ......extracting CHM 
+[2026-08-14 12:04:50] ......predict 
+[2026-08-14 12:06:04] ... [M]  ... before removing stuff | Ncells 2.256 GB | Vcells 13.538 GB 
+[2026-08-14 12:06:08] ... [M]  ... after removing stuff | Ncells 2.256 GB | Vcells 3.496 GB 
+[2026-08-14 12:06:08] Assigning CLMS_CLCPLUS_RAS_S2023_R10m_E43N26_03035_V01_R00 
+[2026-08-14 12:06:11] Writing CLMS_CLCPLUS_RAS_S2023_R10m_E43N26_03035_V01_R00 
+[2026-08-14 12:06:15] ... [M]  ... before pred rem | Ncells 0.170 GB | Vcells 2.677 GB 
+[2026-08-14 12:06:16] ... [M]  ... after pred rem | Ncells 0.170 GB | Vcells 1.773 GB 
+[2026-08-14 12:06:16] CLMS_CLCPLUS_RAS_S2023_R10m_E43N27_03035_V01_R00.tif  4 of 48 
+[2026-08-14 12:06:16] ...Masking 1 
+[2026-08-14 12:06:17] ...Masking 2 
+[2026-08-14 12:06:19] ...Preparing 
+[2026-08-14 12:06:19] ......converting 56619075 cell centers to lat long 
+[2026-08-14 12:06:29] ......converting FINISHED 56619075 cell centers to lat long 
+[2026-08-14 12:06:29] ... N cells diff is = 0 (should be zero) 
+[2026-08-14 12:06:29] ...group by Geotessera tile 
+[2026-08-14 12:06:31] ...predict 70 tiles 
+[2026-08-14 12:06:32] ... [M]  start pbmclapply | Ncells 0.170 GB | Vcells 1.786 GB 
+[2026-08-14 12:07:39] ...extraction finished 
+[2026-08-14 12:07:40] ... [M]  ......before predict | Ncells 0.170 GB | Vcells 1.786 GB 
+[2026-08-14 12:07:40] ......chunk 1 of 2 
+[2026-08-14 12:07:40] ......reading parquet 
+[2026-08-14 12:08:23] ......extracting CHM 
+[2026-08-14 12:09:26] ......predict 
+[2026-08-14 12:14:30] ......chunk 2 of 2 
+[2026-08-14 12:14:30] ......reading parquet 
+[2026-08-14 12:14:45] ......extracting CHM 
+[2026-08-14 12:14:59] ......predict 
+[2026-08-14 12:16:19] ... [M]  ... before removing stuff | Ncells 2.256 GB | Vcells 14.189 GB 
+[2026-08-14 12:16:24] ... [M]  ... after removing stuff | Ncells 2.256 GB | Vcells 3.531 GB 
+[2026-08-14 12:16:24] Assigning CLMS_CLCPLUS_RAS_S2023_R10m_E43N27_03035_V01_R00 
+[2026-08-14 12:16:27] Writing CLMS_CLCPLUS_RAS_S2023_R10m_E43N27_03035_V01_R00 
+[2026-08-14 12:16:31] ... [M]  ... before pred rem | Ncells 0.170 GB | Vcells 2.711 GB 
+[2026-08-14 12:16:32] ... [M]  ... after pred rem | Ncells 0.170 GB | Vcells 1.798 GB 
+[2026-08-14 12:16:32] CLMS_CLCPLUS_RAS_S2023_R10m_E43N28_03035_V01_R00.tif  5 of 48 
+[2026-08-14 12:16:32] ...Masking 1 
+[2026-08-14 12:16:34] ...Masking 2 
+[2026-08-14 12:16:35] ...Preparing 
+[2026-08-14 12:16:35] ......converting 57017060 cell centers to lat long 
+[2026-08-14 12:16:44] ......converting FINISHED 57017060 cell centers to lat long 
+[2026-08-14 12:16:45] ... N cells diff is = 0 (should be zero) 
+[2026-08-14 12:16:45] ...group by Geotessera tile 
+[2026-08-14 12:16:47] ...predict 70 tiles 
+[2026-08-14 12:16:48] ... [M]  start pbmclapply | Ncells 0.170 GB | Vcells 1.811 GB 
+[2026-08-14 12:18:03] ...extraction finished 
+[2026-08-14 12:18:03] ... [M]  ......before predict | Ncells 0.170 GB | Vcells 1.811 GB 
+[2026-08-14 12:18:03] ......chunk 1 of 2 
+[2026-08-14 12:18:03] ......reading parquet 
+[2026-08-14 12:18:46] ......extracting CHM 
+[2026-08-14 12:19:47] ......predict 
+[2026-08-14 12:25:31] ......chunk 2 of 2 
+[2026-08-14 12:25:31] ......reading parquet 
+[2026-08-14 12:25:46] ......extracting CHM 
+[2026-08-14 12:26:01] ......predict 
+[2026-08-14 12:27:26] ... [M]  ... before removing stuff | Ncells 2.256 GB | Vcells 14.847 GB 
+[2026-08-14 12:27:30] ... [M]  ... after removing stuff | Ncells 2.256 GB | Vcells 3.566 GB 
+[2026-08-14 12:27:31] Assigning CLMS_CLCPLUS_RAS_S2023_R10m_E43N28_03035_V01_R00 
+[2026-08-14 12:27:34] Writing CLMS_CLCPLUS_RAS_S2023_R10m_E43N28_03035_V01_R00 
+[2026-08-14 12:27:37] ... [M]  ... before pred rem | Ncells 0.170 GB | Vcells 2.746 GB 
+[2026-08-14 12:27:38] ... [M]  ... after pred rem | Ncells 0.170 GB | Vcells 1.823 GB 
+[2026-08-14 12:27:38] CLMS_CLCPLUS_RAS_S2023_R10m_E43N29_03035_V01_R00.tif  6 of 48 
+[2026-08-14 12:27:38] ...Masking 1 
+[2026-08-14 12:27:40] ...Masking 2 
+[2026-08-14 12:27:41] ...Preparing 
+[2026-08-14 12:27:41] ......converting 57418771 cell centers to lat long 
+[2026-08-14 12:27:51] ......converting FINISHED 57418771 cell centers to lat long 
+[2026-08-14 12:27:52] ... N cells diff is = 0 (should be zero) 
+[2026-08-14 12:27:52] ...group by Geotessera tile 
+[2026-08-14 12:27:54] ...predict 73 tiles 
+[2026-08-14 12:27:54] ... [M]  start pbmclapply | Ncells 0.170 GB | Vcells 1.836 GB 
+[2026-08-14 12:29:18] ...extraction finished 
+[2026-08-14 12:29:19] ... [M]  ......before predict | Ncells 0.170 GB | Vcells 1.836 GB 
+[2026-08-14 12:29:19] ......chunk 1 of 2 
+[2026-08-14 12:29:19] ......reading parquet 
+[2026-08-14 12:30:00] ......extracting CHM 
+[2026-08-14 12:31:02] ......predict 
+[2026-08-14 12:36:17] ......chunk 2 of 2 
+[2026-08-14 12:36:17] ......reading parquet 
+[2026-08-14 12:36:34] ......extracting CHM 
+[2026-08-14 12:36:49] ......predict 
+[2026-08-14 12:38:13] ... [M]  ... before removing stuff | Ncells 2.256 GB | Vcells 15.511 GB 
+[2026-08-14 12:38:19] ... [M]  ... after removing stuff | Ncells 2.256 GB | Vcells 3.601 GB 
+[2026-08-14 12:38:19] Assigning CLMS_CLCPLUS_RAS_S2023_R10m_E43N29_03035_V01_R00 
+[2026-08-14 12:38:22] Writing CLMS_CLCPLUS_RAS_S2023_R10m_E43N29_03035_V01_R00 
+[2026-08-14 12:38:27] ... [M]  ... before pred rem | Ncells 0.170 GB | Vcells 2.782 GB 
+[2026-08-14 12:38:27] ... [M]  ... after pred rem | Ncells 0.170 GB | Vcells 1.848 GB 
+[2026-08-14 12:38:27] CLMS_CLCPLUS_RAS_S2023_R10m_E43N30_03035_V01_R00.tif  7 of 48 
+[2026-08-14 12:38:27] ...Masking 1 
+[2026-08-14 12:38:29] ...Masking 2 
+[2026-08-14 12:38:31] ...Preparing 
+[2026-08-14 12:38:31] ......converting 57824240 cell centers to lat long 
+[2026-08-14 12:38:41] ......converting FINISHED 57824240 cell centers to lat long 
+[2026-08-14 12:38:42] ... N cells diff is = 0 (should be zero) 
+[2026-08-14 12:38:42] ...group by Geotessera tile 
+[2026-08-14 12:38:43] ...predict 80 tiles 
+[2026-08-14 12:38:44] ... [M]  start pbmclapply | Ncells 0.170 GB | Vcells 1.862 GB 
+[2026-08-14 12:40:16] ...extraction finished 
+[2026-08-14 12:40:16] ... [M]  ......before predict | Ncells 0.170 GB | Vcells 1.862 GB 
+[2026-08-14 12:40:16] ......chunk 1 of 2 
+[2026-08-14 12:40:16] ......reading parquet 
+[2026-08-14 12:41:00] ......extracting CHM 
+[2026-08-14 12:42:00] ......predict 
+[2026-08-14 12:46:32] ......chunk 2 of 2 
+[2026-08-14 12:46:32] ......reading parquet 
+[2026-08-14 12:46:50] ......extracting CHM 
+[2026-08-14 12:47:07] ......predict 
+[2026-08-14 12:48:35] ... [M]  ... before removing stuff | Ncells 2.256 GB | Vcells 16.181 GB 
+[2026-08-14 12:48:39] ... [M]  ... after removing stuff | Ncells 2.256 GB | Vcells 3.637 GB 
+[2026-08-14 12:48:40] Assigning CLMS_CLCPLUS_RAS_S2023_R10m_E43N30_03035_V01_R00 
+[2026-08-14 12:48:44] Writing CLMS_CLCPLUS_RAS_S2023_R10m_E43N30_03035_V01_R00 
+[2026-08-14 12:48:48] ... [M]  ... before pred rem | Ncells 0.170 GB | Vcells 2.817 GB 
+[2026-08-14 12:48:49] ... [M]  ... after pred rem | Ncells 0.170 GB | Vcells 1.874 GB 
+[2026-08-14 12:48:49] CLMS_CLCPLUS_RAS_S2023_R10m_E43N31_03035_V01_R00.tif  8 of 48 
+[2026-08-14 12:48:49] ...Masking 1 
+[2026-08-14 12:48:50] ...Masking 2 
+[2026-08-14 12:48:51] ...Preparing 
+[2026-08-14 12:48:51] ......converting 12387828 cell centers to lat long 
+[2026-08-14 12:48:53] ......converting FINISHED 12387828 cell centers to lat long 
+[2026-08-14 12:48:53] ... N cells diff is = 0 (should be zero) 
+[2026-08-14 12:48:53] ...group by Geotessera tile 
+[2026-08-14 12:48:54] ...predict 8 tiles 
+[2026-08-14 12:48:54] ... [M]  start pbmclapply | Ncells 0.170 GB | Vcells 0.688 GB 
+[2026-08-14 12:49:28] ...extraction finished 
+[2026-08-14 12:49:29] ... [M]  ......before predict | Ncells 0.170 GB | Vcells 0.688 GB 
+[2026-08-14 12:49:29] ......chunk 1 of 1 
+[2026-08-14 12:49:29] ......reading parquet 
+[2026-08-14 12:49:35] ......extracting CHM 
+[2026-08-14 12:49:43] ......predict 
+[2026-08-14 12:50:12] ... [M]  ... before removing stuff | Ncells 0.440 GB | Vcells 1.859 GB 
+[2026-08-14 12:50:13] ... [M]  ... after removing stuff | Ncells 0.440 GB | Vcells 0.701 GB 
+[2026-08-14 12:50:13] Assigning CLMS_CLCPLUS_RAS_S2023_R10m_E43N31_03035_V01_R00 
+[2026-08-14 12:50:14] Writing CLMS_CLCPLUS_RAS_S2023_R10m_E43N31_03035_V01_R00 
+[2026-08-14 12:50:16] ... [M]  ... before pred rem | Ncells 0.170 GB | Vcells 0.662 GB 
+[2026-08-14 12:50:16] ... [M]  ... after pred rem | Ncells 0.170 GB | Vcells 0.566 GB 
+[2026-08-14 12:50:16] CLMS_CLCPLUS_RAS_S2023_R10m_E44N24_03035_V01_R00.tif  9 of 48 
+[2026-08-14 12:50:16] ...Masking 1 
+[2026-08-14 12:50:18] ...Masking 2 
+[2026-08-14 12:50:19] ...Preparing 
+[2026-08-14 12:50:19] ......converting 272998 cell centers to lat long 
+[2026-08-14 12:50:19] ......converting FINISHED 272998 cell centers to lat long 
+[2026-08-14 12:50:19] ... N cells diff is = 0 (should be zero) 
+[2026-08-14 12:50:19] ...group by Geotessera tile 
+[2026-08-14 12:50:19] ...predict 7 tiles 
+[2026-08-14 12:50:20] ... [M]  start pbmclapply | Ncells 0.170 GB | Vcells 0.410 GB 
+[2026-08-14 12:50:28] ...extraction finished 
+[2026-08-14 12:50:29] ... [M]  ......before predict | Ncells 0.170 GB | Vcells 0.410 GB 
+[2026-08-14 12:50:29] ......chunk 1 of 1 
+[2026-08-14 12:50:29] ......reading parquet 
+[2026-08-14 12:50:30] ......extracting CHM 
+[2026-08-14 12:50:30] ......predict 
+[2026-08-14 12:50:33] ... [M]  ... before removing stuff | Ncells 0.181 GB | Vcells 0.566 GB 
+[2026-08-14 12:50:33] ... [M]  ... after removing stuff | Ncells 0.181 GB | Vcells 0.305 GB 
+[2026-08-14 12:50:33] Assigning CLMS_CLCPLUS_RAS_S2023_R10m_E44N24_03035_V01_R00 
+[2026-08-14 12:50:34] Writing CLMS_CLCPLUS_RAS_S2023_R10m_E44N24_03035_V01_R00 
+[2026-08-14 12:50:36] ... [M]  ... before pred rem | Ncells 0.170 GB | Vcells 0.303 GB 
+[2026-08-14 12:50:37] ... [M]  ... after pred rem | Ncells 0.170 GB | Vcells 0.299 GB 
+[2026-08-14 12:50:37] CLMS_CLCPLUS_RAS_S2023_R10m_E44N25_03035_V01_R00.tif  10 of 48 
+[2026-08-14 12:50:37] ...Masking 1 
+[2026-08-14 12:50:39] ...Masking 2 
+[2026-08-14 12:50:41] ...Preparing 
+[2026-08-14 12:50:41] ......converting 99729527 cell centers to lat long 
+[2026-08-14 12:51:01] ......converting FINISHED 99729527 cell centers to lat long 
+[2026-08-14 12:51:04] ... N cells diff is = 0 (should be zero) 
+[2026-08-14 12:51:04] ...group by Geotessera tile 
+[2026-08-14 12:51:08] ...predict 131 tiles 
+[2026-08-14 12:51:08] ... [M]  start pbmclapply | Ncells 0.170 GB | Vcells 2.892 GB 
+[2026-08-14 12:52:56] ...extraction finished 
+[2026-08-14 12:52:57] ... [M]  ......before predict | Ncells 0.170 GB | Vcells 2.892 GB 
+[2026-08-14 12:52:57] ......chunk 1 of 3 
+[2026-08-14 12:52:57] ......reading parquet 
+[2026-08-14 12:53:40] ......extracting CHM 
+[2026-08-14 12:54:51] ......predict 
+[2026-08-14 12:59:38] ......chunk 2 of 3 
+[2026-08-14 12:59:38] ......reading parquet 
+[2026-08-14 13:00:31] ......extracting CHM 
+[2026-08-14 13:01:44] ......predict 
+[2026-08-14 13:06:33] ......chunk 3 of 3 
+[2026-08-14 13:06:33] ......reading parquet 
+[2026-08-14 13:07:02] ......extracting CHM 
+[2026-08-14 13:07:31] ......predict 
+[2026-08-14 13:09:53] ... [M]  ... before removing stuff | Ncells 2.256 GB | Vcells 29.453 GB 
+[2026-08-14 13:09:57] ... [M]  ... after removing stuff | Ncells 2.256 GB | Vcells 6.301 GB 
+[2026-08-14 13:09:59] Assigning CLMS_CLCPLUS_RAS_S2023_R10m_E44N25_03035_V01_R00 
+[2026-08-14 13:10:04] Writing CLMS_CLCPLUS_RAS_S2023_R10m_E44N25_03035_V01_R00 
+[2026-08-14 13:10:09] ... [M]  ... before pred rem | Ncells 0.170 GB | Vcells 5.183 GB 
+[2026-08-14 13:10:09] ... [M]  ... after pred rem | Ncells 0.170 GB | Vcells 3.327 GB 
+[2026-08-14 13:10:09] CLMS_CLCPLUS_RAS_S2023_R10m_E44N26_03035_V01_R00.tif  11 of 48 
+[2026-08-14 13:10:09] ...Masking 1 
+[2026-08-14 13:10:11] ...Masking 2 
+[2026-08-14 13:10:13] ...Preparing 
+[2026-08-14 13:10:13] ......converting 100000000 cell centers to lat long 
+[2026-08-14 13:10:28] ......converting FINISHED 100000000 cell centers to lat long 
+[2026-08-14 13:10:29] ... N cells diff is = 0 (should be zero) 
+[2026-08-14 13:10:29] ...group by Geotessera tile 
+[2026-08-14 13:10:32] ...predict 142 tiles 
+[2026-08-14 13:10:32] ... [M]  start pbmclapply | Ncells 0.170 GB | Vcells 3.335 GB 
+[2026-08-14 13:13:06] ...extraction finished 
+[2026-08-14 13:13:07] ... [M]  ......before predict | Ncells 0.170 GB | Vcells 3.335 GB 
+[2026-08-14 13:13:07] ......chunk 1 of 3 
+[2026-08-14 13:13:07] ......reading parquet 
+[2026-08-14 13:13:49] ......extracting CHM 
+[2026-08-14 13:14:49] ......predict 
+[2026-08-14 13:19:27] ......chunk 2 of 3 
+[2026-08-14 13:19:27] ......reading parquet 
+[2026-08-14 13:20:11] ......extracting CHM 
+[2026-08-14 13:21:13] ......predict 
+[2026-08-14 13:25:22] ......chunk 3 of 3 
+[2026-08-14 13:25:22] ......reading parquet 
+[2026-08-14 13:25:53] ......extracting CHM 
+[2026-08-14 13:26:21] ......predict 
+[2026-08-14 13:28:30] ... [M]  ... before removing stuff | Ncells 2.256 GB | Vcells 29.867 GB 
+[2026-08-14 13:28:35] ... [M]  ... after removing stuff | Ncells 2.256 GB | Vcells 6.323 GB 
+[2026-08-14 13:28:36] Assigning CLMS_CLCPLUS_RAS_S2023_R10m_E44N26_03035_V01_R00 
+[2026-08-14 13:28:39] Writing CLMS_CLCPLUS_RAS_S2023_R10m_E44N26_03035_V01_R00 
+[2026-08-14 13:28:44] ... [M]  ... before pred rem | Ncells 0.170 GB | Vcells 5.205 GB 
+[2026-08-14 13:28:45] ... [M]  ... after pred rem | Ncells 0.170 GB | Vcells 3.343 GB 
+[2026-08-14 13:28:45] CLMS_CLCPLUS_RAS_S2023_R10m_E44N27_03035_V01_R00.tif  12 of 48 
+[2026-08-14 13:28:45] ...Masking 1 
+[2026-08-14 13:28:46] ...Masking 2 
+[2026-08-14 13:28:48] ...Preparing 
+[2026-08-14 13:28:48] ......converting 100000000 cell centers to lat long 
+[2026-08-14 13:29:05] ......converting FINISHED 100000000 cell centers to lat long 
+[2026-08-14 13:29:06] ... N cells diff is = 0 (should be zero) 
+[2026-08-14 13:29:06] ...group by Geotessera tile 
+[2026-08-14 13:29:09] ...predict 144 tiles 
+[2026-08-14 13:29:10] ... [M]  start pbmclapply | Ncells 0.170 GB | Vcells 3.343 GB 
+[2026-08-14 13:32:04] ...extraction finished 
+[2026-08-14 13:32:05] ... [M]  ......before predict | Ncells 0.170 GB | Vcells 3.343 GB 
+[2026-08-14 13:32:05] ......chunk 1 of 3 
+[2026-08-14 13:32:05] ......reading parquet 
+[2026-08-14 13:32:49] ......extracting CHM 
+[2026-08-14 13:33:53] ......predict 
+[2026-08-14 13:40:27] ......chunk 2 of 3 
+[2026-08-14 13:40:27] ......reading parquet 
+[2026-08-14 13:41:17] ......extracting CHM 
+[2026-08-14 13:42:35] ......predict 
+[2026-08-14 13:47:15] ......chunk 3 of 3 
+[2026-08-14 13:47:15] ......reading parquet 
+[2026-08-14 13:47:48] ......extracting CHM 
+[2026-08-14 13:48:26] ......predict 
+[2026-08-14 13:50:56] ... [M]  ... before removing stuff | Ncells 2.256 GB | Vcells 29.867 GB 
+[2026-08-14 13:51:00] ... [M]  ... after removing stuff | Ncells 2.256 GB | Vcells 6.323 GB 
+[2026-08-14 13:51:01] Assigning CLMS_CLCPLUS_RAS_S2023_R10m_E44N27_03035_V01_R00 
+[2026-08-14 13:51:08] Writing CLMS_CLCPLUS_RAS_S2023_R10m_E44N27_03035_V01_R00 
+[2026-08-14 13:51:13] ... [M]  ... before pred rem | Ncells 0.170 GB | Vcells 5.205 GB 
+[2026-08-14 13:51:13] ... [M]  ... after pred rem | Ncells 0.170 GB | Vcells 3.343 GB 
+[2026-08-14 13:51:13] CLMS_CLCPLUS_RAS_S2023_R10m_E44N28_03035_V01_R00.tif  13 of 48 
+[2026-08-14 13:51:13] ...Masking 1 
+[2026-08-14 13:51:15] ...Masking 2 
+[2026-08-14 13:51:16] ...Preparing 
+[2026-08-14 13:51:17] ......converting 100000000 cell centers to lat long 
+[2026-08-14 13:51:35] ......converting FINISHED 100000000 cell centers to lat long 
+[2026-08-14 13:51:36] ... N cells diff is = 0 (should be zero) 
+[2026-08-14 13:51:36] ...group by Geotessera tile 
+[2026-08-14 13:51:39] ...predict 151 tiles 
+[2026-08-14 13:51:40] ... [M]  start pbmclapply | Ncells 0.170 GB | Vcells 3.343 GB 
+[2026-08-14 13:54:21] ...extraction finished 
+[2026-08-14 13:54:22] ... [M]  ......before predict | Ncells 0.170 GB | Vcells 3.343 GB 
+[2026-08-14 13:54:22] ......chunk 1 of 3 
+[2026-08-14 13:54:22] ......reading parquet 
+[2026-08-14 13:55:06] ......extracting CHM 
+[2026-08-14 13:56:10] ......predict 
+[2026-08-14 14:01:20] ......chunk 2 of 3 
+[2026-08-14 14:01:20] ......reading parquet 
+[2026-08-14 14:02:05] ......extracting CHM 
+[2026-08-14 14:03:07] ......predict 
+[2026-08-14 14:07:33] ......chunk 3 of 3 
+[2026-08-14 14:07:33] ......reading parquet 
+[2026-08-14 14:08:04] ......extracting CHM 
+[2026-08-14 14:08:35] ......predict 
+[2026-08-14 14:10:48] ... [M]  ... before removing stuff | Ncells 2.256 GB | Vcells 29.867 GB 
+[2026-08-14 14:10:53] ... [M]  ... after removing stuff | Ncells 2.256 GB | Vcells 6.323 GB 
+[2026-08-14 14:10:54] Assigning CLMS_CLCPLUS_RAS_S2023_R10m_E44N28_03035_V01_R00 
+[2026-08-14 14:10:57] Writing CLMS_CLCPLUS_RAS_S2023_R10m_E44N28_03035_V01_R00 
+[2026-08-14 14:11:01] ... [M]  ... before pred rem | Ncells 0.170 GB | Vcells 5.205 GB 
+[2026-08-14 14:11:02] ... [M]  ... after pred rem | Ncells 0.170 GB | Vcells 3.343 GB 
+[2026-08-14 14:11:02] CLMS_CLCPLUS_RAS_S2023_R10m_E44N29_03035_V01_R00.tif  14 of 48 
+[2026-08-14 14:11:02] ...Masking 1 
+[2026-08-14 14:11:04] ...Masking 2 
+[2026-08-14 14:11:05] ...Preparing 
+[2026-08-14 14:11:05] ......converting 100000000 cell centers to lat long 
+[2026-08-14 14:11:21] ......converting FINISHED 100000000 cell centers to lat long 
+[2026-08-14 14:11:21] ... N cells diff is = 0 (should be zero) 
+[2026-08-14 14:11:21] ...group by Geotessera tile 
+[2026-08-14 14:11:24] ...predict 149 tiles 
+[2026-08-14 14:11:25] ... [M]  start pbmclapply | Ncells 0.170 GB | Vcells 3.343 GB 
+[2026-08-14 14:14:23] ...extraction finished 
+[2026-08-14 14:14:24] ... [M]  ......before predict | Ncells 0.170 GB | Vcells 3.343 GB 
+[2026-08-14 14:14:24] ......chunk 1 of 3 
+[2026-08-14 14:14:24] ......reading parquet 
+[2026-08-14 14:15:10] ......extracting CHM 
+[2026-08-14 14:16:07] ......predict 
+[2026-08-14 14:21:19] ......chunk 2 of 3 
+[2026-08-14 14:21:19] ......reading parquet 
+[2026-08-14 14:22:07] ......extracting CHM 
+[2026-08-14 14:23:20] ......predict 
+[2026-08-14 14:28:02] ......chunk 3 of 3 
+[2026-08-14 14:28:02] ......reading parquet 
+[2026-08-14 14:28:35] ......extracting CHM 
+[2026-08-14 14:29:05] ......predict 
+[2026-08-14 14:31:19] ... [M]  ... before removing stuff | Ncells 2.256 GB | Vcells 29.867 GB 
+[2026-08-14 14:31:23] ... [M]  ... after removing stuff | Ncells 2.256 GB | Vcells 6.323 GB 
+[2026-08-14 14:31:25] Assigning CLMS_CLCPLUS_RAS_S2023_R10m_E44N29_03035_V01_R00 
+[2026-08-14 14:31:30] Writing CLMS_CLCPLUS_RAS_S2023_R10m_E44N29_03035_V01_R00 
+[2026-08-14 14:31:35] ... [M]  ... before pred rem | Ncells 0.170 GB | Vcells 5.205 GB 
+[2026-08-14 14:31:35] ... [M]  ... after pred rem | Ncells 0.170 GB | Vcells 3.343 GB 
+[2026-08-14 14:31:35] CLMS_CLCPLUS_RAS_S2023_R10m_E44N30_03035_V01_R00.tif  15 of 48 
+[2026-08-14 14:31:35] ...Masking 1 
+[2026-08-14 14:31:37] ...Masking 2 
+[2026-08-14 14:31:38] ...Preparing 
+[2026-08-14 14:31:38] ......converting 100000000 cell centers to lat long 
+[2026-08-14 14:31:55] ......converting FINISHED 100000000 cell centers to lat long 
+[2026-08-14 14:31:56] ... N cells diff is = 0 (should be zero) 
+[2026-08-14 14:31:56] ...group by Geotessera tile 
+[2026-08-14 14:31:59] ...predict 151 tiles 
+[2026-08-14 14:32:00] ... [M]  start pbmclapply | Ncells 0.170 GB | Vcells 3.343 GB 
+[2026-08-14 14:35:02] ...extraction finished 
+[2026-08-14 14:35:03] ... [M]  ......before predict | Ncells 0.170 GB | Vcells 3.343 GB 
+[2026-08-14 14:35:03] ......chunk 1 of 3 
+[2026-08-14 14:35:03] ......reading parquet 
+[2026-08-14 14:35:47] ......extracting CHM 
+[2026-08-14 14:36:51] ......predict 
+[2026-08-14 14:41:40] ......chunk 2 of 3 
+[2026-08-14 14:41:40] ......reading parquet 
+[2026-08-14 14:42:25] ......extracting CHM 
+[2026-08-14 14:43:40] ......predict 
+[2026-08-14 14:48:08] ......chunk 3 of 3 
+[2026-08-14 14:48:08] ......reading parquet 
+[2026-08-14 14:48:40] ......extracting CHM 
+[2026-08-14 14:49:09] ......predict 
+[2026-08-14 14:51:23] ... [M]  ... before removing stuff | Ncells 2.256 GB | Vcells 29.867 GB 
+[2026-08-14 14:51:27] ... [M]  ... after removing stuff | Ncells 2.256 GB | Vcells 6.323 GB 
+[2026-08-14 14:51:28] Assigning CLMS_CLCPLUS_RAS_S2023_R10m_E44N30_03035_V01_R00 
+[2026-08-14 14:51:31] Writing CLMS_CLCPLUS_RAS_S2023_R10m_E44N30_03035_V01_R00 
+[2026-08-14 14:51:35] ... [M]  ... before pred rem | Ncells 0.170 GB | Vcells 5.205 GB 
+[2026-08-14 14:51:36] ... [M]  ... after pred rem | Ncells 0.170 GB | Vcells 3.343 GB 
+[2026-08-14 14:51:36] CLMS_CLCPLUS_RAS_S2023_R10m_E44N31_03035_V01_R00.tif  16 of 48 
+[2026-08-14 14:51:36] ...Masking 1 
+[2026-08-14 14:51:37] ...Masking 2 
+[2026-08-14 14:51:38] ...Preparing 
+[2026-08-14 14:51:38] ......converting 22809702 cell centers to lat long 
+[2026-08-14 14:51:42] ......converting FINISHED 22809702 cell centers to lat long 
+[2026-08-14 14:51:42] ... N cells diff is = 0 (should be zero) 
+[2026-08-14 14:51:42] ...group by Geotessera tile 
+[2026-08-14 14:51:43] ...predict 25 tiles 
+[2026-08-14 14:51:43] ... [M]  start pbmclapply | Ncells 0.170 GB | Vcells 1.079 GB 
+[2026-08-14 14:53:09] ...extraction finished 
+[2026-08-14 14:53:10] ... [M]  ......before predict | Ncells 0.170 GB | Vcells 1.079 GB 
+[2026-08-14 14:53:10] ......chunk 1 of 1 
+[2026-08-14 14:53:10] ......reading parquet 
+[2026-08-14 14:53:30] ......extracting CHM 
+[2026-08-14 14:53:47] ......predict 
+[2026-08-14 14:55:11] ... [M]  ... before removing stuff | Ncells 0.773 GB | Vcells 14.828 GB 
+[2026-08-14 14:55:12] ... [M]  ... after removing stuff | Ncells 0.773 GB | Vcells 1.204 GB 
+[2026-08-14 14:55:12] Assigning CLMS_CLCPLUS_RAS_S2023_R10m_E44N31_03035_V01_R00 
+[2026-08-14 14:55:13] Writing CLMS_CLCPLUS_RAS_S2023_R10m_E44N31_03035_V01_R00 
+[2026-08-14 14:55:16] ... [M]  ... before pred rem | Ncells 0.170 GB | Vcells 1.106 GB 
+[2026-08-14 14:55:16] ... [M]  ... after pred rem | Ncells 0.170 GB | Vcells 0.890 GB 
+[2026-08-14 14:55:16] CLMS_CLCPLUS_RAS_S2023_R10m_E45N25_03035_V01_R00.tif  17 of 48 
+[2026-08-14 14:55:16] ...Masking 1 
+[2026-08-14 14:55:18] ...Masking 2 
+[2026-08-14 14:55:20] ...Preparing 
+[2026-08-14 14:55:20] ......converting 95410832 cell centers to lat long 
+[2026-08-14 14:55:36] ......converting FINISHED 95410832 cell centers to lat long 
+[2026-08-14 14:55:37] ... N cells diff is = 0 (should be zero) 
+[2026-08-14 14:55:37] ...group by Geotessera tile 
+[2026-08-14 14:55:41] ...predict 125 tiles 
+[2026-08-14 14:55:41] ... [M]  start pbmclapply | Ncells 0.170 GB | Vcells 3.033 GB 
+[2026-08-14 14:58:29] ...extraction finished 
+[2026-08-14 14:58:30] ... [M]  ......before predict | Ncells 0.170 GB | Vcells 3.033 GB 
+[2026-08-14 14:58:30] ......chunk 1 of 3 
+[2026-08-14 14:58:30] ......reading parquet 
+[2026-08-14 14:59:13] ......extracting CHM 
+[2026-08-14 15:00:19] ......predict 
+[2026-08-14 15:05:45] ......chunk 2 of 3 
+[2026-08-14 15:05:45] ......reading parquet 
+[2026-08-14 15:06:30] ......extracting CHM 
+[2026-08-14 15:07:37] ......predict 
+[2026-08-14 15:12:06] ......chunk 3 of 3 
+[2026-08-14 15:12:06] ......reading parquet 
+[2026-08-14 15:12:35] ......extracting CHM 
+[2026-08-14 15:13:00] ......predict 
+[2026-08-14 15:14:54] ... [M]  ... before removing stuff | Ncells 2.256 GB | Vcells 24.008 GB 
+[2026-08-14 15:14:58] ... [M]  ... after removing stuff | Ncells 2.256 GB | Vcells 6.009 GB 
+[2026-08-14 15:14:59] Assigning CLMS_CLCPLUS_RAS_S2023_R10m_E45N25_03035_V01_R00 
+[2026-08-14 15:15:05] Writing CLMS_CLCPLUS_RAS_S2023_R10m_E45N25_03035_V01_R00 
+[2026-08-14 15:15:09] ... [M]  ... before pred rem | Ncells 0.170 GB | Vcells 4.891 GB 
+[2026-08-14 15:15:10] ... [M]  ... after pred rem | Ncells 0.170 GB | Vcells 3.116 GB 
+[2026-08-14 15:15:10] CLMS_CLCPLUS_RAS_S2023_R10m_E45N26_03035_V01_R00.tif  18 of 48 
+[2026-08-14 15:15:10] ...Masking 1 
+[2026-08-14 15:15:11] ...Masking 2 
+[2026-08-14 15:15:13] ...Preparing 
+[2026-08-14 15:15:13] ......converting 100000000 cell centers to lat long 
+[2026-08-14 15:15:29] ......converting FINISHED 100000000 cell centers to lat long 
+[2026-08-14 15:15:31] ... N cells diff is = 0 (should be zero) 
+[2026-08-14 15:15:31] ...group by Geotessera tile 
+[2026-08-14 15:15:34] ...predict 140 tiles 
+[2026-08-14 15:15:35] ... [M]  start pbmclapply | Ncells 0.170 GB | Vcells 3.238 GB 
+[2026-08-14 15:18:48] ...extraction finished 
+[2026-08-14 15:18:49] ... [M]  ......before predict | Ncells 0.170 GB | Vcells 3.238 GB 
+[2026-08-14 15:18:49] ......chunk 1 of 3 
+[2026-08-14 15:18:49] ......reading parquet 
+[2026-08-14 15:19:34] ......extracting CHM 
+[2026-08-14 15:20:33] ......predict 
+[2026-08-14 15:25:33] ......chunk 2 of 3 
+[2026-08-14 15:25:33] ......reading parquet 
+[2026-08-14 15:26:19] ......extracting CHM 
+[2026-08-14 15:27:19] ......predict 
+[2026-08-14 15:32:11] ......chunk 3 of 3 
+[2026-08-14 15:32:11] ......reading parquet 
+[2026-08-14 15:32:46] ......extracting CHM 
+[2026-08-14 15:33:16] ......predict 
+[2026-08-14 15:35:42] ... [M]  ... before removing stuff | Ncells 2.256 GB | Vcells 29.867 GB 
+[2026-08-14 15:35:46] ... [M]  ... after removing stuff | Ncells 2.256 GB | Vcells 6.323 GB 
+[2026-08-14 15:35:47] Assigning CLMS_CLCPLUS_RAS_S2023_R10m_E45N26_03035_V01_R00 
+[2026-08-14 15:35:52] Writing CLMS_CLCPLUS_RAS_S2023_R10m_E45N26_03035_V01_R00 
+[2026-08-14 15:35:56] ... [M]  ... before pred rem | Ncells 0.170 GB | Vcells 5.205 GB 
+[2026-08-14 15:35:57] ... [M]  ... after pred rem | Ncells 0.170 GB | Vcells 3.343 GB 
+[2026-08-14 15:35:57] CLMS_CLCPLUS_RAS_S2023_R10m_E45N27_03035_V01_R00.tif  19 of 48 
+[2026-08-14 15:35:57] ...Masking 1 
+[2026-08-14 15:35:58] ...Masking 2 
+[2026-08-14 15:35:59] ...Preparing 
+[2026-08-14 15:36:00] ......converting 100000000 cell centers to lat long 
+[2026-08-14 15:36:16] ......converting FINISHED 100000000 cell centers to lat long 
+[2026-08-14 15:36:17] ... N cells diff is = 0 (should be zero) 
+[2026-08-14 15:36:17] ...group by Geotessera tile 
+[2026-08-14 15:36:20] ...predict 147 tiles 
+[2026-08-14 15:36:21] ... [M]  start pbmclapply | Ncells 0.170 GB | Vcells 3.343 GB 
+[2026-08-14 15:39:53] ...extraction finished 
+[2026-08-14 15:39:54] ... [M]  ......before predict | Ncells 0.170 GB | Vcells 3.343 GB 
+[2026-08-14 15:39:54] ......chunk 1 of 3 
+[2026-08-14 15:39:54] ......reading parquet 
+[2026-08-14 15:40:44] ......extracting CHM 
+[2026-08-14 15:41:50] ......predict 
+[2026-08-14 15:46:52] ......chunk 2 of 3 
+[2026-08-14 15:46:52] ......reading parquet 
+[2026-08-14 15:47:43] ......extracting CHM 
+[2026-08-14 15:48:52] ......predict 
+[2026-08-14 15:54:01] ......chunk 3 of 3 
+[2026-08-14 15:54:01] ......reading parquet 
+[2026-08-14 15:54:36] ......extracting CHM 
+[2026-08-14 15:55:11] ......predict 
+[2026-08-14 15:57:29] ... [M]  ... before removing stuff | Ncells 2.256 GB | Vcells 29.867 GB 
+[2026-08-14 15:57:33] ... [M]  ... after removing stuff | Ncells 2.256 GB | Vcells 6.323 GB 
+[2026-08-14 15:57:33] Assigning CLMS_CLCPLUS_RAS_S2023_R10m_E45N27_03035_V01_R00 
+[2026-08-14 15:57:36] Writing CLMS_CLCPLUS_RAS_S2023_R10m_E45N27_03035_V01_R00 
+[2026-08-14 15:57:41] ... [M]  ... before pred rem | Ncells 0.170 GB | Vcells 5.205 GB 
+[2026-08-14 15:57:41] ... [M]  ... after pred rem | Ncells 0.170 GB | Vcells 3.343 GB 
+[2026-08-14 15:57:41] CLMS_CLCPLUS_RAS_S2023_R10m_E45N28_03035_V01_R00.tif  20 of 48 
+[2026-08-14 15:57:41] ...Masking 1 
+[2026-08-14 15:57:43] ...Masking 2 
+[2026-08-14 15:57:45] ...Preparing 
+[2026-08-14 15:57:45] ......converting 100000000 cell centers to lat long 
+[2026-08-14 15:58:00] ......converting FINISHED 100000000 cell centers to lat long 
+[2026-08-14 15:58:01] ... N cells diff is = 0 (should be zero) 
+[2026-08-14 15:58:01] ...group by Geotessera tile 
+[2026-08-14 15:58:04] ...predict 144 tiles 
+[2026-08-14 15:58:04] ... [M]  start pbmclapply | Ncells 0.170 GB | Vcells 3.343 GB 
+[2026-08-14 16:01:26] ...extraction finished 
+[2026-08-14 16:01:27] ... [M]  ......before predict | Ncells 0.170 GB | Vcells 3.343 GB 
+[2026-08-14 16:01:27] ......chunk 1 of 3 
+[2026-08-14 16:01:27] ......reading parquet 
+[2026-08-14 16:02:15] ......extracting CHM 
+[2026-08-14 16:03:15] ......predict 
+[2026-08-14 16:08:06] ......chunk 2 of 3 
+[2026-08-14 16:08:06] ......reading parquet 
+[2026-08-14 16:08:53] ......extracting CHM 
+[2026-08-14 16:09:50] ......predict 
+[2026-08-14 16:14:16] ......chunk 3 of 3 
+[2026-08-14 16:14:16] ......reading parquet 
+[2026-08-14 16:14:52] ......extracting CHM 
+[2026-08-14 16:15:21] ......predict 
+[2026-08-14 16:17:37] ... [M]  ... before removing stuff | Ncells 2.256 GB | Vcells 29.867 GB 
+[2026-08-14 16:17:41] ... [M]  ... after removing stuff | Ncells 2.256 GB | Vcells 6.323 GB 
+[2026-08-14 16:17:42] Assigning CLMS_CLCPLUS_RAS_S2023_R10m_E45N28_03035_V01_R00 
+[2026-08-14 16:17:45] Writing CLMS_CLCPLUS_RAS_S2023_R10m_E45N28_03035_V01_R00 
+[2026-08-14 16:17:50] ... [M]  ... before pred rem | Ncells 0.170 GB | Vcells 5.205 GB 
+[2026-08-14 16:17:50] ... [M]  ... after pred rem | Ncells 0.170 GB | Vcells 3.343 GB 
+[2026-08-14 16:17:50] CLMS_CLCPLUS_RAS_S2023_R10m_E45N29_03035_V01_R00.tif  21 of 48 
+[2026-08-14 16:17:50] ...Masking 1 
+[2026-08-14 16:17:52] ...Masking 2 
+[2026-08-14 16:17:53] ...Preparing 
+[2026-08-14 16:17:53] ......converting 100000000 cell centers to lat long 
+[2026-08-14 16:18:09] ......converting FINISHED 100000000 cell centers to lat long 
+[2026-08-14 16:18:10] ... N cells diff is = 0 (should be zero) 
+[2026-08-14 16:18:10] ...group by Geotessera tile 
+[2026-08-14 16:18:13] ...predict 150 tiles 
+[2026-08-14 16:18:13] ... [M]  start pbmclapply | Ncells 0.170 GB | Vcells 3.343 GB 
+[2026-08-14 16:21:26] ...extraction finished 
+[2026-08-14 16:21:28] ... [M]  ......before predict | Ncells 0.170 GB | Vcells 3.343 GB 
+[2026-08-14 16:21:28] ......chunk 1 of 3 
+[2026-08-14 16:21:28] ......reading parquet 
+[2026-08-14 16:22:14] ......extracting CHM 
+[2026-08-14 16:23:13] ......predict 
+[2026-08-14 16:29:01] ......chunk 2 of 3 
+[2026-08-14 16:29:01] ......reading parquet 
+[2026-08-14 16:29:55] ......extracting CHM 
+[2026-08-14 16:31:05] ......predict 
+[2026-08-14 16:35:46] ......chunk 3 of 3 
+[2026-08-14 16:35:46] ......reading parquet 
+[2026-08-14 16:36:21] ......extracting CHM 
+[2026-08-14 16:36:49] ......predict 
+[2026-08-14 16:39:19] ... [M]  ... before removing stuff | Ncells 2.256 GB | Vcells 29.867 GB 
+[2026-08-14 16:39:24] ... [M]  ... after removing stuff | Ncells 2.256 GB | Vcells 6.323 GB 
+[2026-08-14 16:39:24] Assigning CLMS_CLCPLUS_RAS_S2023_R10m_E45N29_03035_V01_R00 
+[2026-08-14 16:39:28] Writing CLMS_CLCPLUS_RAS_S2023_R10m_E45N29_03035_V01_R00 
+[2026-08-14 16:39:32] ... [M]  ... before pred rem | Ncells 0.170 GB | Vcells 5.205 GB 
+[2026-08-14 16:39:33] ... [M]  ... after pred rem | Ncells 0.170 GB | Vcells 3.343 GB 
+[2026-08-14 16:39:33] CLMS_CLCPLUS_RAS_S2023_R10m_E45N30_03035_V01_R00.tif  22 of 48 
+[2026-08-14 16:39:33] ...Masking 1 
+[2026-08-14 16:39:34] ...Masking 2 
+[2026-08-14 16:39:36] ...Preparing 
+[2026-08-14 16:39:36] ......converting 100000000 cell centers to lat long 
+[2026-08-14 16:39:51] ......converting FINISHED 100000000 cell centers to lat long 
+[2026-08-14 16:39:52] ... N cells diff is = 0 (should be zero) 
+[2026-08-14 16:39:52] ...group by Geotessera tile 
+[2026-08-14 16:39:55] ...predict 150 tiles 
+[2026-08-14 16:39:56] ... [M]  start pbmclapply | Ncells 0.170 GB | Vcells 3.343 GB 
+[2026-08-14 16:43:13] ...extraction finished 
+[2026-08-14 16:43:14] ... [M]  ......before predict | Ncells 0.170 GB | Vcells 3.343 GB 
+[2026-08-14 16:43:14] ......chunk 1 of 3 
+[2026-08-14 16:43:14] ......reading parquet 
+[2026-08-14 16:43:58] ......extracting CHM 
+[2026-08-14 16:44:56] ......predict 
+[2026-08-14 16:51:01] ......chunk 2 of 3 
+[2026-08-14 16:51:01] ......reading parquet 
+[2026-08-14 16:51:49] ......extracting CHM 
+[2026-08-14 16:52:51] ......predict 
+[2026-08-14 16:57:26] ......chunk 3 of 3 
+[2026-08-14 16:57:26] ......reading parquet 
+[2026-08-14 16:58:03] ......extracting CHM 
+[2026-08-14 16:58:31] ......predict 
+[2026-08-14 17:00:44] ... [M]  ... before removing stuff | Ncells 2.256 GB | Vcells 29.867 GB 
+[2026-08-14 17:00:48] ... [M]  ... after removing stuff | Ncells 2.256 GB | Vcells 6.323 GB 
+[2026-08-14 17:00:50] Assigning CLMS_CLCPLUS_RAS_S2023_R10m_E45N30_03035_V01_R00 
+[2026-08-14 17:00:54] Writing CLMS_CLCPLUS_RAS_S2023_R10m_E45N30_03035_V01_R00 
+[2026-08-14 17:00:59] ... [M]  ... before pred rem | Ncells 0.170 GB | Vcells 5.205 GB 
+[2026-08-14 17:00:59] ... [M]  ... after pred rem | Ncells 0.170 GB | Vcells 3.343 GB 
+[2026-08-14 17:00:59] CLMS_CLCPLUS_RAS_S2023_R10m_E45N31_03035_V01_R00.tif  23 of 48 
+[2026-08-14 17:00:59] ...Masking 1 
+[2026-08-14 17:01:01] ...Masking 2 
+[2026-08-14 17:01:02] ...Preparing 
+[2026-08-14 17:01:02] ......converting 26279193 cell centers to lat long 
+[2026-08-14 17:01:06] ......converting FINISHED 26279193 cell centers to lat long 
+[2026-08-14 17:01:07] ... N cells diff is = 0 (should be zero) 
+[2026-08-14 17:01:07] ...group by Geotessera tile 
+[2026-08-14 17:01:07] ...predict 30 tiles 
+[2026-08-14 17:01:08] ... [M]  start pbmclapply | Ncells 0.170 GB | Vcells 1.170 GB 
+[2026-08-14 17:03:02] ...extraction finished 
+[2026-08-14 17:03:03] ... [M]  ......before predict | Ncells 0.170 GB | Vcells 1.170 GB 
+[2026-08-14 17:03:03] ......chunk 1 of 1 
+[2026-08-14 17:03:03] ......reading parquet 
+[2026-08-14 17:03:30] ......extracting CHM 
+[2026-08-14 17:03:52] ......predict 
+[2026-08-14 17:05:39] ... [M]  ... before removing stuff | Ncells 0.956 GB | Vcells 19.233 GB 
+[2026-08-14 17:05:41] ... [M]  ... after removing stuff | Ncells 0.956 GB | Vcells 1.490 GB 
+[2026-08-14 17:05:41] Assigning CLMS_CLCPLUS_RAS_S2023_R10m_E45N31_03035_V01_R00 
+[2026-08-14 17:05:42] Writing CLMS_CLCPLUS_RAS_S2023_R10m_E45N31_03035_V01_R00 
+[2026-08-14 17:05:44] ... [M]  ... before pred rem | Ncells 0.170 GB | Vcells 1.340 GB 
+[2026-08-14 17:05:45] ... [M]  ... after pred rem | Ncells 0.170 GB | Vcells 1.060 GB 
+[2026-08-14 17:05:45] CLMS_CLCPLUS_RAS_S2023_R10m_E46N25_03035_V01_R00.tif  24 of 48 
+[2026-08-14 17:05:45] ...Masking 1 
+[2026-08-14 17:05:47] ...Masking 2 
+[2026-08-14 17:05:48] ...Preparing 
+[2026-08-14 17:05:48] ......converting 90964690 cell centers to lat long 
+[2026-08-14 17:06:03] ......converting FINISHED 90964690 cell centers to lat long 
+[2026-08-14 17:06:04] ... N cells diff is = 0 (should be zero) 
+[2026-08-14 17:06:04] ...group by Geotessera tile 
+[2026-08-14 17:06:07] ...predict 126 tiles 
+[2026-08-14 17:06:08] ... [M]  start pbmclapply | Ncells 0.170 GB | Vcells 2.997 GB 
+[2026-08-14 17:09:14] ...extraction finished 
+[2026-08-14 17:09:15] ... [M]  ......before predict | Ncells 0.170 GB | Vcells 2.997 GB 
+[2026-08-14 17:09:15] ......chunk 1 of 3 
+[2026-08-14 17:09:15] ......reading parquet 
+[2026-08-14 17:10:03] ......extracting CHM 
+[2026-08-14 17:10:59] ......predict 
+[2026-08-14 17:15:37] ......chunk 2 of 3 
+[2026-08-14 17:15:37] ......reading parquet 
+[2026-08-14 17:16:28] ......extracting CHM 
+[2026-08-14 17:17:30] ......predict 
+[2026-08-14 17:21:42] ......chunk 3 of 3 
+[2026-08-14 17:21:42] ......reading parquet 
+[2026-08-14 17:22:06] ......extracting CHM 
+[2026-08-14 17:22:20] ......predict 
+[2026-08-14 17:23:42] ... [M]  ... before removing stuff | Ncells 2.256 GB | Vcells 18.587 GB 
+[2026-08-14 17:23:46] ... [M]  ... after removing stuff | Ncells 2.256 GB | Vcells 5.715 GB 
+[2026-08-14 17:23:47] Assigning CLMS_CLCPLUS_RAS_S2023_R10m_E46N25_03035_V01_R00 
+[2026-08-14 17:23:50] Writing CLMS_CLCPLUS_RAS_S2023_R10m_E46N25_03035_V01_R00 
+[2026-08-14 17:23:55] ... [M]  ... before pred rem | Ncells 0.170 GB | Vcells 4.598 GB 
+[2026-08-14 17:23:55] ... [M]  ... after pred rem | Ncells 0.170 GB | Vcells 2.904 GB 
+[2026-08-14 17:23:55] CLMS_CLCPLUS_RAS_S2023_R10m_E46N26_03035_V01_R00.tif  25 of 48 
+[2026-08-14 17:23:55] ...Masking 1 
+[2026-08-14 17:23:57] ...Masking 2 
+[2026-08-14 17:23:58] ...Preparing 
+[2026-08-14 17:23:58] ......converting 100000000 cell centers to lat long 
+[2026-08-14 17:24:15] ......converting FINISHED 100000000 cell centers to lat long 
+[2026-08-14 17:24:15] ... N cells diff is = 0 (should be zero) 
+[2026-08-14 17:24:15] ...group by Geotessera tile 
+[2026-08-14 17:24:18] ...predict 142 tiles 
+[2026-08-14 17:24:19] ... [M]  start pbmclapply | Ncells 0.170 GB | Vcells 3.140 GB 
+[2026-08-14 17:27:30] ...extraction finished 
+[2026-08-14 17:27:31] ... [M]  ......before predict | Ncells 0.170 GB | Vcells 3.140 GB 
+[2026-08-14 17:27:31] ......chunk 1 of 3 
+[2026-08-14 17:27:31] ......reading parquet 
+[2026-08-14 17:28:19] ......extracting CHM 
+[2026-08-14 17:29:18] ......predict 
+[2026-08-14 17:34:03] ......chunk 2 of 3 
+[2026-08-14 17:34:03] ......reading parquet 
+[2026-08-14 17:34:53] ......extracting CHM 
+[2026-08-14 17:35:53] ......predict 
+[2026-08-14 17:40:23] ......chunk 3 of 3 
+[2026-08-14 17:40:23] ......reading parquet 
+[2026-08-14 17:41:00] ......extracting CHM 
+[2026-08-14 17:41:30] ......predict 
+[2026-08-14 17:44:00] ... [M]  ... before removing stuff | Ncells 2.256 GB | Vcells 29.867 GB 
+[2026-08-14 17:44:03] ... [M]  ... after removing stuff | Ncells 2.256 GB | Vcells 6.323 GB 
+[2026-08-14 17:44:05] Assigning CLMS_CLCPLUS_RAS_S2023_R10m_E46N26_03035_V01_R00 
+[2026-08-14 17:44:10] Writing CLMS_CLCPLUS_RAS_S2023_R10m_E46N26_03035_V01_R00 
+[2026-08-14 17:44:14] ... [M]  ... before pred rem | Ncells 0.170 GB | Vcells 5.205 GB 
+[2026-08-14 17:44:15] ... [M]  ... after pred rem | Ncells 0.170 GB | Vcells 3.343 GB 
+[2026-08-14 17:44:15] CLMS_CLCPLUS_RAS_S2023_R10m_E46N27_03035_V01_R00.tif  26 of 48 
+[2026-08-14 17:44:15] ...Masking 1 
+[2026-08-14 17:44:16] ...Masking 2 
+[2026-08-14 17:44:18] ...Preparing 
+[2026-08-14 17:44:18] ......converting 100000000 cell centers to lat long 
+[2026-08-14 17:44:35] ......converting FINISHED 100000000 cell centers to lat long 
+[2026-08-14 17:44:36] ... N cells diff is = 0 (should be zero) 
+[2026-08-14 17:44:36] ...group by Geotessera tile 
+[2026-08-14 17:44:40] ...predict 145 tiles 
+[2026-08-14 17:44:40] ... [M]  start pbmclapply | Ncells 0.170 GB | Vcells 3.343 GB 
+[2026-08-14 17:48:05] ...extraction finished 
+[2026-08-14 17:48:06] ... [M]  ......before predict | Ncells 0.170 GB | Vcells 3.343 GB 
+[2026-08-14 17:48:06] ......chunk 1 of 3 
+[2026-08-14 17:48:06] ......reading parquet 

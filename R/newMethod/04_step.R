@@ -17,34 +17,36 @@ createPredRaster <- function(rids,
   fuelConf[rids] <-  pred_prob
   fuel[ rids ] <-  pred_class
   message("Writing ",  terra::varnames(fuel)[[1]] )
-  writeRaster(fuel, sprintf("%sPre/fuelSB_%s.tif", outdir,
+  writeRaster(fuel, sprintf("%s/fuelSB_%s.tif", outdir,
                             substr(terra::varnames(fuel)[[1]], 19,40 ) ),
               datatype="INT1U", overwrite=T)
-  writeRaster(fuelConf, sprintf("%sConfidencePre/fuelSBCL_%s.tif", outdir,
+  writeRaster(fuelConf, sprintf("%sConfidence/fuelSBCL_%s.tif", outdir,
                                 substr(terra::varnames(fuelConf)[[1]], 21,42 ) ),
               datatype="INT1U", overwrite=T)
 
 }
 
-extractAndPredict <- function(ids, path){
 
-  r <- terra::rast(path[[1]])
-  xy <- xy4326[ids,]
-  pts <- sf::sf_project(
-    from = st_crs(4326)$wkt,
-    to   = st_crs(r)$wkt,
-    pts  = xy
-  )
-  dt <- terra::extract(r, pts)
-  chm <- terra::extract(path.CHM$rast.values, xy)[[2]]
-  chm[is.na(chm)] <- 0
-  dt$treeHeight.values <-chm
-  p <- predict(final_model, dt )
-  data.frame(pred_class=max.col(p),
-             pred_prob= apply(p, 1, max)
-             )
-
-}
+# xgb.model.parameters(final_model) <- list(nthread = 1)
+# extractAndPredict <- function(i, ids, path){
+#   # browser()
+#   r <- terra::rast(path[[1]])
+#   xy <- xy4326[ids,c("x","y")]
+#   pts <- sf::sf_project(
+#     from = st_crs(4326)$wkt,
+#     to   = st_crs(r)$wkt,
+#     pts  = xy
+#   )
+#   dt <- terra::extract(r, pts)
+#   chm <- terra::extract(path.CHM$rast.values, xy)[[2]]
+#   chm[is.na(chm)] <- 0
+#   dt$treeHeight.values <-chm
+#   p <- predict(final_model, dt )
+#   data.frame(pred_class=as.integer(max.col(p)),
+#              pred_prob= as.integer(apply(p, 1, max)*100)
+#             )
+#
+# }
 
 extractOnly <- function(i, ids, path){
   r <- terra::rast(path[[1]])
@@ -62,13 +64,11 @@ extractOnly <- function(i, ids, path){
   )
   NULL
 }
-#-------------------------------------------------------#
+#--------------------'''--------------------------------#
 ######################## APPLY MODEL  ##################
-#-------------------------------------------------------#
+#--------------------'''-----------------------------------#
 
-
-
-outdir <- "/archivio/shared/geodati/raster/wildfire/CEfuelMap"
+outdir <- "/archivio/shared/geodati/raster/wildfire/CEfuelMapPre"
 dir.create(outdir, showWarnings = F, recursive = T)
 dir.create(sprintf("%sConfidence",outdir),showWarnings = F, recursive = T)
 setwd(this.path::this.dir())
@@ -137,9 +137,14 @@ for(clcFile in clcFiles){
     next
   }
 
-  if(file.exists(sprintf("%sPre/fuelSB_%s.tif", outdir,
+  # if(grepl("E48N30", basename(clcFile))){
+  #   clcFilesThatIntersect[[basename(clcFile)]]<- clcFile
+  #   break
+  # }
+  if(file.exists(sprintf("%s/fuelSB_%s.tif", outdir,
                          substr(basename(clcFile), 19,40 ) ) )
   ){
+    message("Should not be here")
     next
   }
   clcFilesThatIntersect[[basename(clcFile)]]<- clcFile
@@ -174,46 +179,34 @@ for(clcFile in clcFilesThatIntersect){
     fuel <- terra::rast(rm, vals=98L)
     fuelConf <- terra::rast(rmConf)
 
-    outer <- 1:2
-    while(length(outer)!=0 ){
-      clc.xy <- terra::xyFromCell(rm, clc.ids)
-      message("......", nrow(clc.xy), " cell centers to lat long")
-      xy4326 <- as.data.table(sf::sf_project(
-        from = st_crs(rm)$wkt,
-        to   = st_crs(4326)$wkt,
-        pts  = clc.xy
-      ) )
-      names(xy4326) <- c("x","y")
-      outer <- which(xy4326$x < bbox[[1]] | xy4326$x > bbox[[3]] |
-                       xy4326$y < bbox[[2]] | xy4326$y > bbox[[4]]
-      )
-      if(length(outer)!=0) {
-        clc.ids <- clc.ids[-1*outer]
-      } else {
-        if(length(clc.ids)==0){
-          break
-        }
-        ## here means we get the final data because loop will exit
-        clc.xy <- terra::xyFromCell(rm, clc.ids)
-        message("...", nrow(clc.xy), " cell centers to lat long")
-        xy4326 <- as.data.table(sf::sf_project(
-          from = st_crs(rm)$wkt,
-          to   = st_crs(4326)$wkt,
-          pts  = clc.xy
-        ) )
-        names(xy4326) <- c("x","y")
-        message("......", nrow(clc.xy), "==", nrow(xy4326),
-                " FINAL NUMBER OF cell centers to lat long")
-      }
+    # outer <- 1:2
+    # while(length(outer)!=0 ){
+      # clc.xy <- terra::xyFromCell(rm, clc.ids)
+    message("......converting ", length(clc.ids), " cell centers to lat long")
+    xy4326 <- as.data.table(sf::sf_project(
+      from = st_crs(rm)$wkt,
+      to   = st_crs(4326)$wkt,
+      pts  = terra::xyFromCell(rm, clc.ids)
+    ) )
+    message("......converting FINISHED ", length(clc.ids), " cell centers to lat long")
 
+    names(xy4326) <- c("x","y")
+    outer <- which(xy4326$x < bbox[[1]] | xy4326$x > bbox[[3]] |
+                     xy4326$y < bbox[[2]] | xy4326$y > bbox[[4]] )
+    ## if length outer is zero then all cells are in the box!
+    if(length(outer)!=0) {
+      clc.ids <- clc.ids[-1*outer]
+      xy4326 <- xy4326[-1*outer,]
     }
+
+
 
     if(length(clc.ids)==0){
       message("... no cells falling in study area, will skip")
       next
     }
     message("... N cells diff is = ",
-            nrow(clc.xy) - nrow(xy4326),
+            length(clc.ids) - nrow(xy4326),
             " (should be zero)")
     message("...group by Geotessera tile")
     groups <- xy4326[
@@ -225,15 +218,17 @@ for(clcFile in clcFilesThatIntersect){
       )
     ]
 
+
     message("...predict ", nrow(groups), " tiles")
     # parallel extraction with progress bar pbmc
     if(exists("ll2")) {
       rm(ll2)
     }
     memlog("start pbmclapply")
+
     if(!dir.exists("tmp")) dir.create("tmp", showWarnings = F, recursive = T)
     file.remove(list.files("tmp", pattern = "\\.parquet$", full.names = T))
-    pbmclapply(
+    ll2 <- pbmclapply(
       seq_len(nrow(groups)), function(i)
          {
 
@@ -243,9 +238,9 @@ for(clcFile in clcFilesThatIntersect){
           return( warningCondition( sprintf("Pathpart=%s not found", pathpart) ))
         }
          extractOnly(i, groups$idx[[i]], path )
-         NULL
-     }, mc.cores = 20
-      )
+
+     }, mc.cores = 40
+    )
 
     message("...extraction finished")
     # dt <- rbindlist(ll2)
@@ -263,6 +258,7 @@ for(clcFile in clcFilesThatIntersect){
     nn <- 0
     tot <- ceiling(n/batch_size)
     pred <- list()
+    memlog("......before predict")
     for (start in seq(1, n, by = batch_size)) {
       nn<-nn+1
       message("......chunk ", nn, " of ", tot)
@@ -274,11 +270,11 @@ for(clcFile in clcFilesThatIntersect){
       chm <- terra::extract(path.CHM$rast.values, xy4326Final)[[2]]
       chm[is.na(chm)] <- 0
       fin$treeHeight.values <-chm
-      ids <- fin$id
+      ids <- clc.ids[fin$id]
       fin$id<-NULL
-      memlog("......before predict")
+      message("......predict")
       p <- predict(final_model, fin )
-      memlog("......after predict")
+      # memlog("......after predict")
       pred[[nn]]  <-     data.frame(pred_class=max.col(p),
                               pred_prob= apply(p, 1, max),
                               ids=ids )
@@ -286,17 +282,20 @@ for(clcFile in clcFilesThatIntersect){
     }
 
     memlog("... before removing stuff")
-    rm(list(fin , p, chm))
+    rm(fin)
+    rm(p)
+    rm(chm)
     memlog("... after removing stuff")
 
     pred <- data.table::rbindlist(pred)
+
 
     createPredRaster( pred$ids,
                   fuel,
                   fuelConf,
                   rm,
                   rmConf,
-                  pred$pred_prob,
+                  pred$pred_prob*100,
                   levs[as.integer(pred$pred_class)] )
 
     memlog("... before pred rem")
@@ -305,4 +304,7 @@ for(clcFile in clcFilesThatIntersect){
 
   }
 
-
+system(sprintf("gdalbuildvrt  %s/000_mosaic.vrt %s/*.tif",
+               outdir, outdir) )
+system(sprintf("gdalbuildvrt  %s/000_mosaic.vrt %s/*.tif",
+               sprintf("%sConfidence", outdir),  sprintf("%sConfidence", outdir)) )

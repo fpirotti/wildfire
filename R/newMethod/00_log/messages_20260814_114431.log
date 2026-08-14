@@ -1,0 +1,43 @@
+[2026-08-14 11:44:31] Starting processing 
+[2026-08-14 11:44:31] step 01 
+[2026-08-14 11:44:31] Skipping check in CLC dataset 
+[2026-08-14 11:44:31] Creating VRT 
+[2026-08-14 11:44:32] Creating VRT 
+[2026-08-14 11:44:34] ETH_GlobalCanopyHeight_10m_2020_N45E009_Map.tif 
+[2026-08-14 11:44:34] ETH_GlobalCanopyHeight_10m_2020_N45E009_Map_SD.tif 
+[2026-08-14 11:44:34] ETH_GlobalCanopyHeight_10m_2020_N48E009_Map.tif 
+[2026-08-14 11:44:34] ETH_GlobalCanopyHeight_10m_2020_N48E009_Map_SD.tif 
+[2026-08-14 11:44:34] ETH_GlobalCanopyHeight_10m_2020_N51E009_Map.tif 
+[2026-08-14 11:44:34] ETH_GlobalCanopyHeight_10m_2020_N51E009_Map_SD.tif 
+[2026-08-14 11:44:34] ETH_GlobalCanopyHeight_10m_2020_N45E012_Map.tif 
+[2026-08-14 11:44:34] ETH_GlobalCanopyHeight_10m_2020_N45E012_Map_SD.tif 
+[2026-08-14 11:44:34] ETH_GlobalCanopyHeight_10m_2020_N48E012_Map.tif 
+[2026-08-14 11:44:34] ETH_GlobalCanopyHeight_10m_2020_N48E012_Map_SD.tif 
+[2026-08-14 11:44:34] ETH_GlobalCanopyHeight_10m_2020_N51E012_Map.tif 
+[2026-08-14 11:44:34] ETH_GlobalCanopyHeight_10m_2020_N51E012_Map_SD.tif 
+[2026-08-14 11:44:34] ETH_GlobalCanopyHeight_10m_2020_N45E015_Map.tif 
+[2026-08-14 11:44:34] ETH_GlobalCanopyHeight_10m_2020_N45E015_Map_SD.tif 
+[2026-08-14 11:44:34] ETH_GlobalCanopyHeight_10m_2020_N48E015_Map.tif 
+[2026-08-14 11:44:34] ETH_GlobalCanopyHeight_10m_2020_N48E015_Map_SD.tif 
+[2026-08-14 11:44:34] ETH_GlobalCanopyHeight_10m_2020_N51E015_Map.tif 
+[2026-08-14 11:44:34] ETH_GlobalCanopyHeight_10m_2020_N51E015_Map_SD.tif 
+[2026-08-14 11:44:34] ETH_GlobalCanopyHeight_10m_2020_N45E018_Map.tif 
+[2026-08-14 11:44:34] ETH_GlobalCanopyHeight_10m_2020_N45E018_Map_SD.tif 
+[2026-08-14 11:44:34] ETH_GlobalCanopyHeight_10m_2020_N48E018_Map.tif 
+[2026-08-14 11:44:34] ETH_GlobalCanopyHeight_10m_2020_N48E018_Map_SD.tif 
+[2026-08-14 11:44:34] ETH_GlobalCanopyHeight_10m_2020_N51E018_Map.tif 
+[2026-08-14 11:44:34] ETH_GlobalCanopyHeight_10m_2020_N51E018_Map_SD.tif 
+[2026-08-14 11:44:34] Creating VRT  
+[2026-08-14 11:44:34] ETH Tree height tiles mosaic returned as list with values and SD rasters 
+[2026-08-14 11:44:34] 3  missing Geotessera files - downloading 
+[2026-08-14 11:44:34] Skipping check in GeoTESSERA dataset 
+[2026-08-14 11:44:34] No new tiles downloaded 
+[2026-08-14 11:44:34] GeoTESSERA Map downloaded and tile index provided (tiles are in different CRS) 
+[2026-08-14 11:44:34] Fire Loss Map downloaded 
+[2026-08-14 11:44:34] step 02 
+[2026-08-14 11:44:34] File DT.all does exists, loading... 
+[2026-08-14 11:44:34] step 03 
+[2026-08-14 11:44:34] ################################# 
+[2026-08-14 11:44:34] ############################ 
+[2026-08-14 11:44:34] everything done, Cross validataion and training, model ready!!!! 
+[2026-08-14 11:44:34] step 04 
