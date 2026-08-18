@@ -209,10 +209,19 @@ plotIt <- function(rown=T, title=NA, tile=""){
 
   if(!is.na(title)){
     if(!dir.exists("plots")) dir.create("plots", showWarnings = F)
+    w <- 4 + 0.25 * length(unique(df$vPredsMacro))
+    h <- 4 + 0.25 * length(unique(df$vCLC))
+
     ggsave(
       file.path("plots",
                 sprintf("%s_%s.png", gsub(" ", "_", title),
-                                 titadd) ), p)
+                        titadd) ),
+      p,
+      width = 18,
+      height = h,
+      units = "cm",
+      dpi = 300
+    )
   } else{
     print(p)
   }
