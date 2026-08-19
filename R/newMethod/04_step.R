@@ -10,7 +10,9 @@ createPredRaster <- function(rids,
                           rm,
                           rmConf,
                           pred_prob,
-                          pred_class){
+                          pred_class,
+                          pred_prob2,
+                          pred_class2){
 
   message("Assigning ",  terra::varnames(fuel)[[1]] )
 
@@ -21,6 +23,18 @@ createPredRaster <- function(rids,
                             substr(terra::varnames(fuel)[[1]], 19,40 ) ),
               datatype="INT1U", overwrite=T)
   writeRaster(fuelConf, sprintf("%sConfidence/fuelSBCL_%s.tif", outdir,
+                                substr(terra::varnames(fuelConf)[[1]], 21,42 ) ),
+              datatype="INT1U", overwrite=T)
+
+
+
+  fuelConf[rids] <-  pred_prob2
+  fuel[ rids ] <-  pred_class2
+
+  writeRaster(fuel, sprintf("%s2/fuelSB_%s.tif", outdir,
+                            substr(terra::varnames(fuel)[[1]], 19,40 ) ),
+              datatype="INT1U", overwrite=T)
+  writeRaster(fuelConf, sprintf("%sConfidence2/fuelSBCL_%s.tif", outdir,
                                 substr(terra::varnames(fuelConf)[[1]], 21,42 ) ),
               datatype="INT1U", overwrite=T)
 
@@ -71,6 +85,8 @@ extractOnly <- function(i, ids, path){
 outdir <- "/archivio/shared/geodati/raster/wildfire/CEfuelMapPre"
 dir.create(outdir, showWarnings = F, recursive = T)
 dir.create(sprintf("%sConfidence",outdir),showWarnings = F, recursive = T)
+dir.create(sprintf("%s2",outdir), showWarnings = F, recursive = T)
+dir.create(sprintf("%sConfidence2",outdir),showWarnings = F, recursive = T)
 setwd(this.path::this.dir())
 ## read model ---
 
@@ -260,6 +276,7 @@ for(clcFile in clcFilesThatIntersect){
     pred <- list()
     memlog("......before predict")
     for (start in seq(1, n, by = batch_size)) {
+      browser()
       nn<-nn+1
       message("......chunk ", nn, " of ", tot)
       end <- min(start + batch_size - 1, n)
@@ -275,9 +292,26 @@ for(clcFile in clcFilesThatIntersect){
       message("......predict")
       p <- predict(final_model, fin )
       # memlog("......after predict")
-      pred[[nn]]  <-     data.frame(pred_class=max.col(p),
-                              pred_prob= apply(p, 1, max),
-                              ids=ids )
+      # predo  <-     data.frame(pred_class=max.col(p),
+      #                         pred_prob= apply(p, 1, max),
+      #                         ids=ids )
+
+      p1 <- max.col(p)
+
+      # Replace the maximum with -Inf, then find the second maximum
+      p_tmp <- p
+      p_tmp[cbind(seq_len(nrow(p_tmp)), p1)] <- -Inf
+
+      p2 <- max.col(p_tmp)
+
+      pred[[nn]] <- data.frame(
+        pred_class = p1,
+        pred_prob  = p[cbind(seq_len(nrow(p)), p1)],
+        second_class = p2,
+        second_prob  = p[cbind(seq_len(nrow(p)), p2)],
+        ids = ids
+      )
+
 
     }
 
@@ -296,7 +330,9 @@ for(clcFile in clcFilesThatIntersect){
                   rm,
                   rmConf,
                   pred$pred_prob*100,
-                  levs[as.integer(pred$pred_class)] )
+                  levs[as.integer(pred$pred_class)],
+                  pred$second_prob*100,
+                  levs[as.integer(pred$second_class)] )
 
     memlog("... before pred rem")
     rm(pred)

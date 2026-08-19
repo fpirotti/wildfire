@@ -123,18 +123,18 @@ for(predFile in predFiles){
   finalFuel <- terra::rast(rm, vals=98)
   finalFuelConf <- terra::rast(rm, vals=0)
 
-  tb <- table(vCLC, vPreds)
-  which2keep <- which(rowSums(tb)/sum(tb) > 0.0001)
-  tb <- tb[which2keep, ]
+  tb1 <- table(vCLC, vPreds)
+  which2keep <- which(rowSums(tb1)/sum(tb1) > 0.0001)
+  tb <- tb1[which2keep, ]
   # getTileCode(predFile)
   plotIt(T,title = sprintf("All classes %s", getTileCode(predFile)),
          getTileCode(predFile))
   plotIt(F, title = sprintf("All classes %s", getTileCode(predFile)),
          getTileCode(predFile))
 
-  tb <- table(vCLC, vPredsMacro)
-  which2keep <- which(rowSums(tb)/sum(tb) > 0.0001)
-  tb <- tb[which2keep, ]
+  tb2 <- table(vCLC, vPredsMacro)
+  which2keep2 <- which(rowSums(tb2)/sum(tb2) > 0.0001)
+  tb <- tb2[which2keep2, ]
   # getTileCode(predFile)
   plotIt(T,title = sprintf("Macro classes %s", getTileCode(predFile)),
          getTileCode(predFile))
@@ -152,20 +152,12 @@ plotIt <- function(rown=T, title=NA, tile=""){
     tb_pct <- sweep(tb, 1, rowSums(tb), "/") * 100
     titadd <- "rowWise"
   } else {
-    tb_pct <- sweep(tb, 1, colSums(tb), "/") * 100
+    tb_pct <- sweep(tb, 2, colSums(tb), "/") * 100
     titadd <- "colWise"
   }
   df <- as.data.frame(as.table(tb_pct))
   names(df) <- c("vCLC", "vPredsMacro", "pct")
-  y_labels <- setNames(
-    paste0(
-      "<span style='color:", clcplus_colors[as.integer(rownames(tb_pct))],
-      ";'>",
-      as.character(rownames(tb_pct)),
-      "</span>"
-    ),
-    as.character(rownames(tb_pct))
-  )
+
   p <- ggplot(df, aes(x = vPredsMacro, y = vCLC, fill = pct)) +
     geom_tile(color = "white", linewidth = 0.3) +
     geom_text(
@@ -209,15 +201,15 @@ plotIt <- function(rown=T, title=NA, tile=""){
 
   if(!is.na(title)){
     if(!dir.exists("plots")) dir.create("plots", showWarnings = F)
-    w <- 4 + 0.25 * length(unique(df$vPredsMacro))
-    h <- 4 + 0.25 * length(unique(df$vCLC))
+    w <- 4 + 1 * length(unique(df$vPredsMacro))
+    h <- 4 + 1 * length(unique(df$vCLC))
 
     ggsave(
       file.path("plots",
                 sprintf("%s_%s.png", gsub(" ", "_", title),
                         titadd) ),
       p,
-      width = 18,
+      width = w,
       height = h,
       units = "cm",
       dpi = 300
