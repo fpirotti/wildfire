@@ -276,7 +276,6 @@ for(clcFile in clcFilesThatIntersect){
     pred <- list()
     memlog("......before predict")
     for (start in seq(1, n, by = batch_size)) {
-      browser()
       nn<-nn+1
       message("......chunk ", nn, " of ", tot)
       end <- min(start + batch_size - 1, n)
