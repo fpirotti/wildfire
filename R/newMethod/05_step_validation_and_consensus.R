@@ -1,147 +1,6 @@
 source(file.path(this.path::this.dir(), "00_functions.R"))
 
-
-#-------------------------------------------------------#
-#-------------------------------------------------------#
-#-------------------------------------------------------#
-consensusMatch <- function(rids,
-                          fuel,
-                          fuelConf,
-                          rm,
-                          rmConf,
-                          pred_prob,
-                          pred_class){
-  # CLC=>S&B:  11 => 92, 10 => 98, 9 => 99, 8=>103, 7 => 93,
-  from <- c(1L, 11L, 10L, 9L, 8L, 7L)
-  to   <- c(91L,92L, 98L, 99L, 103L, 93L)
-
-  message("Assigning ",  terra::varnames(fuel)[[1]] )
-
-  length(pred_prob)
-  fuelConf[rids] <-  pred_prob
-  fuel[ rids ] <-  pred_class
-  message("Writing ",  terra::varnames(fuel)[[1]] )
-  writeRaster(fuel, sprintf("%sPre/fuelSB_%s.tif", outdir,
-                            substr(terra::varnames(fuel)[[1]], 19,40 ) ),
-              datatype="INT1U", overwrite=T)
-  writeRaster(fuelConf, sprintf("%sConfidencePre/fuelSBCL_%s.tif", outdir,
-                                substr(terra::varnames(fuelConf)[[1]], 21,42 ) ),
-              datatype="INT1U", overwrite=T)
-  return()
-
-  ## get all the corine values
-  clc <- rm[[1]][rids][,1]
-  ## cross check which belong to the LUT rule-based ones
-  i <- which(clc%in%from)
-
-  clcConf <- rmConf[[1]][rids[i] ][,1]
-
-  iindex <- match(clc[i], from)
-  pred_class[i] <- to[iindex]
-  pred_prob <- pred_prob*100
-  pred_prob[i] <- clcConf
-
-  i <- which(clc%in%from)
-
-  fuelConf[rids] <<-  pred_prob
-  fuel[ rids ] <<-  pred_class
-  ## ASSIGN CLASSES FROM XGBOOST -----
-  # levels(fuel) <- data.frame(
-  #   value = fuel_models$number,
-  #   class = fuel_models$code
-  # )
-
-  coltab(fuel) <- data.frame(value=fuel_models$number, color=fuel_models$hex)
-  message("Writing ",  terra::varnames(fuel)[[1]] )
-  writeRaster(fuel, sprintf("%s/fuelSB_%s.tif", outdir,
-                            substr(terra::varnames(fuel)[[1]], 19,40 ) ),
-              datatype="INT1U", overwrite=T)
-  writeRaster(fuelConf, sprintf("%sConfidence/fuelSBCL_%s.tif", outdir,
-                            substr(terra::varnames(fuelConf)[[1]], 21,42 ) ),
-              datatype="INT1U", overwrite=T)
-}
-
-#-------------------------------------------------------#
-######################## APPLY MODEL  ##################
-#-------------------------------------------------------#
-
-CLCconsensusLUT <- c("1"=91,
-                     "2" = c(16, 18, 20),
-                     "3"=c(16,18,20),
-                     "4"=c(16,18,20),
-                     "5"=3,
-                     "6"=4,
-                     "7"=4,
-                     "9"=4,
-                     "10"=98)
-
-outdir <- "/archivio/shared/geodati/raster/wildfire/CEfuelMap"
-dir.create(outdir, showWarnings = F, recursive = T)
-dir.create(sprintf("%sConfidence",outdir),showWarnings = F, recursive = T)
-setwd(this.path::this.dir())
-## get tilen ---
-getTileCode <- function(name){
-  name<-basename(name)
-  sub(".*_(E[0-9]{2}N[0-9]{2})_.*", "\\1", name)
-}
-## chunk input
-
-clcFiles <- list.files( dirname(terra::sources(path.CLCplus$`Raster Layer`)), full.names = T, pattern="\\.tif$")
-clcFilesConf <- list.files( dirname(terra::sources(path.CLCplus$`Confidence Layer`)), full.names = T, pattern="\\.tif$")
-
-getTileCode(clcFiles)
-
-predFiles <- list.files(paste0(outdir, "Pre"), full.names = T, pattern="\\.tif$")
-predFilesConf <- list.files(paste0(outdir, "PreConfidence"), full.names = T, pattern="\\.tif$")
-studyArea <- terra::vect(geometry |> st_transform(sf::st_crs(terra::rast(predFiles[[1]]))))
-for(predFile in predFiles){
-  if(grepl("E46N30", predFile)) break
-  next
-
-  message(getTileCode(predFile))
-  clcFile <- grep(getTileCode(predFile), clcFiles, value=T)
-  clcFileConf <- grep(getTileCode(predFile), clcFilesConf, value=T)
-  predFileConf <- grep(getTileCode(predFile), predFilesConf, value=T)
-  r <- terra::rast(predFile)
-  rConf <- terra::rast(predFileConf)
-  rm <- terra::mask(r, studyArea)
-  cells.ids <- terra::cells(rm)
-
-  vPreds <- rm[cells.ids][,1]
-  vPredsConf <- rConf[cells.ids][,1]
-
-  rCLC <- terra::rast(clcFile)
-  vCLC <-  rCLC[cells.ids][,1]
-  vPredsF <- vPreds > 100
-  vPredsMacro <- vPreds
-  vPredsMacro[vPredsF] <- trunc(vPreds[vPredsF]/10)
-
-  rCLCconf <- terra::rast(clcFileConf)
-  vCLCconf <- rCLCconf[cells.ids][,1]
-  vCLC.water <- vCLC==10
-  vPredsMacro[vCLC.water] <- 98
-  finalFuel <- terra::rast(rm, vals=98)
-  finalFuelConf <- terra::rast(rm, vals=0)
-
-  tb1 <- table(vCLC, vPreds)
-  which2keep <- which(rowSums(tb1)/sum(tb1) > 0.0001)
-  tb <- tb1[which2keep, ]
-  # getTileCode(predFile)
-  plotIt(T,title = sprintf("All classes %s", getTileCode(predFile)),
-         getTileCode(predFile))
-  plotIt(F, title = sprintf("All classes %s", getTileCode(predFile)),
-         getTileCode(predFile))
-
-  tb2 <- table(vCLC, vPredsMacro)
-  which2keep2 <- which(rowSums(tb2)/sum(tb2) > 0.0001)
-  tb <- tb2[which2keep2, ]
-  # getTileCode(predFile)
-  plotIt(T,title = sprintf("Macro classes %s", getTileCode(predFile)),
-         getTileCode(predFile))
-  plotIt(F, title = sprintf("Macro classes %s", getTileCode(predFile)),
-         getTileCode(predFile))
-}
-
+library(terra)
 
 plotIt <- function(rown=T, title=NA, tile=""){
   library(ggplot2)
@@ -175,7 +34,7 @@ plotIt <- function(rown=T, title=NA, tile=""){
       limits = c(2, 100),
       name = "%", na.value = "#eaeaea"
     ) +
-     scale_y_discrete(limits = rev) +
+    scale_y_discrete(limits = rev) +
     labs(
       x = "Predicted S&B class",
       y = "CLC+ reference class",
@@ -191,10 +50,10 @@ plotIt <- function(rown=T, title=NA, tile=""){
         hjust = 1
       )
       # strip.background = element_rect(fill = "grey90"),
-        # axis.text.y = ggtext::element_markdown(face = "bold",size = 12,
-        #                                        # fill = "black",
-        #                                        padding = unit(c(10, 10, 10, 10), "pt"),
-        #   colour = clcplus_colors[rev(as.integer(rownames(tb_pct)))] )
+      # axis.text.y = ggtext::element_markdown(face = "bold",size = 12,
+      #                                        # fill = "black",
+      #                                        padding = unit(c(10, 10, 10, 10), "pt"),
+      #   colour = clcplus_colors[rev(as.integer(rownames(tb_pct)))] )
     )
 
   # p
@@ -218,5 +77,226 @@ plotIt <- function(rown=T, title=NA, tile=""){
     print(p)
   }
 }
+# CLC+ classes (rows)------
+clc <- c(1, 2, 3, 4, 5, 6, 7, 8,  9, 10, 11)
+
+# Scott & Burgan classes (columns) ----
+sb <- c(91, 92, 98, 99, 10, 12, 14, 16, 18, 20)
+
+specialClassCLC23 <- list(conifer= c(181,183,184,185,188),
+                          broadlvs=c(182,186,186,187,189) )
+# Final S&B class MATRIX ------- 999 means leave as is and skip check - 1 and 2 is LUT for TL
+M <- matrix(c(
+  # 91  92  98  99   10    12    14   16   18   20
+    999, 91, 99, 99, 101,  121,  141, 161, 181,  201,   # CLC 1
+    181,181,181,181, 181,  181,  181, 181,   1,  201,     # CLC 2
+    182,182,182,182, 122,  122,  145, 182,   2,  201,     # CLC 3
+    182,182,182,182, 122,  122,  145, 182,   2,  201,  # CLC 4
+    121,121,121,121, 122,  999,  999, 999, 145,  999,        # CLC 5
+    101,101,101,101, 999,  999, 121,  121, 121,  121,        # CLC 6
+    101,101,101,101, 999,  999, 121,  121, 121,  121,        # CLC 7
+    101,101,101,999, 101,  101, 101,  101, 101,  101,        # CLC 8 lichens and mosses
+    99, 99, 99, 999, 101,  101, 101,  101, 101,  101,         # CLC 9
+    98, 98, 999, 98,  98,   98,  98,   98,   98,  98,         # CLC 10
+    92, 999, 92, 92,  92,   92,  92,   92,   92,  92          # CLC 11
+), nrow = length(clc), byrow = TRUE )
+
+
+CLCplus2023userAccuracy <- list(
+  ALP=c(67, 88.8  , 83.2 , 50, 59.9, 83.2 , 89.1, 81.2, 79.9, 93.7, 80.0),
+  CON=c(72.7, 91.5 , 94.6 , 50, 67.5, 85.5 , 97.5, 81, 45.6, 96.2 , 80),
+  PAN=c(65.5 , 82.1 , 94.3 , 50, 38.6, 73.2 , 98.0, 81, 45.6, 93.8, 80)
+)
+
+consensusMatch <- function(rids,
+                          fuel,
+                          fuelConf,
+                          rm,
+                          rmConf,
+                          pred_prob,
+                          pred_class){
+
+  message("Writing ",  terra::varnames(fuel)[[1]] )
+  writeRaster(fuel, sprintf("%s/fuelSB_%s.tif", outdir,
+                            substr(terra::varnames(fuel)[[1]], 19,40 ) ),
+              datatype="INT1U", overwrite=T)
+  writeRaster(fuelConf, sprintf("%sConfidence/fuelSBCL_%s.tif", outdir,
+                            substr(terra::varnames(fuelConf)[[1]], 21,42 ) ),
+              datatype="INT1U", overwrite=T)
+}
+
+######################## APPLY MODEL  ##################
+
+outdir <- "/archivio/shared/geodati/raster/wildfire/CEfuelMap"
+dir.create(outdir, showWarnings = F, recursive = T)
+dir.create(sprintf("%sConfidence",outdir),showWarnings = F, recursive = T)
+setwd(this.path::this.dir())
+## get tilen ---
+getTileCode <- function(name){
+  name<-basename(name)
+  sub(".*_(E[0-9]{2}N[0-9]{2})_.*", "\\1", name)
+}
+## chunk input
+
+clcFiles <- list.files( dirname(terra::sources(path.CLCplus$`Raster Layer`)), full.names = T, pattern="\\.tif$")
+clcFilesConf <- list.files( dirname(terra::sources(path.CLCplus$`Confidence Layer`)), full.names = T, pattern="\\.tif$")
+
+# getTileCode(clcFiles)
+
+predFiles <- list.files(paste0(outdir, "Pre"), full.names = T, pattern="\\.tif$")
+predFilesConf <- list.files(paste0(outdir, "PreConfidence"), full.names = T, pattern="\\.tif$")
+studyArea <- terra::vect(geometry |> st_transform(sf::st_crs(terra::rast(predFiles[[1]]))))
+stats <- list()
+for(predFile in predFiles){
+  # if(grepl("E46N30", predFile)) break
+  # next
+
+  ## START ----
+  message(getTileCode(predFile))
+  clcFile <- grep(getTileCode(predFile), clcFiles, value=T)
+  clcFileConf <- grep(getTileCode(predFile), clcFilesConf, value=T)
+  predFileConf <- grep(getTileCode(predFile), predFilesConf, value=T)
+  rPredPre <- terra::rast(predFile)
+  rPredConfPre <- terra::rast(predFileConf)
+  rm <- terra::mask(rPredPre, studyArea)
+  ## all ids ----
+  cells.ids <- terra::cells(rm)
+
+  ## all S&B values ----
+  vPreds <- rm[cells.ids][,1]
+  vPredsF <- vPreds > 100
+  vPredsMacro <- vPreds
+  vPredsMacro[vPredsF] <- trunc(vPreds[vPredsF]/10)
+
+  ## all CLC+ values ----
+  rCLC <- terra::rast(clcFile)
+  vCLC <-  rCLC[cells.ids][,1]
+  lutBind <- cbind(vCLC,match(vPredsMacro, sb))
+  names(lutBind)<- NULL
+  lutValues <- M[lutBind]
+  ambigous.ids <-  cells.ids[which(lutValues != vPredsMacro)]
+
+
+  fuel <- terra::rast(rm)
+  fuelConf <- terra::rast(rPredConfPre)
+
+  message(round(length(ambigous.ids)/length(cells.ids)*100), "% ambigous ")
+  ## ids without match ----
+
+  vPredsConf <- rPredConfPre[cells.ids][,1]
+
+
+
+  rCLCconf <- terra::rast(clcFileConf)
+  vCLCconf <-  rCLCconf[cells.ids][,1]
+  vCLCconfWeighted <- vCLCconf[ambigous.ids] * CLCplus2023userAccuracy$CON[vCLC[ambigous.ids]]/10000
+  if(anyNA(vCLCconfWeighted)){
+    warning("NA values in weighted conf")
+  }
+  CLCwins <- vCLCconfWeighted > (vPredsConf[ambigous.ids]/100)
+  ambigous.ids2 <-  ambigous.ids[which(CLCwins)]
+  ambigous.ids2.values <- vCLCconfWeighted[ambigous.ids2]
+  # hist(vCLCconfWeighted)
+  message(round(length(ambigous.ids)/length(cells.ids)*100), "% ambigous ")
+  message(round(length(ambigous.ids2)/length(cells.ids)*100), "% ambigous with confidence > XGBoost ")
+
+  ## make sure CLC+ 2 is conifer-related
+  masks.vCLC.ambig2 <- lapply(1:length(clc), function(i){
+    vCLC[ambigous.ids2]==i
+  })
+  masks.vPreds.ambig2 <- lapply(as.character(sb), function(i){
+    vPredsMacro[ambigous.ids2]==as.integer(i)
+  })
+  names(masks.vPreds.ambig2) <- as.character(sb)
+
+  statsTb<-data.frame(n=length(cells.ids),
+                                             ambigous=length(ambigous.ids)/length(cells.ids)*100,
+                                             ambigousConf=length(ambigous.ids2)/length(cells.ids)*100
+  )
+
+  ## Fix class 1 -----
+  ### Fix class 1 - 98 -----
+  for(clcClass in clc){
+    for(sbClass in sb){
+      colIndex <- which(sbClass==sb)
+      if(M[clcClass,colIndex ]>900){
+        message("CLC Class ",clcClass," and S&B Class ", sbClass, " skipping.")
+        next
+      }
+      if(sbClass== M[clcClass,colIndex ]) {
+        message("CLC Class ",clcClass," and S&B Class ", sbClass, " no change.")
+        next
+      }
+      cname <- sprintf("clc%02d_sb%s",clcClass, sbClass)
+
+      msk <- which(masks.vCLC.ambig2[[clcClass]] & masks.vPreds.ambig2[[as.character(sbClass)]])
+      statsTb[,cname] <- length(msk)/length(ambigous.ids2)*100
+
+      ## special case for class 2 and 3 and 4
+      if(M[clcClass,colIndex ]<10){
+        message("CLC Class ",clcClass," and S&B Class ", sbClass, " going to S&B ",
+                specialClassCLC23[ M[clcClass,colIndex ] ] )
+        message(sprintf("%.2f%%", statsTb[,cname] ))
+        ##  M[clcClass,colIndex ]%%2+1 the modulo is to flip 1 becomes 2 and 2 becomes 1
+        mskExtra <- which(vPreds[ambigous.ids2][msk]%in% specialClassCLC23[ M[clcClass,colIndex ]%%2+1 ][[1]])
+        # browser()
+        statsTb[,cname] <- length(mskExtra)/length(ambigous.ids2)*100
+        if(statsTb[,cname]==0 ){
+          next
+        }
+
+        mtc <- match(vPreds[ambigous.ids2][msk][ mskExtra ], specialClassCLC23[ M[clcClass,colIndex ]%%2+1 ][[1]])
+        vPreds[ambigous.ids2][msk][ mskExtra ] <- specialClassCLC23[ M[clcClass,colIndex ]  ][[1]][mtc]
+
+        # if(length(mskExtra)>0) browser()
+      } else {
+        message("CLC Class ",clcClass," and S&B Class ", sbClass, " going to S&B ", M[clcClass,colIndex ])
+      }
+
+      message(sprintf("%.2f%%", statsTb[,cname] ))
+      if(statsTb[,cname]==0 ){
+        next
+      }
+      vPreds[ambigous.ids2][ msk ] <- M[clcClass,colIndex ]
+    }
+  }
+  # vPreds[ambigous.ids2][ masks.vCLC.ambig2[[1]] & masks.vPreds.ambig2[["98"]]   ] <- 91
+
+  stats[[getTileCode(predFile)]] <- statsTb
+
+  fuel[]     <- vPreds
+  names(fuel)<- varnames(fuel)
+  fuelConf[ambigous.ids2] <- ambigous.ids2.values*100
+  names(fuelConf)<- varnames(fuelConf)
+
+  writeRaster(fuel, sprintf("%s/%s.tif", outdir,
+                            terra::varnames(fuel)[[1]]  ),
+              datatype="INT1U", overwrite=T)
+
+  writeRaster(fuelConf, sprintf("%sConfidence/%s.tif", outdir,
+                                terra::varnames(fuelConf)[[1]] ),
+              datatype="INT1U", overwrite=T)
+
+
+  tb1 <- table(vCLC, vPreds)
+  which2keep <- which(rowSums(tb1)/sum(tb1) > 0.0001)
+  tb <- tb1[which2keep, ]
+  # getTileCode(predFile)
+  plotIt(T,title = sprintf("All classes %s", getTileCode(predFile)),
+         getTileCode(predFile))
+  plotIt(F, title = sprintf("All classes %s", getTileCode(predFile)),
+         getTileCode(predFile))
+
+  tb2 <- table(vCLC, vPredsMacro)
+  which2keep2 <- which(rowSums(tb2)/sum(tb2) > 0.0001)
+  tb <- tb2[which2keep2, ]
+  # getTileCode(predFile)
+  plotIt(T,title = sprintf("Macro classes %s", getTileCode(predFile)),
+         getTileCode(predFile))
+  plotIt(F, title = sprintf("Macro classes %s", getTileCode(predFile)),
+         getTileCode(predFile))
+}
+
+
 
 
