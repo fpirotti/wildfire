@@ -83,9 +83,14 @@ clc <- c(1, 2, 3, 4, 5, 6, 7, 8,  9, 10, 11)
 # Scott & Burgan classes (columns) ----
 sb <- c(91, 92, 98, 99, 10, 12, 14, 16, 18, 20)
 
+# LUT for assigning conifer classes to broadleaves and viceversa to
+# match CLC+ classes 2 and 3
 specialClassCLC23 <- list(conifer= c(181,183,184,185,188),
                           broadlvs=c(182,186,186,187,189) )
-# Final S&B class MATRIX ------- 999 means leave as is and skip check - 1 and 2 is LUT for TL
+# Final S&B class MATRIX ------- 999 means "leave as is" and skip check.
+# - 1 and 2 indicates that LUT for Timber Litter conifer vs broadleaves
+# is to be used (specialClassCLC23)
+
 M <- matrix(c(
   # 91  92  98  99   10    12    14   16   18   20
     999, 91, 99, 99, 101,  121,  141, 161, 181,  201,   # CLC 1
@@ -108,27 +113,6 @@ CLCplus2023userAccuracy <- list(
   PAN=c(65.5 , 82.1 , 94.3 , 50, 38.6, 73.2 , 98.0, 81, 45.6, 93.8, 80)
 )
 
-consensusMatch <- function( ){
-
-  message("Writing ",  terra::varnames(fuel)[[1]] )
-  writeRaster(fuel, sprintf("%s/fuelSB_%s.tif", outdir,
-                            substr(terra::varnames(fuel)[[1]], 19,40 ) ),
-              datatype="INT1U", overwrite=T)
-  writeRaster(fuelConf, sprintf("%sConfidence/fuelSBCL_%s.tif", outdir,
-                            substr(terra::varnames(fuelConf)[[1]], 21,42 ) ),
-              datatype="INT1U", overwrite=T)
-}
-
-writeRasterFuelTIFF <- function( ){
-
-  message("Writing ",  terra::varnames(fuel)[[1]] )
-  writeRaster(fuel, sprintf("%s/fuelSB_%s.tif", outdir,
-                            substr(terra::varnames(fuel)[[1]], 19,40 ) ),
-              datatype="INT1U", overwrite=T)
-  writeRaster(fuelConf, sprintf("%sConfidence/fuelSBCL_%s.tif", outdir,
-                                substr(terra::varnames(fuelConf)[[1]], 21,42 ) ),
-              datatype="INT1U", overwrite=T)
-}
 
 ######################## APPLY MODEL  ##################
 
