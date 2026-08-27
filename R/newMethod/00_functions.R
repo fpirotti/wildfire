@@ -1,27 +1,22 @@
-if (!requireNamespace("pacman", quietly = TRUE)) {
-  install.packages("pacman")
-}
-pacman::p_load(
-  pbmcapply, this.path ,
-  terra, hdar,arrow,
-  sf, data.table, xgboost,
-  parallel, openxlsx,
-  reticulate,
-  dplyr
-)
+
 tmpWd <- getwd()
 setwd(this.path::this.dir())
+
+source(file.path(this.path::this.dir(), "00_globals.R"))
+
 on.exit(parallel:::mccollect(wait = FALSE), add = TRUE)
 
 log_file <-      file.path("00_log", format(Sys.time(), "messages_%Y%m%d_%H%M%S.log"))
 if(!dir.exists("00_log")) dir.create("00_log",showWarnings = F)
+
+
 message <- local({
   old_message <- base::message
 
   function(...) {
     txt <- paste0(...)
     txt <- paste0(
-      format(Sys.time(), "[%Y-%m-%d %H:%M:%S] "),
+      format(Sys.time(), "[%Y-%m-%d %H:%M:%S]  "),
       txt
     )
     old_message(txt)
@@ -50,6 +45,23 @@ memlog <- function(label) {
       m[2, 2] / 1024
     )
   )
+}
+
+
+getCellsIDS<-function(rm){
+  cells.ids_ <- terra::cells(rm)
+  xy4326 <- as.data.table(sf::sf_project(
+    from = st_crs(rm)$wkt,
+    to   = st_crs(4326)$wkt,
+    pts  =  terra::xyFromCell(rm, cells.ids_)
+  ) )
+  names(xy4326) <- c("x","y")
+  outer <- which(xy4326$x < bbox[[1]] | xy4326$x > bbox[[3]] |
+                   xy4326$y < bbox[[2]] | xy4326$y > bbox[[4]] )
+  if(length(outer)!=0) {
+    cells.ids_ <- cells.ids_[-1*outer]
+  }
+  cells.ids_
 }
 
 ## S&B fuel model color tables ----
@@ -437,4 +449,28 @@ prettyPrint <- function(perf, agg=F){
 }
 
 
+
+#--------------------------------------------#
+#-------  write color table -----------------#
+#--------------------------------------------#
+# which(fuel_models$number%in%levs)
+# fuel_modelsPart <- fuel_models[fuel_models$number%in%levs,]
+rgb <- t(col2rgb(fuel_models$hex))
+clr <- data.frame(
+  value = fuel_models$number,
+  R = rgb[, 1],
+  G = rgb[, 2],
+  B = rgb[, 3],
+  A = 255,
+  label = fuel_models$code
+)
+write.table(
+  clr,
+  file.path(outdir, "000_QGIS_fuel_colors.clr"),
+  row.names = FALSE,
+  col.names = FALSE,
+  quote = FALSE,
+  sep = " "
+)
+#------------------------#
 

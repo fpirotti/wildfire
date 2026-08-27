@@ -115,29 +115,7 @@ r <- terra::rast(clcFile)
 poly_rcrs <- st_transform(st_buffer(st_union(by_feature = F, st_buffer(path.TesseraTiles,20,nQuadSegs = 0) ), -40, nQuadSegs = 0), crs(r))
 poly_v <- vect(poly_rcrs)
 
-#--------------------------------------------#
-#-------  write color table -----------------#
-#--------------------------------------------#
-# which(fuel_models$number%in%levs)
-fuel_modelsPart <- fuel_models[fuel_models$number%in%levs,]
-rgb <- t(col2rgb(fuel_modelsPart$hex))
-clr <- data.frame(
-  value = fuel_modelsPart$number,
-  R = rgb[, 1],
-  G = rgb[, 2],
-  B = rgb[, 3],
-  A = 255,
-  label = fuel_modelsPart$code
-)
-write.table(
-  clr,
-  file.path(outdir, "000_QGIS_fuel_colors.clr"),
-  row.names = FALSE,
-  col.names = FALSE,
-  quote = FALSE,
-  sep = " "
-)
-#------------------------#
+
 clcFilesThatIntersect<-list()
 
 message( " Getting only intersecting CLC tiles")

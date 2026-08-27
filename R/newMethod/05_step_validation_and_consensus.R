@@ -108,13 +108,7 @@ CLCplus2023userAccuracy <- list(
   PAN=c(65.5 , 82.1 , 94.3 , 50, 38.6, 73.2 , 98.0, 81, 45.6, 93.8, 80)
 )
 
-consensusMatch <- function(rids,
-                          fuel,
-                          fuelConf,
-                          rm,
-                          rmConf,
-                          pred_prob,
-                          pred_class){
+consensusMatch <- function( ){
 
   message("Writing ",  terra::varnames(fuel)[[1]] )
   writeRaster(fuel, sprintf("%s/fuelSB_%s.tif", outdir,
@@ -122,6 +116,17 @@ consensusMatch <- function(rids,
               datatype="INT1U", overwrite=T)
   writeRaster(fuelConf, sprintf("%sConfidence/fuelSBCL_%s.tif", outdir,
                             substr(terra::varnames(fuelConf)[[1]], 21,42 ) ),
+              datatype="INT1U", overwrite=T)
+}
+
+writeRasterFuelTIFF <- function( ){
+
+  message("Writing ",  terra::varnames(fuel)[[1]] )
+  writeRaster(fuel, sprintf("%s/fuelSB_%s.tif", outdir,
+                            substr(terra::varnames(fuel)[[1]], 19,40 ) ),
+              datatype="INT1U", overwrite=T)
+  writeRaster(fuelConf, sprintf("%sConfidence/fuelSBCL_%s.tif", outdir,
+                                substr(terra::varnames(fuelConf)[[1]], 21,42 ) ),
               datatype="INT1U", overwrite=T)
 }
 
@@ -136,31 +141,44 @@ getTileCode <- function(name){
   name<-basename(name)
   sub(".*_(E[0-9]{2}N[0-9]{2})_.*", "\\1", name)
 }
-## chunk input
+## CLC+ source files  ----
+rootPathCLC <- "/archivio/shared/geodati/raster/CLMS_CLCplus_RASTER_2023/TIFFs"
+rootPathCLCconf <- "/archivio/shared/geodati/raster/CLMS_CLCplus_RASTER_2023confidence/TIFFs"
+clcFiles <- list.files( rootPathCLC, full.names = T, pattern="\\.tif$")
+clcFilesConf <- list.files( rootPathCLCconf, full.names = T, pattern="\\.tif$")
 
-clcFiles <- list.files( dirname(terra::sources(path.CLCplus$`Raster Layer`)), full.names = T, pattern="\\.tif$")
-clcFilesConf <- list.files( dirname(terra::sources(path.CLCplus$`Confidence Layer`)), full.names = T, pattern="\\.tif$")
+## S&B source files from XGBoost ('Pre') ----
+rootPathSBfuelPredictedML <- "/archivio/shared/geodati/raster/wildfire/CEfuelMapPre"
+rootPathSBfuelPredictedMLconf <- "/archivio/shared/geodati/raster/wildfire/CEfuelMapPreConfidence/"
+predFiles <- list.files(rootPathSBfuelPredictedML, full.names = T, pattern="\\.tif$")
+predFilesConf <- list.files(rootPathSBfuelPredictedMLconf, full.names = T, pattern="\\.tif$")
 
-# getTileCode(clcFiles)
-
-predFiles <- list.files(paste0(outdir, "Pre"), full.names = T, pattern="\\.tif$")
-predFilesConf <- list.files(paste0(outdir, "PreConfidence"), full.names = T, pattern="\\.tif$")
+## convert study area boundaries to CRS of S&B ----
 studyArea <- terra::vect(geometry |> st_transform(sf::st_crs(terra::rast(predFiles[[1]]))))
-stats <- list()
-for(predFile in predFiles){
-  # if(grepl("E46N30", predFile)) break
-  # next
 
+
+gc()
+# for(predFile in predFiles){
+  # if(grepl("E43N31", predFile)) break
+  # next
+stats <- pbmclapply(predFiles, function(predFile)
+    {
   ## START ----
+
   message(getTileCode(predFile))
   clcFile <- grep(getTileCode(predFile), clcFiles, value=T)
   clcFileConf <- grep(getTileCode(predFile), clcFilesConf, value=T)
   predFileConf <- grep(getTileCode(predFile), predFilesConf, value=T)
+  if(length(clcFile)!=1 || length(clcFileConf)!=1 || length(predFileConf)!=1){
+    message(getTileCode(predFile), " - Problem with length of CLC or CLCPred or predFileConf")
+    return(NULL)
+  }
   rPredPre <- terra::rast(predFile)
   rPredConfPre <- terra::rast(predFileConf)
   rm <- terra::mask(rPredPre, studyArea)
+
   ## all ids ----
-  cells.ids <- terra::cells(rm)
+  cells.ids <- getCellsIDS(rm)
 
   ## all S&B values ----
   vPreds <- rm[cells.ids][,1]
@@ -168,19 +186,20 @@ for(predFile in predFiles){
   vPredsMacro <- vPreds
   vPredsMacro[vPredsF] <- trunc(vPreds[vPredsF]/10)
 
+
   ## all CLC+ values ----
   rCLC <- terra::rast(clcFile)
   vCLC <-  rCLC[cells.ids][,1]
   lutBind <- cbind(vCLC,match(vPredsMacro, sb))
   names(lutBind)<- NULL
   lutValues <- M[lutBind]
-  ambigous.ids <-  cells.ids[which(lutValues != vPredsMacro)]
+  ambigous.ids <-  cells.ids[which(lutValues != vPredsMacro & lutValues!=999)]
 
 
   fuel <- terra::rast(rm)
   fuelConf <- terra::rast(rPredConfPre)
 
-  message(round(length(ambigous.ids)/length(cells.ids)*100), "% ambigous ")
+  # message(getTileCode(predFile), " - ", round(length(ambigous.ids)/length(cells.ids)*100), "% ambigous ")
   ## ids without match ----
 
   vPredsConf <- rPredConfPre[cells.ids][,1]
@@ -189,6 +208,9 @@ for(predFile in predFiles){
 
   rCLCconf <- terra::rast(clcFileConf)
   vCLCconf <-  rCLCconf[cells.ids][,1]
+
+  gc()
+
   vCLCconfWeighted <- vCLCconf[ambigous.ids] * CLCplus2023userAccuracy$CON[vCLC[ambigous.ids]]/10000
   if(anyNA(vCLCconfWeighted)){
     warning("NA values in weighted conf")
@@ -197,8 +219,8 @@ for(predFile in predFiles){
   ambigous.ids2 <-  ambigous.ids[which(CLCwins)]
   ambigous.ids2.values <- vCLCconfWeighted[ambigous.ids2]
   # hist(vCLCconfWeighted)
-  message(round(length(ambigous.ids)/length(cells.ids)*100), "% ambigous ")
-  message(round(length(ambigous.ids2)/length(cells.ids)*100), "% ambigous with confidence > XGBoost ")
+  message(getTileCode(predFile), " - ", round(length(ambigous.ids)/length(cells.ids)*100), "% ambigous ")
+  message(getTileCode(predFile), " - ", round(length(ambigous.ids2)/length(cells.ids)*100), "% ambigous with CLC+ confidence > XGBoost ")
 
   ## make sure CLC+ 2 is conifer-related
   masks.vCLC.ambig2 <- lapply(1:length(clc), function(i){
@@ -207,54 +229,64 @@ for(predFile in predFiles){
   masks.vPreds.ambig2 <- lapply(as.character(sb), function(i){
     vPredsMacro[ambigous.ids2]==as.integer(i)
   })
+
+
   names(masks.vPreds.ambig2) <- as.character(sb)
 
-  statsTb<-data.frame(n=length(cells.ids),
-                                             ambigous=length(ambigous.ids)/length(cells.ids)*100,
-                                             ambigousConf=length(ambigous.ids2)/length(cells.ids)*100
+  statsTb<-list(n=length(cells.ids),
+                    ambigous=length(ambigous.ids)/length(cells.ids)*100,
+                    ambigousConf=length(ambigous.ids2)/length(cells.ids)*100
   )
 
   ## Fix class 1 -----
   ### Fix class 1 - 98 -----
   for(clcClass in clc){
+    statsTb[[sprintf("%02d",clcClass)]]<-list()
     for(sbClass in sb){
+      statsTb[[sprintf("%02d",clcClass)]][[sprintf("%d",sbClass)]]<-NA
       colIndex <- which(sbClass==sb)
       if(M[clcClass,colIndex ]>900){
-        message("CLC Class ",clcClass," and S&B Class ", sbClass, " skipping.")
+        # message("CLC Class ",clcClass," and S&B Class ", sbClass, " skipping.")
         next
       }
       if(sbClass== M[clcClass,colIndex ]) {
-        message("CLC Class ",clcClass," and S&B Class ", sbClass, " no change.")
+        # message("CLC Class ",clcClass," and S&B Class ", sbClass, " no change.")
         next
       }
       cname <- sprintf("clc%02d_sb%s",clcClass, sbClass)
 
       msk <- which(masks.vCLC.ambig2[[clcClass]] & masks.vPreds.ambig2[[as.character(sbClass)]])
-      statsTb[,cname] <- length(msk)/length(ambigous.ids2)*100
 
+      if(length(msk)==0) {
+        statsTb[[sprintf("%02d",clcClass)]][[sprintf("%d",sbClass)]] <- 0
+        # message(sprintf("None present here"  ))
+        next
+      }
       ## special case for class 2 and 3 and 4
       if(M[clcClass,colIndex ]<10){
-        message("CLC Class ",clcClass," and S&B Class ", sbClass, " going to S&B ",
-                specialClassCLC23[ M[clcClass,colIndex ] ] )
-        message(sprintf("%.2f%%", statsTb[,cname] ))
+        # message("CLC Class ",clcClass," and S&B Class ", sbClass, " going to S&B ",
+        # specialClassCLC23[ M[clcClass,colIndex ] ] )
+
         ##  M[clcClass,colIndex ]%%2+1 the modulo is to flip 1 becomes 2 and 2 becomes 1
         mskExtra <- which(vPreds[ambigous.ids2][msk]%in% specialClassCLC23[ M[clcClass,colIndex ]%%2+1 ][[1]])
         # browser()
-        statsTb[,cname] <- length(mskExtra)/length(ambigous.ids2)*100
-        if(statsTb[,cname]==0 ){
+        if(length(mskExtra)==0) {
+          statsTb[[sprintf("%02d",clcClass)]][[sprintf("%d",sbClass)]] <- 0
+          # message(sprintf("None present here"  ))
           next
         }
-
+        statsTb[[sprintf("%02d",clcClass)]][[sprintf("%d",sbClass)]] <- length(mskExtra)/length(ambigous.ids2)*100
         mtc <- match(vPreds[ambigous.ids2][msk][ mskExtra ], specialClassCLC23[ M[clcClass,colIndex ]%%2+1 ][[1]])
         vPreds[ambigous.ids2][msk][ mskExtra ] <- specialClassCLC23[ M[clcClass,colIndex ]  ][[1]][mtc]
-
-        # if(length(mskExtra)>0) browser()
-      } else {
-        message("CLC Class ",clcClass," and S&B Class ", sbClass, " going to S&B ", M[clcClass,colIndex ])
+        next
       }
 
-      message(sprintf("%.2f%%", statsTb[,cname] ))
-      if(statsTb[,cname]==0 ){
+      # message("CLC Class ",clcClass," and S&B Class ", sbClass, " going to S&B ", M[clcClass,colIndex ])
+
+      statsTb[[sprintf("%02d",clcClass)]][[sprintf("%d",sbClass)]] <- length(msk)/length(ambigous.ids2)*100
+
+      if(statsTb[[sprintf("%02d",clcClass)]][[sprintf("%d",sbClass)]]==0 ){
+        message(getTileCode(predFile), " -  ERRRR - CLC Class ",clcClass," and S&B Class ", sbClass, " going to S&B ", M[clcClass,colIndex ], " Should NOT be here!")
         next
       }
       vPreds[ambigous.ids2][ msk ] <- M[clcClass,colIndex ]
@@ -262,12 +294,13 @@ for(predFile in predFiles){
   }
   # vPreds[ambigous.ids2][ masks.vCLC.ambig2[[1]] & masks.vPreds.ambig2[["98"]]   ] <- 91
 
-  stats[[getTileCode(predFile)]] <- statsTb
-
+  # stats[[getTileCode(predFile)]] <- statsTb
+  # save(stats, file="stats.rda")
   fuel[]     <- vPreds
   names(fuel)<- varnames(fuel)
   fuelConf[ambigous.ids2] <- ambigous.ids2.values*100
   names(fuelConf)<- varnames(fuelConf)
+  coltab(fuel) <- clr[,1:5]
 
   writeRaster(fuel, sprintf("%s/%s.tif", outdir,
                             terra::varnames(fuel)[[1]]  ),
@@ -295,7 +328,15 @@ for(predFile in predFiles){
          getTileCode(predFile))
   plotIt(F, title = sprintf("Macro classes %s", getTileCode(predFile)),
          getTileCode(predFile))
+
+  stats
 }
+ ,
+mc.cores=4
+)
+
+
+
 
 
 
