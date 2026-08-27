@@ -1,14 +1,7 @@
-
-
-#-------------------------------------------------------#
 # MODEL TRAINING ##########################
-#-------------------------------------------------------#
-# source(file.path(this.path::this.dir(), "00_functions.R"))
-#-------------------------------------------------------#
+## run through 00_run.R -----
 ######################## LOAD TRAINING ##################
-#-------------------------------------------------------#
 
-message("#################################")
 
 if( !file.exists("DT.all.parquet")){
   stop("data frame for training not present, DT.all.rda not found - did you run the previous steps?")

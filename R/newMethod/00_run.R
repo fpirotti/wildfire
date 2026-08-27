@@ -1,8 +1,5 @@
-
 message("Starting processing")
 source(file.path(this.path::this.dir(), "00_functions.R"))
-
-message("Starting processing")
 
 
 message("step 01")
