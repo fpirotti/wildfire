@@ -38,3 +38,9 @@ and run the last R file. It will check and apply consensus rules.
 # References
 
 > Kurtchartt et al. 202X - A novel hybrid approach to fuel mapping in Central Europe based on remote sensing foundation model embeddings.
+
+# Acknowledgements 
+
+This work is supported by the Wildfire CE Interreg Project, grant number CE0200934.
+
+![](images/clipboard-259128068.png)
