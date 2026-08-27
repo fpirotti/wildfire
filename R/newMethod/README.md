@@ -43,4 +43,4 @@ and run the last R file. It will check and apply consensus rules.
 
 This work is supported by the Wildfire CE Interreg Project, grant number CE0200934.
 
-![Wildfire CE LOGO](images/clipboard-259128068.png){width="363"}
+<img src=images/clipboard-259128068.png width=320 /> 
