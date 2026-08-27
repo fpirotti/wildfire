@@ -310,7 +310,7 @@ stats <- pbmclapply(predFiles, function(predFile)
   plotIt(F, title = sprintf("Macro classes %s", getTileCode(predFile)),
          getTileCode(predFile))
 
-  stats
+  statsTb
 }
  ,
 mc.cores=8
