@@ -115,8 +115,8 @@ CLCplus2023userAccuracy <- list(
 
 
 ######################## APPLY MODEL  ##################
+## OUTDIR is in 00_globals.R ----
 
-outdir <- "/archivio/shared/geodati/raster/wildfire/CEfuelMap"
 dir.create(outdir, showWarnings = F, recursive = T)
 dir.create(sprintf("%sConfidence",outdir),showWarnings = F, recursive = T)
 setwd(this.path::this.dir())
@@ -276,10 +276,7 @@ stats <- pbmclapply(predFiles, function(predFile)
       vPreds[ambigous.ids2][ msk ] <- M[clcClass,colIndex ]
     }
   }
-  # vPreds[ambigous.ids2][ masks.vCLC.ambig2[[1]] & masks.vPreds.ambig2[["98"]]   ] <- 91
 
-  # stats[[getTileCode(predFile)]] <- statsTb
-  # save(stats, file="stats.rda")
   fuel[]     <- vPreds
   names(fuel)<- varnames(fuel)
   fuelConf[ambigous.ids2] <- ambigous.ids2.values*100
@@ -316,7 +313,7 @@ stats <- pbmclapply(predFiles, function(predFile)
   stats
 }
  ,
-mc.cores=4
+mc.cores=8
 )
 
 

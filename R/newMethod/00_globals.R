@@ -13,6 +13,7 @@ pacman::p_load(
 year <- 2023
 bbox <- c(10.4, 45.6, 17.7, 51.1)
 
+outdir <- "/archivio/shared/geodati/raster/wildfire/CEfuelMap"
 
 lat <- seq(bbox[[2]], bbox[[4]]-0.5, by = 0.5)# north bounds  51.1
 lon <- seq(bbox[[1]], bbox[[3]]-0.1, by = 0.1) # east bounds 17.7
