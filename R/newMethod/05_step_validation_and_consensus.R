@@ -2,16 +2,14 @@ source(file.path(this.path::this.dir(), "00_functions.R"))
 
 library(terra)
 
-plotIt <- function(rown=T, title=NA, tile=""){
-  library(ggplot2)
-  library(RColorBrewer)
-  library(ggtext)
+plotIt <- function(rown=T, title=NA, tile="", tableTB=NA){
+
 
   if(rown) {
-    tb_pct <- sweep(tb, 1, rowSums(tb), "/") * 100
+    tb_pct <- sweep(tableTB, 1, rowSums(tableTB), "/") * 100
     titadd <- "rowWise"
   } else {
-    tb_pct <- sweep(tb, 2, colSums(tb), "/") * 100
+    tb_pct <- sweep(tableTB, 2, colSums(tableTB), "/") * 100
     titadd <- "colWise"
   }
   df <- as.data.frame(as.table(tb_pct))
@@ -150,6 +148,7 @@ stats <- pbmclapply(predFiles, function(predFile)
   ## START ----
 
   message(getTileCode(predFile))
+
   clcFile <- grep(getTileCode(predFile), clcFiles, value=T)
   clcFileConf <- grep(getTileCode(predFile), clcFilesConf, value=T)
   predFileConf <- grep(getTileCode(predFile), predFilesConf, value=T)
@@ -158,6 +157,10 @@ stats <- pbmclapply(predFiles, function(predFile)
     return(NULL)
   }
   rPredPre <- terra::rast(predFile)
+  if( file.exists(sprintf("%s/%s.tif", outdir, terra::varnames(rPredPre)[[1]]  ) ) ){
+    message(getTileCode(predFile), " - EXISTS")
+    return(NULL)
+  }
   rPredConfPre <- terra::rast(predFileConf)
   rm <- terra::mask(rPredPre, studyArea)
 
@@ -294,21 +297,21 @@ stats <- pbmclapply(predFiles, function(predFile)
 
   tb1 <- table(vCLC, vPreds)
   which2keep <- which(rowSums(tb1)/sum(tb1) > 0.0001)
-  tb <- tb1[which2keep, ]
+  tbll <- tb1[which2keep, ]
   # getTileCode(predFile)
   plotIt(T,title = sprintf("All classes %s", getTileCode(predFile)),
-         getTileCode(predFile))
+         getTileCode(predFile), tbll)
   plotIt(F, title = sprintf("All classes %s", getTileCode(predFile)),
-         getTileCode(predFile))
+         getTileCode(predFile), tbll)
 
   tb2 <- table(vCLC, vPredsMacro)
   which2keep2 <- which(rowSums(tb2)/sum(tb2) > 0.0001)
-  tb <- tb2[which2keep2, ]
+  tbl <- tb2[which2keep2, ]
   # getTileCode(predFile)
   plotIt(T,title = sprintf("Macro classes %s", getTileCode(predFile)),
-         getTileCode(predFile))
+         getTileCode(predFile), tbl)
   plotIt(F, title = sprintf("Macro classes %s", getTileCode(predFile)),
-         getTileCode(predFile))
+         getTileCode(predFile), tbl)
 
   statsTb
 }

@@ -7,7 +7,7 @@ pacman::p_load(
   sf, data.table, xgboost,
   parallel, openxlsx,
   reticulate,
-  dplyr
+  dplyr, ggplot2,RColorBrewer,ggtext
 )
 
 year <- 2023
