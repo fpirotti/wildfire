@@ -171,7 +171,6 @@ for(clcFileN in names(clcFilesThatIntersect) ){
       message("Done ", basename(clcFileN))
       next
     }
-    break
     message(basename(clcFile), "  ", i , " of ", length(clcFilesThatIntersect))
     r <- terra::rast(clcFile)
     clcFileConf <- grep( substr(basename(clcFile), 22,34), clcFilesConf, value = T)
@@ -337,9 +336,6 @@ for(clcFileN in names(clcFilesThatIntersect) ){
 
     memlog("... before pred rem")
     rm(pred)
-    rm(rm)
-    rm(ids)
-    # rm(rmss)
     memlog("... after pred rem")
 
   }
