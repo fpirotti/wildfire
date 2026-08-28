@@ -12,9 +12,9 @@ message("step 03")
 # source("03_step.R")
 ## CREATES FUEL MAP  ----
 message("step 04")
-# source("04_step.R")
+ source("04_step.R")
 ## CREATES FUEL MAP  ----
 message("step 05")
-source("05_step_validation_and_consensus.R")
+# source("05_step_validation_and_consensus.R")
 
 

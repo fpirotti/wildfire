@@ -170,17 +170,23 @@ stats <- pbmclapply(predFiles, function(predFile)
   ## all S&B values ----
   vPreds <- rm[cells.ids][,1]
   vPredsF <- vPreds > 100
-  vPredsMacro <- vPreds
-  vPredsMacro[vPredsF] <- trunc(vPreds[vPredsF]/10)
+  vPredsMacro <- as.integer(vPreds)
+  vPredsMacro[vPredsF] <- as.integer(trunc(vPreds[vPredsF]/10))
 
 
   ## all CLC+ values ----
   rCLC <- terra::rast(clcFile)
   vCLC <-  rCLC[cells.ids][,1]
-  lutBind <- cbind(vCLC,match(vPredsMacro, sb))
+  ## lutBind is a 2 column dataframe with index of rows in matrix and index of
+  ## columns in matrix M
+  lutBind <- cbind(vCLC, match(vPredsMacro, sb))
   names(lutBind)<- NULL
   lutValues <- M[lutBind]
-  ambigous.ids <-  cells.ids[which(lutValues != vPredsMacro & lutValues!=999)]
+
+  ## NB ambigous.indexes are the indexes of the cells.ids! Not the IDs
+  # ambigous.ids <-  cells.ids[which(lutValues != vPredsMacro & lutValues!=999)]
+  ambigous.indexes  <-  lutValues != vPredsMacro & lutValues!=999
+  ambigous.ids <-  cells.ids[ambigous.indexes]
 
 
   fuel <- terra::rast(rm)
@@ -189,7 +195,9 @@ stats <- pbmclapply(predFiles, function(predFile)
   # message(getTileCode(predFile), " - ", round(length(ambigous.ids)/length(cells.ids)*100), "% ambigous ")
   ## ids without match ----
 
-  vPredsConf <- rPredConfPre[cells.ids][,1]
+  rmConf <- terra::mask(rPredConfPre, studyArea)
+  cells.ids.comf <- getCellsIDS(rmConf)
+  vPredsConf <- rmConf[cells.ids][,1]
 
 
 
@@ -198,23 +206,27 @@ stats <- pbmclapply(predFiles, function(predFile)
 
   gc()
 
-  vCLCconfWeighted <- vCLCconf[ambigous.ids] * CLCplus2023userAccuracy$CON[vCLC[ambigous.ids]]/10000
+  vCLCconfWeighted <- vCLCconf[ambigous.indexes] * CLCplus2023userAccuracy$CON[vCLC[ambigous.indexes]]/10000
   if(anyNA(vCLCconfWeighted)){
     warning("NA values in weighted conf")
   }
-  CLCwins <- vCLCconfWeighted > (vPredsConf[ambigous.ids]/100)
-  ambigous.ids2 <-  ambigous.ids[which(CLCwins)]
-  ambigous.ids2.values <- vCLCconfWeighted[ambigous.ids2]
+  CLCwins <- vCLCconfWeighted > (vPredsConf[ambigous.indexes]/100)
+  ambigous.indexes2 <-  ambigous.indexes & CLCwins
+  ambigous.ids2 <-  ambigous.ids[ambigous.indexes2]
+  ambigous.ids2.values <- vCLCconfWeighted[CLCwins]
   # hist(vCLCconfWeighted)
   message(getTileCode(predFile), " - ", round(length(ambigous.ids)/length(cells.ids)*100), "% ambigous ")
   message(getTileCode(predFile), " - ", round(length(ambigous.ids2)/length(cells.ids)*100), "% ambigous with CLC+ confidence > XGBoost ")
 
   ## make sure CLC+ 2 is conifer-related
   masks.vCLC.ambig2 <- lapply(1:length(clc), function(i){
-    vCLC[ambigous.ids2]==i
+    if(anyNA(vCLC[ambigous.indexes2])){
+      browser()
+    }
+    vCLC[ambigous.indexes2]==i
   })
   masks.vPreds.ambig2 <- lapply(as.character(sb), function(i){
-    vPredsMacro[ambigous.ids2]==as.integer(i)
+    vPredsMacro[ambigous.indexes2]==as.integer(i)
   })
 
 
@@ -320,7 +332,7 @@ mc.cores=8
 )
 
 
-
+names(stats) <- getTileCode(basename(predFiles))
 
 
 

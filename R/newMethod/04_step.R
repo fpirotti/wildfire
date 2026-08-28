@@ -5,10 +5,10 @@ source(file.path(this.path::this.dir(), "00_functions.R"))
 #-------------------------------------------------------#
 #-------------------------------------------------------#
 createPredRaster <- function(rids,
-                          fuel,
-                          fuelConf,
-                          rm,
-                          rmConf,
+                          # fuel,
+                          # fuelConf,
+                          clcFile_,
+                          clcFileConf_,
                           pred_prob,
                           pred_class,
                           pred_prob2,
@@ -16,8 +16,13 @@ createPredRaster <- function(rids,
 
   message("Assigning ",  terra::varnames(fuel)[[1]] )
 
+  fuel <- terra::rast(terra::rast(clcFile_) )
+  fuelConf <- terra::rast(terra::rast(clcFileConf_))
+
   fuelConf[rids] <-  pred_prob
   fuel[ rids ] <-  pred_class
+  coltab(fuel) <- clr[,1:5]
+
   message("Writing ",  terra::varnames(fuel)[[1]] )
   writeRaster(fuel, sprintf("%s/fuelSB_%s.tif", outdir,
                             substr(terra::varnames(fuel)[[1]], 19,40 ) ),
@@ -27,9 +32,12 @@ createPredRaster <- function(rids,
               datatype="INT1U", overwrite=T)
 
 
+  fuel <- terra::rast(terra::rast(clcFile_) )
+  fuelConf <- terra::rast(terra::rast(clcFileConf_))
 
   fuelConf[rids] <-  pred_prob2
   fuel[ rids ] <-  pred_class2
+  coltab(fuel) <- clr[,1:5]
 
   writeRaster(fuel, sprintf("%s2/fuelSB_%s.tif", outdir,
                             substr(terra::varnames(fuel)[[1]], 19,40 ) ),
@@ -38,6 +46,7 @@ createPredRaster <- function(rids,
                                 substr(terra::varnames(fuelConf)[[1]], 21,42 ) ),
               datatype="INT1U", overwrite=T)
 
+  NULL
 }
 
 
@@ -62,9 +71,10 @@ createPredRaster <- function(rids,
 #
 # }
 
-extractOnly <- function(i, ids, path){
+extractOnly <- function(i, ids, path, xy){
+
   r <- terra::rast(path[[1]])
-  xy <- xy4326[ids,]
+
   pts <- sf::sf_project(
     from = st_crs(4326)$wkt,
     to   = st_crs(r)$wkt,
@@ -76,6 +86,8 @@ extractOnly <- function(i, ids, path){
     out,
     sprintf("tmp/result_%05d.parquet", i)
   )
+  rm(out)
+  rm(pts)
   NULL
 }
 #--------------------'''--------------------------------#
@@ -139,6 +151,7 @@ for(clcFile in clcFiles){
                          substr(basename(clcFile), 19,40 ) ) )
   ){
     message("Should not be here")
+    clcFilesThatIntersect[[basename(clcFile)]]<- TRUE
     next
   }
   clcFilesThatIntersect[[basename(clcFile)]]<- clcFile
@@ -148,16 +161,24 @@ if(length(clcFilesThatIntersect)==0){
   stop("Problem, no CLC Files found  !")
 }
 message( length(clcFilesThatIntersect), " CLC tiles to process found")
+
+clcFilesThatIntersect <- clcFilesThatIntersect[order(names(clcFilesThatIntersect))]
 i <- 0
-for(clcFile in clcFilesThatIntersect){
-   i <- i + 1
+for(clcFileN in names(clcFilesThatIntersect) ){
+    clcFile<- clcFilesThatIntersect[[clcFileN]]
+    i <- i + 1
+    if(clcFile==T){
+      message("Done ", basename(clcFileN))
+      next
+    }
+    break
     message(basename(clcFile), "  ", i , " of ", length(clcFilesThatIntersect))
     r <- terra::rast(clcFile)
     clcFileConf <- grep( substr(basename(clcFile), 22,34), clcFilesConf, value = T)
     if(length(clcFileConf)!=1){
       stop(paste0(length(clcFileConf), " clcFileConf files... should be one only") )
     }
-    rConf <- terra::rast(clcFileConf)
+    # rConf <- terra::rast(clcFileConf)
     # remove partially covered parts
     message("...Masking 1")
     rm <- terra::mask(r, poly_v)
@@ -167,11 +188,11 @@ for(clcFile in clcFilesThatIntersect){
       message(basename(clcFile), "  NOT interecting really, skipping... ")
       next
     }
-    message("...Masking 2")
-    rmConf<- terra::mask(rConf, poly_v)
-    message("...Preparing")
-    fuel <- terra::rast(rm, vals=98L)
-    fuelConf <- terra::rast(rmConf)
+    # message("...Masking 2")
+    # rmConf<- terra::mask(rConf, poly_v)
+    # message("...Preparing")
+    # fuel <- terra::rast(rm)
+    # fuelConf <- terra::rast(rmConf)
 
     # outer <- 1:2
     # while(length(outer)!=0 ){
@@ -214,28 +235,25 @@ for(clcFile in clcFilesThatIntersect){
 
 
     message("...predict ", nrow(groups), " tiles")
-    # parallel extraction with progress bar pbmc
-    if(exists("ll2")) {
-      rm(ll2)
-    }
+
     memlog("start pbmclapply")
 
     if(!dir.exists("tmp")) dir.create("tmp", showWarnings = F, recursive = T)
-    file.remove(list.files("tmp", pattern = "\\.parquet$", full.names = T))
+    file.remove(list.files("tmp", pattern = "\\.parquet$", full.names = T) )
     ll2 <- pbmclapply(
       seq_len(nrow(groups)), function(i)
          {
 
         path <- grep(sprintf("%.2f_%.2f", groups$lon[i], groups$lat[i]), path.TesseraTiles$location, value = T)
+        #
+        # if(length(path)==0){
+        #   return( warningCondition( sprintf("Pathpart=%s not found", pathpart) ))
+        # }
+         extractOnly(i, groups$idx[[i]], path,  xy =xy4326[groups$idx[[i]],] )
 
-        if(length(path)==0){
-          return( warningCondition( sprintf("Pathpart=%s not found", pathpart) ))
-        }
-         extractOnly(i, groups$idx[[i]], path )
-
-     }, mc.cores = 40
+     }, mc.cores = 30
     )
-
+    rm(ll2)
     message("...extraction finished")
     # dt <- rbindlist(ll2)
 
@@ -295,17 +313,23 @@ for(clcFile in clcFilesThatIntersect){
     memlog("... before removing stuff")
     rm(fin)
     rm(p)
+    rm(p1)
+    rm(p2)
     rm(chm)
+    rm(clc.ids, p_tmp)
+    rm(xy4326, groups)
+    rm(xy4326Final, groups)
+    rm(ids)
     memlog("... after removing stuff")
 
     pred <- data.table::rbindlist(pred)
 
 
     createPredRaster( pred$ids,
-                  fuel,
-                  fuelConf,
-                  rm,
-                  rmConf,
+                  # fuel,
+                  # fuelConf,
+                  clcFile,
+                  clcFileConf,
                   pred$pred_prob*100,
                   levs[as.integer(pred$pred_class)],
                   pred$second_prob*100,
@@ -313,6 +337,9 @@ for(clcFile in clcFilesThatIntersect){
 
     memlog("... before pred rem")
     rm(pred)
+    rm(rm)
+    rm(ids)
+    # rm(rmss)
     memlog("... after pred rem")
 
   }
