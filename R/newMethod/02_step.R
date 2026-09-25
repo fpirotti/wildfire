@@ -145,6 +145,9 @@ ggplot(ac, aes(distance, correlation)) +
     y = "Binary indicator correlation"
   ) + theme_bw()
 }
+
+
+
 extractAndPredict2 <- function(ids, path){
 
   r <- terra::rast(path[[1]])
@@ -154,14 +157,24 @@ extractAndPredict2 <- function(ids, path){
     to   = st_crs(r)$wkt,
     pts  = xy
   )
+  pts3035 <- sf::sf_project(
+    from = st_crs(4326)$wkt,
+    to   = st_crs(3035)$wkt,
+    pts  = xy
+  )
   dt <- terra::extract(r, pts)
   if(sum(is.na(dt[,1]))>0){
-    cat(path, file="output.log", append = T, sep="\n")
+    # browser()
+    cat( paste(path, " (NAs=",sum(is.na(dt[,1])), ")"), file="output.log", append = T, sep="\n")
     cat(capture.output(print(xy[1:10,])), file="output.log", append = T, sep="\n")
   }
   chm <- terra::extract(path.CHM$rast.values, as.matrix(xy) )[[1]]
+  clc <- terra::extract(path.CLCplus$`Raster Layer`, pts3035 )[[1]]
+
   chm[is.na(chm)] <- 0
   dt$treeHeight.values <-chm
+
+  dt$CLCclass <- clc
   dt$class <- clc.values[ ids ]
 
   dt
@@ -226,21 +239,33 @@ extractTrainAndValidationData <- function(force=F){
   trainers <- list(
     terra::rast("validation/WildfireCE_Fuel_map_validation_DE-CZ_CzechGlobe_model.tif"),
     terra::rast("validation/WildfireCE_Fuel_map_validation_AT-CZ_CzechGlobe_model.tif"),
-    terra::rast("validation/carinthia_forest_fuel_3416.tif"),
-    terra::rast("validation/thayatal_forest_fuel_3416.tif")
+    terra::rast("validation/fuel_model_carinthia.tif"),
+    terra::rast("validation/fuel_model_thayatal.tif")
+    # terra::rast("validation/carinthia_forest_fuel_3416.tif"),
+    # terra::rast("validation/thayatal_forest_fuel_3416.tif")
   )
 
   trainers.vals <- list()
   cat( as.character(Sys.time()) , file="output.log", sep="\n")
   for(trainer in trainers){
-
+    # mr <- mean(res(trainer))
+    # if(mr<20){
+      message("Aggregating")
+    trainer2 <- terra::aggregate(trainer, fact=3, fun=sd )
+    # trn <- trainer2==0
+    trainer2[trainer2[]!=0] <- NA
+    plot(trn)
+    # }
+    # next
+    # trainer30m <- terra::aggregate()
     trainern <- terra::sources(trainer)
     message(basename(trainern))
     cat( "#####################", file="output.log", sep="\n", append=T)
     cat( basename(trainern) , file="output.log", sep="\n", append=T)
-    clc.ids <- terra::cells(trainer)
-    clc.values <-  trainer[[1]][clc.ids][,1]
-    clc.xy <- terra::xyFromCell(trainer, clc.ids)
+    clc.ids <- terra::cells(trainer2)
+    clc.xy <- terra::xyFromCell(trainer2, clc.ids)
+    clc.ids.pre <- terra::cellFromXY(trainer, clc.xy)
+    clc.values <-  trainer[[1]][clc.ids.pre][,1]
     xy4326 <- as.data.table(sf::sf_project(
       from = st_crs(trainer)$wkt,
       to   = st_crs(4326)$wkt,
@@ -260,12 +285,13 @@ extractTrainAndValidationData <- function(force=F){
     ]
 
     message(nrow(groups))
+    ll2<-list()
     # ll2 <- pbmclapply(
-    ll2 <- pbmclapply(
-      # for( i in
-           seq_len(nrow(groups)),
-       function(i)
-        {
+    for( i in
+       seq_len(nrow(groups)) ) { #,
+       # function(i)
+        # {
+      message(i)
         pathpart <- sprintf("%.2f_%.2f", groups$lon[i], groups$lat[i])
         path <- grep(pathpart, path.TesseraTiles$location, value = T)
         if(length(path)!=1){
@@ -273,28 +299,33 @@ extractTrainAndValidationData <- function(force=F){
         }
         out <- extractAndPredict2(groups$idx[[i]], path[[1]] )
         out$latTile <- trunc(groups$lat[[i]]*10)
-        out
+        ll2[[i]] <- out
       }
-      ,
-      mc.cores = 20
-    )
-    tt <- data.table::rbindlist(ll2)
-    trainers.vals[[basename(trainern)]] <- tt
+    #   ,
+    #   mc.cores = 12
+    # )
 
+    trainers.vals[[basename(trainern)]] <- data.table::rbindlist(ll2)
   }
 
-  save(trainers.vals, file="extractTrainAndValidationData.rda")
+  save(trainers.vals, file="extractTrainAndValidationData2.rda")
   trainers.vals
 }
 
 if(!file.exists("DT.all.parquet")){
   message("File DT.all does not exist, creating...")
-  DT <- extractTrainAndValidationData(T)
+  if(!file.exists("extractTrainAndValidationData2.rda")){
+    DT <- extractTrainAndValidationData(T)
+  } else {
+    load("extractTrainAndValidationData2.rda")
+    DT <- trainers.vals
+  }
   DT.all <-  data.table::rbindlist(DT)
+  rm(DT)
+  gc()
   DT.all <-  na.omit(DT.all)
   # for(ii in 1:129) message(sum(is.na(DT.all[,..ii])))
-  DT.all$class <- as.factor(DT.all$class)
-  DT.all$macro.class<- NULL
+  # DT.all$macro.class<- NULL
   arrow::write_parquet(DT.all, "DT.all.parquet")
   # DT.all <- arrow::read_parquet( "DT.all.parquet")
   # length(DT.all$class)
@@ -303,6 +334,9 @@ if(!file.exists("DT.all.parquet")){
 
 message("File DT.all does exists, loading...")
 DT.all <- arrow::read_parquet( "DT.all.parquet")
+DT.all$class <- as.factor(DT.all$class)
+DT.all$CLCclass <- NULL
+
 #########################################################
 ######################## SAMPLE TESSERA ON TRAINING ##################
 #########################################################
@@ -311,8 +345,10 @@ DT.all <- arrow::read_parquet( "DT.all.parquet")
 
 
 plotsNmatrices  <- function(){
-  mat <- table( trunc(DT.all$class/10),
-                DT.all$clc.values  )
+  DT.all$class <- as.factor(DT.all$class)
+  sbClasses <- trunc(as.integer(as.character(as.factor(DT.all$class)))/10)
+  mat <- table( sbClasses,
+                DT.all$CLCclass  )
 
 
 
@@ -326,12 +362,13 @@ plotsNmatrices  <- function(){
   library(ggplot2)
 
   DT.all$treeHeight.values[ is.na(DT.all$treeHeight.values) ] <- 0
-  DT.all$macro.class <- factor( trunc((DT.all$class/10)),
-                             levels=sort(unique(trunc(as.numeric(DT.all$class/10)))),
+  DT.all$macro.class <- factor(sbClasses,
+                             levels=sort(unique(trunc(as.numeric(sbClasses)))),
                              labels=c("NB", "GR", "GS", "SH", "TU", "TL", "SB")
   )
+
   DT.all$clc.values <- factor(
-    DT.all$clc.values,
+    DT.all$CLCclass,
     levels = 1:11,
     labels = levels(clc_classes)
   )
@@ -347,7 +384,7 @@ plotsNmatrices  <- function(){
       legend.position = "none"
     )
 
-  ggsave("violin.png", plot = p1, width = 9, dpi = 300)
+  ggsave("violin2.png", plot = p1, width = 9,height = 6, dpi = 300)
   plot_data <- DT.all |>
     # filter(class != 142) |>
     group_by(macro.class, clc.values) |>
@@ -376,7 +413,7 @@ plotsNmatrices  <- function(){
     ) +
     theme(axis.text.x = element_text(angle = 45, hjust = 1))
 
-  ggsave("a.png", plot = p2, width = 9, dpi = 300)
+  ggsave("a2.png", plot = p2, width = 9, height=5, dpi = 300)
 
 }
 

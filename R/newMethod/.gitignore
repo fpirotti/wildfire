@@ -2,6 +2,8 @@ tmp/
 plots/
 00_log/
 DT.all.parquet
+extractTrainAndValidationData2.rda
+extractTrainAndValidationData.rda
 classification_report.xlsx
 classification_report2.xlsx
 model
@@ -10,5 +12,6 @@ unionTessera.gpkg
 validation
 xgb_cv.rds
 xgb_cv_cuda.rds
+xgb_cv_cudaOld.rds
 xgb_final.model
 06_geotesseraRemoteSample.R

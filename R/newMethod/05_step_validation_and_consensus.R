@@ -111,6 +111,17 @@ CLCplus2023userAccuracy <- list(
   PAN=c(65.5 , 82.1 , 94.3 , 50, 38.6, 73.2 , 98.0, 81, 45.6, 93.8, 80)
 )
 
+SBuserAccuracy <- c("91"=0.7075,
+                    "92"=0.9999, ##snow ice
+                    "98"=0.8187,
+                    "99"=0.4727,
+                    "10"=0.881,
+                    "12"=0.709,
+                    "14"=0.695,
+                    "16"=0.669,
+                    "18"=0.860,
+                    "20"=0.660)
+
 
 ######################## APPLY MODEL  ##################
 ## OUTDIR is in 00_globals.R ----
@@ -141,14 +152,18 @@ studyArea <- terra::vect(geometry |> st_transform(sf::st_crs(terra::rast(predFil
 
 gc()
 # for(predFile in predFiles){
-  # if(grepl("E43N31", predFile)) break
-  # next
+# if(grepl("E46N30", predFile)) break
+# next
+# }
 stats <- pbmclapply(predFiles, function(predFile)
     {
   ## START ----
 
   message(getTileCode(predFile))
-
+  if( any(grepl(getTileCode(predFile), list.files(outdir, pattern="\\.tif$"))) ){
+    message(getTileCode(predFile), " - EXISTS")
+    # return(NULL)
+  }
   clcFile <- grep(getTileCode(predFile), clcFiles, value=T)
   clcFileConf <- grep(getTileCode(predFile), clcFilesConf, value=T)
   predFileConf <- grep(getTileCode(predFile), predFilesConf, value=T)
@@ -157,10 +172,7 @@ stats <- pbmclapply(predFiles, function(predFile)
     return(NULL)
   }
   rPredPre <- terra::rast(predFile)
-  if( file.exists(sprintf("%s/%s.tif", outdir, terra::varnames(rPredPre)[[1]]  ) ) ){
-    message(getTileCode(predFile), " - EXISTS")
-    return(NULL)
-  }
+
   rPredConfPre <- terra::rast(predFileConf)
   rm <- terra::mask(rPredPre, studyArea)
 
@@ -177,16 +189,16 @@ stats <- pbmclapply(predFiles, function(predFile)
   ## all CLC+ values ----
   rCLC <- terra::rast(clcFile)
   vCLC <-  rCLC[cells.ids][,1]
-  ## lutBind is a 2 column dataframe with index of rows in matrix and index of
+  ## matrix.indexes.per.pixel is a 2 column dataframe with index of rows in matrix and index of
   ## columns in matrix M
-  lutBind <- cbind(vCLC, match(vPredsMacro, sb))
-  names(lutBind)<- NULL
-  lutValues <- M[lutBind]
+  matrix.indexes.per.pixel <- cbind(vCLC, match(vPredsMacro, sb))
+  colnames(matrix.indexes.per.pixel)<- c("rows.clcplus","cols.sb")
+  lutValues <- M[matrix.indexes.per.pixel]
 
-  ## NB ambigous.indexes are the indexes of the cells.ids! Not the IDs
+  ## NB cells.ids.ambigous.mask are the indexes of the cells.ids! Not the IDs
   # ambigous.ids <-  cells.ids[which(lutValues != vPredsMacro & lutValues!=999)]
-  ambigous.indexes  <-  lutValues != vPredsMacro & lutValues!=999
-  ambigous.ids <-  cells.ids[ambigous.indexes]
+  cells.ids.ambigous.mask  <-  lutValues != vPredsMacro & lutValues!=999
+  # ambigous.ids <-  cells.ids[cells.ids.ambigous.mask]
 
 
   fuel <- terra::rast(rm)
@@ -195,52 +207,66 @@ stats <- pbmclapply(predFiles, function(predFile)
   # message(getTileCode(predFile), " - ", round(length(ambigous.ids)/length(cells.ids)*100), "% ambigous ")
   ## ids without match ----
 
-  rmConf <- terra::mask(rPredConfPre, studyArea)
-  cells.ids.comf <- getCellsIDS(rmConf)
-  vPredsConf <- rmConf[cells.ids][,1]
+  # rmConf <- rPredConfPre[] #terra::mask(rPredConfPre, studyArea)
+  # cells.ids.comf <- getCellsIDS(rmConf)
+  vPredsConf <- rPredConfPre[cells.ids][,1]
 
 
 
   rCLCconf <- terra::rast(clcFileConf)
   vCLCconf <-  rCLCconf[cells.ids][,1]
 
-  gc()
+  # gc()
 
-  vCLCconfWeighted <- vCLCconf[ambigous.indexes] * CLCplus2023userAccuracy$CON[vCLC[ambigous.indexes]]/10000
+  vCLCconfWeighted <- (vCLCconf/100) * (CLCplus2023userAccuracy$CON[vCLC]/100)
   if(anyNA(vCLCconfWeighted)){
-    warning("NA values in weighted conf")
+    stop("NA values in weighted conf")
   }
-  CLCwins <- vCLCconfWeighted > (vPredsConf[ambigous.indexes]/100)
-  ambigous.indexes2 <-  ambigous.indexes & CLCwins
-  ambigous.ids2 <-  ambigous.ids[ambigous.indexes2]
-  ambigous.ids2.values <- vCLCconfWeighted[CLCwins]
-  # hist(vCLCconfWeighted)
-  message(getTileCode(predFile), " - ", round(length(ambigous.ids)/length(cells.ids)*100), "% ambigous ")
-  message(getTileCode(predFile), " - ", round(length(ambigous.ids2)/length(cells.ids)*100), "% ambigous with CLC+ confidence > XGBoost ")
 
-  ## make sure CLC+ 2 is conifer-related
-  masks.vCLC.ambig2 <- lapply(1:length(clc), function(i){
-    if(anyNA(vCLC[ambigous.indexes2])){
-      browser()
-    }
-    vCLC[ambigous.indexes2]==i
-  })
-  masks.vPreds.ambig2 <- lapply(as.character(sb), function(i){
-    vPredsMacro[ambigous.indexes2]==as.integer(i)
-  })
+  vPredsConfWeighted <- vPredsConf/100 * as.numeric(SBuserAccuracy)[matrix.indexes.per.pixel[,2]]
+  if(anyNA(vPredsConfWeighted)){
+    stop("NA values in weighted conf")
+  }
 
+  # head(matrix.indexes.per.pixel)
+  message(getTileCode(predFile), " - ", round(sum(cells.ids.ambigous.mask)/length(cells.ids)*100), "% ambigous ")
 
-  names(masks.vPreds.ambig2) <- as.character(sb)
+  CLCwins <- vCLCconfWeighted > vPredsConfWeighted
 
-  statsTb<-list(n=length(cells.ids),
-                    ambigous=length(ambigous.ids)/length(cells.ids)*100,
-                    ambigousConf=length(ambigous.ids2)/length(cells.ids)*100
+  statsTb<-list(tile=getTileCode(predFile),
+                n=length(cells.ids),
+                ambigous=sum(cells.ids.ambigous.mask)/length(cells.ids)*100
   )
+
+  cells.ids.ambigous.mask <-  cells.ids.ambigous.mask & CLCwins
+
+  statsTb$ambigousConfHigherCLC <- sum(cells.ids.ambigous.mask)/length(cells.ids)*100
+
+  if(anyNA(cells.ids.ambigous.mask)){
+    stop("NA values in weighted conf")
+  }
+
+  # hist(vCLCconfWeighted)
+  message(getTileCode(predFile), " - ", round(sum(cells.ids.ambigous.mask)/length(cells.ids)*100), "% ambigous with CLC+ confidence > XGBoost ")
+
+  ## attenzione, sono gli cells.ids! che NON corrispondono agli indices
+  which.cells.ids.are.ambigous <-  cells.ids[cells.ids.ambigous.mask]
+  ## attenzione, gli indices
+  which.indices.are.ambigous <-  which(cells.ids.ambigous.mask)
+
+
+  clcMsk <- vCLC[cells.ids.ambigous.mask]
+  sbMsk  <- vPredsMacro[cells.ids.ambigous.mask]
+
+  key <- (clcMsk - 1L) * 1000 + sbMsk
+
+  msks <- split(which.indices.are.ambigous, key)
 
   ## Fix class 1 -----
   ### Fix class 1 - 98 -----
   for(clcClass in clc){
     statsTb[[sprintf("%02d",clcClass)]]<-list()
+    message(getTileCode(predFile), " - CLC Class ",clcClass)
     for(sbClass in sb){
       statsTb[[sprintf("%02d",clcClass)]][[sprintf("%d",sbClass)]]<-NA
       colIndex <- which(sbClass==sb)
@@ -252,9 +278,10 @@ stats <- pbmclapply(predFiles, function(predFile)
         # message("CLC Class ",clcClass," and S&B Class ", sbClass, " no change.")
         next
       }
+
       cname <- sprintf("clc%02d_sb%s",clcClass, sbClass)
 
-      msk <- which(masks.vCLC.ambig2[[clcClass]] & masks.vPreds.ambig2[[as.character(sbClass)]])
+      msk <- msks[[as.character((clcClass - 1L) * 1000 + sbClass)]]
 
       if(length(msk)==0) {
         statsTb[[sprintf("%02d",clcClass)]][[sprintf("%d",sbClass)]] <- 0
@@ -267,34 +294,51 @@ stats <- pbmclapply(predFiles, function(predFile)
         # specialClassCLC23[ M[clcClass,colIndex ] ] )
 
         ##  M[clcClass,colIndex ]%%2+1 the modulo is to flip 1 becomes 2 and 2 becomes 1
-        mskExtra <- which(vPreds[ambigous.ids2][msk]%in% specialClassCLC23[ M[clcClass,colIndex ]%%2+1 ][[1]])
-        # browser()
+        mskExtra <- vPreds[msk] %in% specialClassCLC23[ M[clcClass,colIndex ]%%2+1 ][[1]]
+
         if(length(mskExtra)==0) {
           statsTb[[sprintf("%02d",clcClass)]][[sprintf("%d",sbClass)]] <- 0
           # message(sprintf("None present here"  ))
           next
         }
-        statsTb[[sprintf("%02d",clcClass)]][[sprintf("%d",sbClass)]] <- length(mskExtra)/length(ambigous.ids2)*100
-        mtc <- match(vPreds[ambigous.ids2][msk][ mskExtra ], specialClassCLC23[ M[clcClass,colIndex ]%%2+1 ][[1]])
-        vPreds[ambigous.ids2][msk][ mskExtra ] <- specialClassCLC23[ M[clcClass,colIndex ]  ][[1]][mtc]
+        statsTb[[sprintf("%02d",clcClass)]][[sprintf("%d",sbClass)]] <- sum(mskExtra)/length(which.indices.are.ambigous)*100
+        mtc <- match(vPreds[msk][ mskExtra ], specialClassCLC23[ M[clcClass,colIndex ]%%2+1 ][[1]])
+        tryCatch(
+          {
+            vPreds[msk][mskExtra] <-
+              specialClassCLC23[M[clcClass, colIndex]][[1]][mtc]
+            vPredsConf[msk][mskExtra] <- ((1-vPredsConf[msk][mskExtra]/100) * (vCLCconf[msk][mskExtra]/100))*100
+          },
+          warning = function(w) {
+            browser()
+            NULL
+          }
+        )
         next
       }
 
       # message("CLC Class ",clcClass," and S&B Class ", sbClass, " going to S&B ", M[clcClass,colIndex ])
 
-      statsTb[[sprintf("%02d",clcClass)]][[sprintf("%d",sbClass)]] <- length(msk)/length(ambigous.ids2)*100
+      statsTb[[sprintf("%02d",clcClass)]][[sprintf("%d",sbClass)]] <- length(msk)/length(which.indices.are.ambigous)*100
 
       if(statsTb[[sprintf("%02d",clcClass)]][[sprintf("%d",sbClass)]]==0 ){
         message(getTileCode(predFile), " -  ERRRR - CLC Class ",clcClass," and S&B Class ", sbClass, " going to S&B ", M[clcClass,colIndex ], " Should NOT be here!")
         next
       }
-      vPreds[ambigous.ids2][ msk ] <- M[clcClass,colIndex ]
+      # if(is.element(153, cells.ids[cells.ids.ambigous.mask][msk] )) {
+      #   message("HERE")
+      #   browser()
+      # }
+      # suppressWarnings({
+        vPreds[ msk ] <- M[clcClass,colIndex ]
+        vPredsConf[msk] <- ((1-vPredsConf[msk]/100) * (vCLCconf[msk]/100))*100
+      # })
     }
   }
 
-  fuel[]     <- vPreds
+  fuel[cells.ids]     <- vPreds
   names(fuel)<- varnames(fuel)
-  fuelConf[ambigous.ids2] <- ambigous.ids2.values*100
+  fuelConf[cells.ids] <- vPredsConf
   names(fuelConf)<- varnames(fuelConf)
   coltab(fuel) <- clr[,1:5]
 
@@ -331,6 +375,18 @@ stats <- pbmclapply(predFiles, function(predFile)
 mc.cores=8
 )
 
+id<-153
+
+idx<-which(ambigous.ids==id)
+
+cat("S&B predicted:",vPreds[id],
+      "Confid=", vPredsConf[id], "%",
+      "\nWeighted Conf=", vPredsConfWeighted[idx],
+      " (Weight=", SBuserAccuracy[matrix.indexes.per.pixel[idx,2]],
+      ") \n CLC CLass:", vCLC[id],
+    "\n CLC conf", vCLCconf[id],
+    "\n Weighted Conf=", vCLCconfWeighted[idx]
+)
 
 names(stats) <- getTileCode(basename(predFiles))
 

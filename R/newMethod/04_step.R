@@ -14,10 +14,10 @@ createPredRaster <- function(rids,
                           pred_prob2,
                           pred_class2){
 
-  message("Assigning ",  terra::varnames(fuel)[[1]] )
 
   fuel <- terra::rast(terra::rast(clcFile_) )
   fuelConf <- terra::rast(terra::rast(clcFileConf_))
+  message("Assigning ",  terra::varnames(fuel)[[1]] )
 
   fuelConf[rids] <-  pred_prob
   fuel[ rids ] <-  pred_class
@@ -252,8 +252,16 @@ for(clcFileN in names(clcFilesThatIntersect) ){
 
      }, mc.cores = 30
     )
+    nt <- Filter( function(X){!is.null(X)}, ll2)
+    if(length(nt)!=0){
+      message("Problem here!")
+      for(err in nt){
+        message(err)
+      }
+    }
     rm(ll2)
-    message("...extraction finished")
+    rm(groups)
+    memlog("......extraction finished")
     # dt <- rbindlist(ll2)
 
     files <- list.files(
@@ -316,8 +324,8 @@ for(clcFileN in names(clcFilesThatIntersect) ){
     rm(p2)
     rm(chm)
     rm(clc.ids, p_tmp)
-    rm(xy4326, groups)
-    rm(xy4326Final, groups)
+    rm(xy4326, xy4326Final)
+
     rm(ids)
     memlog("... after removing stuff")
 

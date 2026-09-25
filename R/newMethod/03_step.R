@@ -11,6 +11,8 @@ if(!exists("DT.all")){
   DT.all <- arrow::read_parquet( "DT.all.parquet" )
   message("imported parquet")
 }
+DT.all$class <- as.factor(DT.all$class)
+DT.all$CLCclass <- NULL
 
 y <- "class"
 x <- setdiff(colnames(DT.all), c(y, "latTile"))
@@ -26,7 +28,8 @@ params <- list(
   colsample_bylevel = 0.6,
   min_child_weight = 20,
   lambda = 100,
-  device="cuda"
+  device="cuda",
+  max_bin = 128 ## otherwise the RTX ADA runs out of memory
 )
 runCV <- function(){
 
